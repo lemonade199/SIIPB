@@ -1,68 +1,73 @@
 # SIIPB (Sistem Informasi Inventaris dan Peminjaman Barang)
 
-Sistem Informasi Inventaris dan Peminjaman Barang berbasis web dengan fokus pada integritas data transaksi, kontrol hak akses berbasis peran (RBAC), idempotency notifikasi email, dan audit trail menyeluruh.
+Sistem Informasi Inventaris dan Peminjaman Barang berbasis web dengan arsitektur monorepo terpadu, mendukung integrasi mulus antara tim **Frontend** dan **Backend**.
 
 ---
 
-## 🛠️ Tech Stack & Database Architecture
+## 📁 Struktur Repositori (Monorepo)
 
-- **Language / Runtime:** Python 3.12
-- **ORM / Migrations:** SQLAlchemy 2.0 (Modern 2.x declarative syntax), Alembic 1.13+
-- **Database:** MariaDB 13 (InnoDB Engine, `utf8mb4`, `utf8mb4_unicode_ci`)
-- **Driver:** PyMySQL 1.1+
+```text
+SIIPB/
+├── backend/                  # 🐍 Backend API Service (Flask 3.0 & SQLAlchemy 2.x)
+│   ├── app/                  # Application Factory, Models, & REST Blueprints
+│   ├── alembic/              # Database Migrations
+│   ├── scripts/              # Seed data & verification scripts
+│   ├── run.py                # Development server runner (Port 5000)
+│   └── README.md             # Panduan lengkap backend developer
+│
+├── frontend/                 # ⚛️ Frontend UI Workspace (React / Vue / Vite / Next.js)
+│   ├── .env.example          # Konfigurasi endpoint API klien
+│   └── README.md             # Panduan integrasi tim frontend
+│
+├── database/                 # 🗄️ Database Schema & DDL
+│   ├── SIIPB.sql             # MariaDB 13 Full Database Dump (26 Tabel)
+│   └── README.md             # Dokumentasi skema & panduan restore manual
+│
+├── docs/                     # 📚 Dokumentasi Teknis & Kontrak
+│   ├── api_specification.md  # Spesifikasi REST API Kontrak Frontend <-> Backend
+│   └── architecture.md       # Diagram arsitektur sistem & integrasi
+│
+├── .gitignore                # Global gitignore (Virtualenv, .env, caches)
+└── README.md                 # Dokumentasi utama proyek
+```
 
 ---
 
-## 📌 Karakteristik & Desain Skema (26 Tabel)
+## 🚀 Quick Start untuk Tim Pengembang
 
-1. **Peminjam Tanpa Akun (`borrowers`):** Peminjam hanya tercatat sebagai master data dan tidak memiliki username/password/login.
-2. **RBAC Dinamis (`users`, `roles`, `permissions`, `user_roles`, `role_permissions`):** Role tidak di-hardcode ke permission.
-3. **Autentikasi Aman (`refresh_tokens`, `external_identities`):** Refresh token disimpan dalam bentuk hash SHA-256 (`token_hash`), OAuth OIDC menggunakan `(provider, provider_subject)`.
-4. **Hierarki Organisasi & Lokasi (`organizational_units`, `locations`):** Mendukung relasi multi-level (Gedung > Lantai > Ruangan, Sekolah > Unit/Jurusan).
-5. **Integritas Status Barang (`assets`, `asset_history`):** Status barang dikunci oleh database CHECK constraints (`TERSEDIA`, `DIPINJAM`, `RUSAK`, `RUSAK_BERAT`, `DALAM_PERBAIKAN`, `HILANG`, `NONAKTIF`). Perubahan status tercatat secara *append-only* di `asset_history`.
-6. **Transaksi Peminjaman & Pengembalian (`borrowings`, `borrowing_items`, `returns`, `return_items`):** Mendukung pengembalian parsial dan proteksi `ON DELETE RESTRICT` agar riwayat transaksi tidak dapat terhapus.
-7. **Laporan Kerusakan & Kehilangan (`damage_reports`, `loss_reports`):** Siklus perbaikan barang rusak memiliki tracking terpisah dengan status perbaikan dan estimasi biaya non-negatif.
-8. **Idempotent Notifications (`notification_events`, `notifications`, `notification_logs`, `email_deliveries`):** Idempotency dijamin oleh database constraint `UNIQUE(borrowing_id, event_code)`. Scheduler aman dieksekusi berkali-kali tanpa duplikasi pengiriman.
-9. **Audit Trail & Konfigurasi (`audit_logs`, `system_settings`):** Snapshot perubahan data disimpan dalam kolom format JSON tervalidasi (`json_valid`).
-
----
-
-## 🚀 Panduan Setup & Instalasi Lokal
-
-### 1. Prasyarat
-- Python 3.12+
-- MariaDB Server 10.11+ / 13.0+
-
-### 2. Virtual Environment & Dependensi
+### 1. Menjalankan Backend API
 ```bash
+cd backend
 python -m venv .venv
-.\.venv\Scripts\activate  # Windows
+.\.venv\Scripts\activate      # Windows
 pip install -r requirements.txt
-```
 
-### 3. Konfigurasi Lingkungan (`.env`)
-Salin berkas template konfigurasi:
-```bash
-cp .env.example .env
-```
-Sesuaikan `DATABASE_URL` di dalam file `.env`:
-```env
-DATABASE_URL=mariadb+pymysql://USER:PASSWORD@127.0.0.1:3306/siipb?charset=utf8mb4
-```
-
-### 4. Eksekusi Migrasi Database
-```bash
+# Siapkan database & migrasi
+cp .env.example .env          # Sesuaikan DATABASE_URL di .env
 alembic upgrade head
-```
 
-### 5. Validasi & Pengujian Skema Otomatis
-Jalankan test suite integritas skema (12 skenario pengujian):
-```bash
-python scripts/verify_schema.py
-```
+# Isi data simulasi untuk frontend
+python scripts/seed_data.py
 
-### 6. Impor Langsung Dump SQL (Alternatif)
-Dump lengkap skema database tersedia di dalam folder [database/](file:///c:/SIIPB/database):
-```bash
-mariadb -u root -p siipb < database/SIIPB.sql
+# Jalankan server
+python run.py
 ```
+Backend API aktif di `http://localhost:5000/api` (CORS otomatis aktif untuk port frontend lokal).
+
+### 2. Mengembangkan Frontend
+1. Masuk ke direktori `frontend/`.
+2. Arahkan base URL API ke `http://localhost:5000/api`.
+3. Konsumsi endpoint yang telah disediakan sesuai dokumen [docs/api_specification.md](docs/api_specification.md).
+
+---
+
+## 📌 Ringkasan Skema Database (26 Tabel)
+
+- **RBAC Dinamis:** `users`, `roles`, `permissions`, `user_roles`, `role_permissions`
+- **Autentikasi:** `refresh_tokens` (SHA-256 hash), `external_identities` (OAuth/OIDC)
+- **Master Data:** `organizational_units`, `locations`, `categories`, `borrowers` (**Peminjam tanpa akun**)
+- **Inventaris:** `assets` (CHECK status & kondisi), `asset_history` (Append-only)
+- **Transaksi:** `borrowings`, `borrowing_items`, `returns`, `return_items` (**ON DELETE RESTRICT**)
+- **Insiden:** `damage_reports` (Repair lifecycle), `loss_reports`
+- **Notifikasi Idempotent:** `notification_events` (`UNIQUE(borrowing, event)`), `notifications`, `notification_logs`, `email_deliveries`
+- **Audit & Konfigurasi:** `audit_logs` (JSON snapshot), `system_settings`
