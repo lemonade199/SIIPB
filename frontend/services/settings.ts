@@ -72,3 +72,16 @@ export function shiftDemoDays(shift: number | 'reset', runAfter: boolean, userId
   }
   return null;
 }
+
+/** Ubah label/keterangan parameter status atau kondisi (master data). Kode tidak dapat diubah. */
+export function updateParameter(kind: 'item_status' | 'condition', code: string, label: string, desc: string) {
+  const errors: Record<string, string> = {};
+  if (!label.trim()) errors.label = 'Wajib diisi.';
+  if (Object.keys(errors).length) return { ok: false as const, errors };
+  const group = db.data.settings.parameters[kind] as Record<string, { label: string; desc: string }>;
+  const old = { ...group[code] };
+  group[code] = { label: label.trim(), desc: desc.trim() };
+  audit('settings.parameter', 'settings', null, { kode: code, ...old }, { kode: code, ...group[code] });
+  db.save();
+  return { ok: true as const };
+}

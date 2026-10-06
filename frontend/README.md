@@ -1,62 +1,93 @@
 # SIIPB — Frontend (Next.js + React + TypeScript)
 
-Konversi mockup HTML/JS SIIPB ke **Next.js 16 (App Router) + React 19 + TypeScript (strict) + Tailwind CSS v4**, dengan komponen bergaya shadcn/ui dan ikon `lucide-react`. Semua halaman, alur, aturan bisnis, dan RBAC dari mockup sudah dipindahkan.
+Frontend SIIPB sesuai dokumen *Plan SIIPB Scrum*: **Next.js 16 (App Router) + React 19 + TypeScript (strict) + Tailwind CSS v4 + shadcn/ui** (Radix UI + class-variance-authority, ikon lucide-react). Semua halaman, alur, aturan bisnis, dan RBAC dari mockup sudah dipindahkan, dan frontend dapat berjalan **tanpa backend (mode mock)** atau **terhubung ke Flask REST API (mode api)**.
 
 ## Menjalankan
 
 ```bash
 cd frontend
 npm install
-npm run dev        # http://localhost:3000
-npm run build && npm start   # mode production
-npm run lint
+npm run dev                      # http://localhost:3000 (mode mock, bawaan)
 ```
 
-Akun demo: `admin / admin123`, `petugas / petugas123`, `pimpinan / pimpinan123`.
+| Mode | Cara | Data |
+|---|---|---|
+| `mock` (bawaan) | `NEXT_PUBLIC_DATA_SOURCE=mock` | Data contoh di browser (localStorage) — untuk demo & Sprint Review |
+| `api` | `NEXT_PUBLIC_DATA_SOURCE=api` + `NEXT_PUBLIC_API_BASE_URL=http://localhost:5000/api/v1` | Flask REST API, login JWT backend |
 
-## Struktur (sesuai bagian 14 dokumen Plan)
+Salin `.env.example` menjadi `.env` lalu atur nilainya. Variabel `NEXT_PUBLIC_*` dibaca saat build, jadi jalankan ulang `npm run dev` / `npm run build` setelah mengubahnya.
+
+Akun demo (mode mock): `admin / admin123`, `petugas / petugas123`, `pimpinan / pimpinan123`.
+Akun mode api: akun hasil `backend/scripts/seed_data.py` (`admin / admin123`, `petugas / petugas123`).
+
+### Perintah lain
+
+```bash
+npm run build && npm start   # production
+npm run build:api            # build mode api
+npm run lint                 # ESLint
+npm run typecheck            # TypeScript
+npm test                     # Vitest (unit, aturan bisnis, mapper API, komponen)
+npm run test:e2e             # Playwright (UI) — membangun & menjalankan app otomatis
+E2E_API=1 npm run test:e2e   # Playwright integrasi API (backend harus berjalan, build mode api)
+```
+
+## Struktur (dokumen Plan bagian 14)
 
 ```
 frontend/
 ├── app/
-│   ├── layout.tsx              # root: FeedbackProvider (toast/confirm) + DataProvider
-│   ├── page.tsx                # redirect ke halaman awal sesuai role
-│   ├── login/                  # login lokal + simulasi SSO OIDC
-│   └── (app)/                  # area terautentikasi (AppShell: sidebar, topbar, RBAC per rute)
-│       ├── dashboard/  inventaris/[id]/ubah  inventaris/baru
-│       ├── peminjaman/[id]/ubah  peminjaman/baru
-│       ├── pengembalian/[id]  pengembalian/baru
-│       ├── monitoring/  notifikasi/  qr/  laporan/
-│       ├── master/[tab]/  pengguna/  audit/  pengaturan/  profil/
+│   ├── layout.tsx            # FeedbackProvider (toast/confirm) + DataProvider
+│   ├── page.tsx              # redirect ke halaman awal sesuai role
+│   ├── login/                # login lokal / JWT backend + SSO OIDC
+│   └── (app)/                # area terautentikasi: dashboard, inventaris, peminjaman, pengembalian,
+│                             #   monitoring, notifikasi, qr, laporan, master/[tab], pengguna, audit, pengaturan, profil
 ├── components/
-│   ├── ui/          # Button, Card, Badge, Field/Input/Select, Modal, Tabs, Pager, QrCode, Icon …
-│   ├── layout/      # AppShell, Sidebar, Topbar
-│   ├── domain/      # ItemForm, BorrowForm, EmailPreview, BorrowBadge/DueText
-│   └── providers/   # DataProvider, FeedbackProvider (useToast, useConfirm)
-├── lib/             # date, utils, file (CSV/unduh/foto), constants, navigation (menu + izin rute)
-│   └── mock/        # db.ts (store localStorage reaktif) + seed.ts (data contoh)
-├── services/        # aturan bisnis: auth, inventory, borrowing, return, notification,
-│   │                #   scheduler, dashboard, report, master, users, settings, backup, audit
-│   └── api/         # HTTP client Flask REST API /api/v1 (JWT + refresh) & endpoint bertipe
-├── hooks/           # useAuth/useCan, useDbVersion, usePersistentState, useTitle
-└── types/           # tipe domain (kontrak data frontend ↔ backend)
+│   ├── ui/                   # shadcn/ui: button, badge, card, input, label, checkbox/switch, dialog, tabs, form, qr-code …
+│   ├── layout/               # AppShell (RBAC per rute), Sidebar, Topbar
+│   ├── domain/               # ItemForm, BorrowForm, PhotoGallery/Editor, EmailPreview, status transaksi
+│   └── providers/            # DataProvider, FeedbackProvider
+├── lib/                      # date, utils, file, export (Excel .xlsx & PDF), constants, navigation, config
+│   └── mock/                 # db.ts (store reaktif), seed.ts, defaults.ts (pengaturan, parameter, migrasi)
+├── services/                 # aturan bisnis per modul (mode mock) + repo.ts (pintu mutasi untuk halaman)
+│   └── api/                  # client.ts (JWT + refresh), endpoints.ts (DTO), sync.ts (adapter mode api)
+├── hooks/                    # useAuth/useCan, useDbVersion, usePersistentState, useTitle
+├── types/                    # tipe domain
+└── tests/                    # unit/ (Vitest) & e2e/ (Playwright)
 ```
 
-## Lapisan data
+## Arsitektur data
 
-- **Sekarang (mockup fungsional):** `services/*` menjalankan aturan bisnis di atas `lib/mock/db.ts` (localStorage). Setiap `db.save()` memicu render ulang lewat `useSyncExternalStore`, sehingga UI selalu sinkron.
-- **Integrasi backend:** `services/api/client.ts` sudah menangani envelope `{ success, message, data, meta, errors }`, header `Authorization: Bearer`, dan refresh token otomatis. `services/api/endpoints.ts` memetakan endpoint yang tersedia di `backend/app/routes` (auth, assets, borrowings, returns, master, notifications, dashboard, audit-logs). Atur base URL di `.env`:
+- Halaman membaca store (`lib/mock/db.ts`) secara sinkron dan dirender ulang otomatis lewat `useSyncExternalStore`.
+- Semua **mutasi** lewat `services/repo.ts`:
+  - mode mock → layanan lokal di `services/*` (aturan bisnis lengkap di browser);
+  - mode api → endpoint Flask (`services/api/endpoints.ts`), lalu cache disegarkan dari server (`services/api/sync.ts`).
+- `lib/config.ts` (`CAPABILITIES`) menyembunyikan fitur yang belum punya endpoint backend, sehingga UI tidak menjanjikan data yang tidak tersimpan.
 
-  ```
-  NEXT_PUBLIC_API_BASE_URL=http://localhost:5000/api/v1
-  ```
+### Cakupan mode api (diverifikasi terhadap backend yang berjalan)
 
-  Langkah integrasi per modul: ganti pemanggilan fungsi di `services/<modul>.ts` dengan pemanggilan `services/api/endpoints.ts` (disarankan dibungkus TanStack Query), lalu petakan DTO backend (`inventory_code`, `name`, …) ke tipe di `types/`.
-  Catatan: backend belum menyediakan endpoint untuk pengguna/role, pengaturan, laporan, scheduler manual, dan QR — modul tersebut tetap memakai adapter mock sampai endpoint-nya tersedia.
+| Fitur | Endpoint | Status |
+|---|---|---|
+| Login, sesi, logout, refresh token | `/auth/login`, `/auth/me`, `/auth/logout`, `/auth/refresh` | ✅ |
+| Inventaris: daftar, tambah, ubah, aktif/nonaktif, foto utama, riwayat | `/assets`, `/assets/{id}`, `/assets/{id}/history`, `/assets/{id}/upload-photo` | ✅ |
+| Master: peminjam (tambah/ubah/nonaktif/hapus); kategori, lokasi, unit (tambah) | `/borrowers`, `/categories`, `/locations`, `/organizational-units` | ✅ |
+| Peminjaman (checkout langsung) & pengembalian (rusak/hilang → laporan kerusakan/kehilangan) | `/borrowings`, `/returns` | ✅ |
+| Notifikasi (riwayat, kirim ulang), audit log | `/notifications`, `/audit-logs` | ✅ |
+| Dashboard, monitoring, laporan, QR | dihitung di frontend dari data API | ✅ |
+| Pengguna/role, pengaturan, template, draf peminjaman, ubah status manual, jalankan scheduler | belum ada endpoint | ⏸️ disembunyikan / disimpan lokal |
 
-## Catatan teknis
+### Temuan di backend (tidak diubah — di luar lingkup frontend)
 
-- RBAC dua lapis di antarmuka: menu/tombol disembunyikan per permission, dan `lib/navigation.ts` menolak rute (tampilan 403) bila izin tidak cukup.
-- QR dibuat lokal dengan pustaka `qrcode` (SVG) — tidak lagi bergantung CDN, berfungsi offline.
-- Filter & pencarian daftar dipertahankan saat berpindah halaman (`usePersistentState`).
-- Cetak bukti/label/laporan memakai CSS `@media print` (PDF via "Simpan sebagai PDF").
+1. `POST/PUT /assets` dengan `purchase_date` → error 500 (`serialize_asset` memanggil `.isoformat()` pada string). Data tetap tersimpan, tetapi respons gagal. Karena itu tahun perolehan tidak dikirim pada mode api.
+2. `GET /notifications/templates` → error 500 (`NotificationTemplate` tidak punya atribut `channel`).
+3. Endpoint di dokumen bagian 11 berbeda dengan implementasi: `/items` ↔ `/assets`; belum ada `/users`, `/borrowings/{id}/checkout`, `/notifications/{id}/read`, `/dashboard/overdue`, `/dashboard/statistics`.
+4. Respons notifikasi belum menyertakan `borrowing_id`, jadi notifikasi dikaitkan ke transaksi terbaru peminjam.
+
+## Catatan fitur
+
+- **Parameter status & kondisi** (Master Data → Status & Kondisi): label & keterangan dapat diubah, kode tetap karena terikat aturan bisnis.
+- **Monitoring** mencakup tab *Rusak / hilang* (RUSAK, RUSAK_BERAT, DALAM_PERBAIKAN, HILANG).
+- **Foto barang**: hingga 5 foto per barang (`item_photos`), foto pertama = foto utama. Mode api: 1 foto (`photo_path`).
+- **Laporan**: unduh **Excel .xlsx** (ExcelJS: header, autofilter, format Rupiah) dan **PDF** (jsPDF: A4 lanskap, kop, nomor halaman, tanda tangan), plus cetak.
+- **QR** dibuat lokal (`qrcode`, SVG) — tetap berfungsi offline; pemindaian lewat keyboard scanner atau kamera (BarcodeDetector).
+- RBAC dua lapis di antarmuka: menu/tombol per permission dan penolakan rute (403) di `lib/navigation.ts`.

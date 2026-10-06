@@ -1,5 +1,6 @@
 /** Backup & pemulihan (mockup: seluruh data dalam JSON). */
 import { db, TABLES } from '@/lib/mock/db';
+import { migrate } from '@/lib/mock/defaults';
 import { clone } from '@/lib/utils';
 import { audit } from '@/services/audit';
 import { currentUser } from '@/services/session';
@@ -25,6 +26,7 @@ export function restoreJSON(text: string) {
   TABLES.forEach((t) => {
     if (!db.data[t]) (db.data as unknown as Record<string, unknown[]>)[t] = [];
   });
+  migrate(db.data);
   audit('backup.restore', 'settings', null, null, { item: obj.items.length, transaksi: obj.borrowings.length });
   db.save();
   return { ok: true as const };

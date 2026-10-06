@@ -4,18 +4,21 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { db } from '@/lib/mock/db';
-import { CONDITIONS } from '@/lib/constants';
+import { CONDITION_KEYS} from '@/lib/constants';
 import { readImage } from '@/lib/file';
 import { useTitle } from '@/hooks/use-title';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { SelectField, TextareaField, TextField, toOptions } from '@/components/ui/form';
-import { PageHead, Photo } from '@/components/ui/misc';
+import { PageHead } from '@/components/ui/misc';
+import { PhotoEditor } from '@/components/domain/photo-gallery';
 import { NotFoundView } from '@/components/layout/app-shell';
 import { useToast } from '@/components/providers/feedback-provider';
-import { genItemCode, saveItem, type ItemInput } from '@/services/inventory';
-import { item as getItem } from '@/services/lookup';
+import { genItemCode, MAX_PHOTOS, type ItemInput } from '@/services/inventory';
+import * as repo from '@/services/repo';
+import { CAPABILITIES } from '@/lib/config';
+import { item as getItem, conditionLabel } from '@/services/lookup';
 import type { Condition, FieldErrors, ID } from '@/types';
 
 const ALLOWED = ['image/jpeg', 'image/png', 'image/webp'];
@@ -41,34 +44,49 @@ export function ItemForm({ id }: { id?: ID }) {
     acquisition_value: existing?.acquisition_value ?? '',
     notes: existing?.notes ?? '',
   }));
-  const [photo, setPhoto] = useState<string | null>(existing?.photo ?? null);
+  const [photos, setPhotos] = useState<string[]>(existing?.photos ?? []);
   const [photoErr, setPhotoErr] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
   const fileRef = useRef<HTMLInputElement>(null);
+  const [saving, setSaving] = useState(false);
+  const maxPhotos = CAPABILITIES.multiPhoto ? MAX_PHOTOS : 1;
 
   if (id && !existing) return <NotFoundView text="Barang tidak ditemukan." />;
   const sec = db.data.settings.security;
   const set = <K extends keyof ItemInput>(k: K, val: ItemInput[K]) => setV((p) => ({ ...p, [k]: val }));
 
-  const onFile = async (f: File | undefined) => {
+  const onFiles = async (files: File[]) => {
     setPhotoErr('');
-    if (!f) return;
     const max = Number(sec.upload_max_mb) * 1024 * 1024;
-    if (!ALLOWED.includes(f.type)) return setPhotoErr('Tipe berkas tidak diizinkan. Gunakan JPG, PNG, atau WEBP.');
-    if (f.size > max) return setPhotoErr(`Ukuran berkas ${(f.size / 1048576).toFixed(1)} MB melebihi batas.`);
-    try {
-      setPhoto(await readImage(f, 640));
-    } catch (e) {
-      setPhotoErr((e as Error).message);
+    const room = maxPhotos - photos.length;
+    if (files.length > room) setPhotoErr(`Maksimal ${maxPhotos} foto per barang; ${files.length - Math.max(room, 0)} berkas dilewati.`);
+    const added: string[] = [];
+    for (const f of files.slice(0, Math.max(room, 0))) {
+      if (!ALLOWED.includes(f.type)) {
+        setPhotoErr(`${f.name}: tipe berkas tidak diizinkan. Gunakan JPG, PNG, atau WEBP.`);
+        continue;
+      }
+      if (f.size > max) {
+        setPhotoErr(`${f.name}: ukuran ${(f.size / 1048576).toFixed(1)} MB melebihi batas.`);
+        continue;
+      }
+      try {
+        added.push(await readImage(f, 640));
+      } catch (e) {
+        setPhotoErr((e as Error).message);
+      }
     }
+    if (added.length) setPhotos((p) => [...p, ...added]);
   };
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const r = saveItem({ ...v, photo }, id ?? null);
+    setSaving(true);
+    const r = await repo.saveItem({ ...v, photos }, id ?? null);
+    setSaving(false);
     if (!r.ok) {
-      setErrors(r.errors);
-      toast('Periksa kembali isian yang ditandai.', 'err');
+      setErrors(r.errors || {});
+      toast(r.error, 'err');
       return;
     }
     toast(id ? 'Perubahan barang disimpan.' : `Barang ${r.item.item_code} ditambahkan.`);
@@ -141,13 +159,14 @@ export function ItemForm({ id }: { id?: ID }) {
                   label="Kondisi"
                   value={v.condition_status}
                   onChange={(e) => set('condition_status', e.target.value as Condition)}
-                  options={Object.entries(CONDITIONS).map(([k, l]) => ({ value: k, label: l }))}
+                  options={CONDITION_KEYS.map((k) => ({ value: k, label: conditionLabel(k) }))}
                 />
               </div>
             </Card>
             <Card title="Perolehan">
               <div className="form-grid">
-                <TextField
+                {CAPABILITIES.acquisitionYear && (
+                  <TextField
                   label="Tahun perolehan"
                   type="number"
                   min={1990}
@@ -156,12 +175,15 @@ export function ItemForm({ id }: { id?: ID }) {
                   error={errors.acquisition_year}
                   onChange={(e) => set('acquisition_year', e.target.value)}
                 />
-                <TextField
-                  label="Sumber perolehan"
-                  placeholder="mis. APBN 2024, Hibah"
-                  value={v.acquisition_source}
-                  onChange={(e) => set('acquisition_source', e.target.value)}
-                />
+                )}
+                {CAPABILITIES.acquisitionSource && (
+                  <TextField
+                    label="Sumber perolehan"
+                    placeholder="mis. APBN 2024, Hibah"
+                    value={v.acquisition_source}
+                    onChange={(e) => set('acquisition_source', e.target.value)}
+                  />
+                )}
                 <TextField
                   label="Nilai perolehan (Rp)"
                   type="number"
@@ -183,27 +205,31 @@ export function ItemForm({ id }: { id?: ID }) {
 
           <div className="stack">
             <Card title="Foto barang">
-              <Photo src={photo} alt="Pratinjau foto" style={{ marginBottom: 12 }} />
+              <PhotoEditor photos={photos} onChange={setPhotos} max={maxPhotos} />
               <input
                 ref={fileRef}
                 type="file"
+                multiple={maxPhotos > 1}
                 accept="image/jpeg,image/png,image/webp"
                 className="sr-only"
+                aria-label="Pilih foto barang"
                 onChange={(e) => {
-                  onFile(e.target.files?.[0]);
+                  onFiles(Array.from(e.target.files || []));
                   e.target.value = '';
                 }}
               />
-              <div className="row">
-                <Button icon="upload" onClick={() => fileRef.current?.click()}>
-                  Pilih foto
+              <div className="row" style={{ marginTop: 12 }}>
+                <Button icon="upload" disabled={photos.length >= maxPhotos} onClick={() => fileRef.current?.click()}>
+                  Tambah foto
                 </Button>
-                <Button variant="ghost" onClick={() => setPhoto(null)}>
-                  Hapus
-                </Button>
+                {photos.length > 0 && (
+                  <Button variant="ghost" onClick={() => setPhotos([])}>
+                    Hapus semua
+                  </Button>
+                )}
               </div>
               <p className="small muted" style={{ marginTop: 8 }}>
-                {sec.upload_types}, maks. {sec.upload_max_mb} MB. Disimpan di penyimpanan berkas (MinIO/S3).
+                Maks. {maxPhotos} foto, {sec.upload_types}, {sec.upload_max_mb} MB per berkas. Foto pertama menjadi foto utama. Disimpan di penyimpanan berkas (MinIO/S3).
               </p>
               {photoErr && (
                 <p className="small" style={{ color: 'var(--danger)' }}>
@@ -221,8 +247,8 @@ export function ItemForm({ id }: { id?: ID }) {
             )}
             <div className="card" style={{ padding: 16 }}>
               <div className="stack" style={{ gap: 8 }}>
-                <Button type="submit" variant="primary" icon="check" block>
-                  {existing ? 'Simpan perubahan' : 'Simpan barang'}
+                <Button type="submit" variant="primary" icon="check" block disabled={saving}>
+                  {saving ? 'Menyimpan…' : existing ? 'Simpan perubahan' : 'Simpan barang'}
                 </Button>
                 <Button block href={existing ? `/inventaris/${existing.id}` : '/inventaris'}>
                   Batal

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { CAPABILITIES } from '@/lib/config';
 import { useState } from 'react';
 import { db } from '@/lib/mock/db';
 import { fmtDate, fmtDateTime } from '@/lib/date';
@@ -60,7 +61,7 @@ export default function NotifikasiPage() {
                 Atur jadwal &amp; template
               </Button>
             )}
-            {can('notification.manage') && (
+            {CAPABILITIES.scheduler && can('notification.manage') && (
               <Button icon="play" variant="primary" onClick={onRun}>
                 Jalankan pemeriksaan sekarang
               </Button>

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { CAPABILITIES } from '@/lib/config';
 import { db } from '@/lib/mock/db';
 import { fmtDate, fmtDateTime, greeting, today } from '@/lib/date';
 import { ITEM_STATUS } from '@/lib/constants';
@@ -192,7 +193,7 @@ export default function DashboardPage() {
           <Card
             title="Pemeriksaan terjadwal"
             actions={
-              can('notification.manage') && (
+              CAPABILITIES.scheduler && can('notification.manage') && (
                 <Button size="sm" icon="play" onClick={onRun}>
                   Jalankan
                 </Button>
@@ -212,7 +213,13 @@ export default function DashboardPage() {
               <p className="muted">Belum pernah dijalankan.</p>
             )}
             <p className="small muted" style={{ marginTop: 10 }}>
-              Celery Beat memeriksa setiap hari pukul <b>{sc.time}</b> ({sc.timezone}).
+              {CAPABILITIES.scheduler ? (
+                <>
+                  Celery Beat memeriksa setiap hari pukul <b>{sc.time}</b> ({sc.timezone}).
+                </>
+              ) : (
+                <>Pemeriksaan keterlambatan dijalankan oleh Celery Beat di server.</>
+              )}
             </p>
           </Card>
 

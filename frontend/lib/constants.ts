@@ -40,6 +40,8 @@ export const CONDITIONS: Record<Condition, string> = {
   RUSAK_BERAT: 'Rusak berat',
 };
 
+export const CONDITION_KEYS: Condition[] = ['BAIK', 'RUSAK_RINGAN', 'RUSAK_BERAT'];
+
 export const BORROW_STATUS: BorrowStatus[] = ['DRAF', 'DIPINJAM', 'TERLAMBAT', 'DIKEMBALIKAN', 'DIBATALKAN'];
 
 export interface ReturnConditionRule {

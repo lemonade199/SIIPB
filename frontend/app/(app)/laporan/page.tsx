@@ -1,11 +1,12 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useEffect } from 'react';
+import { Input } from '@/components/ui/input';
+import { useEffect, useState } from 'react';
 import { db } from '@/lib/mock/db';
 import { fmtDate, fmtDateTime, nowISO, parseDate, toDateStr, today } from '@/lib/date';
 import { ITEM_STATUS, REPORTS } from '@/lib/constants';
-import { downloadCSV } from '@/lib/file';
+import { exportPdf, exportXlsx } from '@/lib/export';
 import { rupiah } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { usePersistentState } from '@/hooks/use-persistent-state';
@@ -43,6 +44,8 @@ export default function LaporanPage() {
   });
   const set = <K extends keyof ReportFilters>(k: K, v: ReportFilters[K]) => setF((p) => ({ ...p, [k]: v }));
 
+  const [busy, setBusy] = useState<'' | 'pdf' | 'xlsx'>('');
+
   useEffect(() => {
     const t = params.get('type') as ReportType | null;
     if (t && REPORTS[t]) setF((p) => ({ ...p, type: t }));
@@ -70,18 +73,39 @@ export default function LaporanPage() {
     return v === '' || v === undefined || v === null ? '—' : v;
   };
 
-  const doPrint = (fmt: string) => {
-    logReport(f, fmt, rep.rows.length);
+  const exportMeta = {
+    title: `LAPORAN ${meta.label.toUpperCase()}`,
+    subtitle: [`${s.institution} — ${s.unit_sarpras}`, `${periodText}${filt ? ` · ${filt}` : ''}`],
+    footer: `${rep.summary} · Dicetak ${fmtDateTime(nowISO())} oleh ${user.name}`,
+    sheetName: meta.label,
+  };
+  const doPrint = () => {
+    logReport(f, 'Cetak', rep.rows.length);
     setTimeout(() => window.print(), 50);
   };
-  const doCsv = () => {
-    downloadCSV(
-      `laporan-${f.type}-${today()}.csv`,
-      [{ key: '_no', label: 'No' }, ...rep.columns],
-      rep.rows.map((r, i) => ({ _no: i + 1, ...r })),
-    );
-    logReport(f, 'Excel (CSV)', rep.rows.length);
-    toast('Laporan diunduh. Berkas CSV dapat dibuka di Microsoft Excel.');
+  const doPdf = async () => {
+    setBusy('pdf');
+    try {
+      await exportPdf(`laporan-${f.type}-${today()}.pdf`, { ...exportMeta, signature: 'Pimpinan' }, rep.columns, rep.rows);
+      logReport(f, 'PDF', rep.rows.length);
+      toast('Laporan PDF diunduh.');
+    } catch (e) {
+      toast(`Gagal membuat PDF: ${(e as Error).message}`, 'err');
+    } finally {
+      setBusy('');
+    }
+  };
+  const doXlsx = async () => {
+    setBusy('xlsx');
+    try {
+      await exportXlsx(`laporan-${f.type}-${today()}.xlsx`, exportMeta, rep.columns, rep.rows);
+      logReport(f, 'Excel', rep.rows.length);
+      toast('Laporan Excel (.xlsx) diunduh.');
+    } catch (e) {
+      toast(`Gagal membuat Excel: ${(e as Error).message}`, 'err');
+    } finally {
+      setBusy('');
+    }
   };
 
   return (
@@ -119,11 +143,11 @@ export default function LaporanPage() {
                 <label className="small muted" htmlFor="rp-from">
                   Dari
                 </label>
-                <input type="date" className="input" id="rp-from" value={f.from} onChange={(e) => set('from', e.target.value)} />
+                <Input type="date" id="rp-from" value={f.from} onChange={(e) => set('from', e.target.value)} />
                 <label className="small muted" htmlFor="rp-to">
                   s.d.
                 </label>
-                <input type="date" className="input" id="rp-to" value={f.to} onChange={(e) => set('to', e.target.value)} />
+                <Input type="date" id="rp-to" value={f.to} onChange={(e) => set('to', e.target.value)} />
               </span>
             )}
             <Select aria-label="Unit kerja" value={f.unit_id} onChange={(e) => set('unit_id', e.target.value)} options={toOptions(db.all('units'), 'Semua unit kerja')} />
@@ -209,16 +233,16 @@ export default function LaporanPage() {
           <Card title="Unduh / cetak">
             {can('report.export') ? (
               <div className="stack" style={{ gap: 8 }}>
-                <Button variant="primary" icon="download" block onClick={() => doPrint('PDF')}>
-                  Unduh PDF
+                <Button variant="primary" icon="download" block disabled={!!busy} onClick={doPdf}>
+                  {busy === 'pdf' ? 'Membuat PDF…' : 'Unduh PDF'}
                 </Button>
-                <Button icon="download" block onClick={doCsv}>
-                  Unduh Excel (CSV)
+                <Button icon="download" block disabled={!!busy} onClick={doXlsx}>
+                  {busy === 'xlsx' ? 'Membuat Excel…' : 'Unduh Excel (.xlsx)'}
                 </Button>
-                <Button icon="printer" block onClick={() => doPrint('Cetak')}>
+                <Button icon="printer" block onClick={doPrint}>
                   Cetak
                 </Button>
-                <p className="small muted">PDF: pilih &quot;Simpan sebagai PDF&quot; pada dialog cetak. Di backend, PDF dibuat dengan WeasyPrint dan Excel dengan openpyxl.</p>
+                <p className="small muted">PDF (A4 lanskap, dengan kop & kolom tanda tangan) dan Excel (.xlsx, dengan filter & format Rupiah) dibuat langsung di browser. Saat endpoint laporan backend tersedia, berkas dapat dibuat oleh WeasyPrint/openpyxl.</p>
               </div>
             ) : (
               <p className="small muted">Peran Anda hanya dapat melihat laporan.</p>
@@ -229,7 +253,7 @@ export default function LaporanPage() {
               <ul className="list">
                 {hist.map((h) => (
                   <li key={h.id}>
-                    <StatIcon icon={h.format === 'Excel (CSV)' ? 'download' : 'printer'} tone="gray" size={15} />
+                    <StatIcon icon={h.format === 'Cetak' ? 'printer' : 'download'} tone="gray" size={15} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div className="small strong">
                         {REPORTS[h.type].label} · {h.format}

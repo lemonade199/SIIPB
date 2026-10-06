@@ -2,6 +2,11 @@
 
 import { useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input, NativeSelect, Textarea } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+
+export { Checkbox, Switch } from '@/components/ui/checkbox';
 
 interface FieldShellProps {
   label?: ReactNode;
@@ -14,14 +19,14 @@ interface FieldShellProps {
   children: ReactNode;
 }
 
-/** Bungkus label + kontrol + hint + pesan error (pola shadcn <FormField>). */
+/** Bungkus label + kontrol + hint + pesan error (pola shadcn <FormItem>). */
 export function Field({ label, required, hint, error, full, className, htmlFor, children }: FieldShellProps) {
   return (
-    <div className={cn('field', full && 'full', className)}>
+    <div data-slot="form-item" className={cn('field', full && 'full', className)}>
       {label && (
-        <label htmlFor={htmlFor} className={cn(required && 'req')}>
+        <Label htmlFor={htmlFor} className={cn(required && 'req')}>
           {label}
-        </label>
+        </Label>
       )}
       {children}
       {hint && <span className="hint">{hint}</span>}
@@ -41,7 +46,7 @@ export function TextField({ label, hint, error, full, mono, fieldClassName, clas
   const fid = id || auto;
   return (
     <Field label={label} hint={hint} error={error} full={full} required={required} htmlFor={fid} className={fieldClassName}>
-      <input id={fid} className={cn('input', mono && 'mono', error && 'invalid', className)} aria-invalid={!!error || undefined} {...rest} />
+      <Input id={fid} className={cn(mono && 'font-mono', rest.type === 'date' || rest.type === 'time' ? 'w-full' : '', className)} aria-invalid={!!error || undefined} {...rest} />
     </Field>
   );
 }
@@ -50,6 +55,18 @@ export interface Option {
   value: string | number;
   label: string;
   disabled?: boolean;
+}
+
+function OptionList({ options }: { options: Option[] }) {
+  return (
+    <>
+      {options.map((o) => (
+        <option key={String(o.value)} value={o.value} disabled={o.disabled}>
+          {o.label}
+        </option>
+      ))}
+    </>
+  );
 }
 
 export function SelectField({
@@ -68,13 +85,9 @@ export function SelectField({
   const fid = id || auto;
   return (
     <Field label={label} hint={hint} error={error} full={full} required={required} htmlFor={fid} className={fieldClassName}>
-      <select id={fid} className={cn('input', error && 'invalid', className)} aria-invalid={!!error || undefined} {...rest}>
-        {options.map((o) => (
-          <option key={String(o.value)} value={o.value} disabled={o.disabled}>
-            {o.label}
-          </option>
-        ))}
-      </select>
+      <NativeSelect id={fid} className={className} aria-invalid={!!error || undefined} {...rest}>
+        <OptionList options={options} />
+      </NativeSelect>
     </Field>
   );
 }
@@ -84,39 +97,45 @@ export function TextareaField({ label, hint, error, full, mono, fieldClassName, 
   const fid = id || auto;
   return (
     <Field label={label} hint={hint} error={error} full={full} required={required} htmlFor={fid} className={fieldClassName}>
-      <textarea id={fid} rows={rest.rows || 3} className={cn('input', mono && 'mono', error && 'invalid', className)} aria-invalid={!!error || undefined} {...rest} />
+      <Textarea id={fid} rows={rest.rows || 3} className={cn(mono && 'font-mono text-[13px]', className)} aria-invalid={!!error || undefined} {...rest} />
     </Field>
   );
 }
 
-/** <select> polos untuk toolbar/filter. */
+/** <select> ringkas untuk toolbar/filter. */
 export function Select({ options, className, ...rest }: SelectHTMLAttributes<HTMLSelectElement> & { options: Option[] }) {
   return (
-    <select className={cn('input', className)} {...rest}>
-      {options.map((o) => (
-        <option key={String(o.value)} value={o.value} disabled={o.disabled}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+    <NativeSelect className={cn('w-auto', className)} {...rest}>
+      <OptionList options={options} />
+    </NativeSelect>
   );
 }
 
-export function Checkbox({ label, className, ...rest }: { label: ReactNode } & Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>) {
+/** Checkbox + label (shadcn Checkbox). */
+export function CheckField({
+  label,
+  checked,
+  onCheckedChange,
+  disabled,
+  className,
+  id,
+}: {
+  label: ReactNode;
+  checked: boolean;
+  onCheckedChange: (v: boolean) => void;
+  disabled?: boolean;
+  className?: string;
+  id?: string;
+}) {
+  const auto = useId();
+  const fid = id || auto;
   return (
-    <label className={cn('check', className)}>
-      <input type="checkbox" {...rest} />
-      <span>{label}</span>
-    </label>
-  );
-}
-
-export function Switch({ className, ...rest }: Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>) {
-  return (
-    <label className={cn('switch', className)} title={rest.title}>
-      <input type="checkbox" {...rest} />
-      <span />
-    </label>
+    <div className={cn('check', className)}>
+      <Checkbox id={fid} checked={checked} disabled={disabled} onCheckedChange={(v) => onCheckedChange(v === true)} />
+      <label htmlFor={fid} className="cursor-pointer">
+        {label}
+      </label>
+    </div>
   );
 }
 

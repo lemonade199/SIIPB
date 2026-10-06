@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
+import { isApiMode } from '@/lib/config';
 import { db } from '@/lib/mock/db';
+import { initApiStore, restoreApiSession } from '@/services/api/sync';
 import { seedDatabase } from '@/lib/mock/seed';
 import { Spinner } from '@/components/ui/misc';
 import { useToast } from '@/components/providers/feedback-provider';
@@ -23,6 +25,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (db.ready) return;
     db.onSaveError((m) => toast(m, 'err'));
+    if (isApiMode) {
+      // Mode api: siapkan cache kosong, lalu pulihkan sesi JWT & tarik data dari Flask API.
+      initApiStore();
+      restoreApiSession()
+        .catch(() => false)
+        .finally(() => setReady(true));
+      return;
+    }
     const fresh = db.load(seedDatabase);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- inisialisasi satu kali dari storage browser
     setReady(true);
@@ -31,6 +41,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (res && (res.sent || res.late_marked)) setTimeout(() => toast(schedulerToastText(res, db.data.settings.scheduler.time), 'warn'), 600);
   }, [toast]);
 
-  if (!ready) return <Spinner label="Menyiapkan data SIIPB…" />;
+  if (!ready) return <Spinner label={isApiMode ? 'Menghubungkan ke server SIIPB…' : 'Menyiapkan data SIIPB…'} />;
   return <>{children}</>;
 }

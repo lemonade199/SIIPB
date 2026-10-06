@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { Input } from '@/components/ui/input';
 import { db } from '@/lib/mock/db';
 import { fmtDateTime, localDate, today } from '@/lib/date';
-import { downloadCSV } from '@/lib/file';
+import { exportXlsx } from '@/lib/export';
 import { match, paginate } from '@/lib/utils';
 import { patchFilter, usePersistentState } from '@/hooks/use-persistent-state';
 import { useTitle } from '@/hooks/use-title';
@@ -89,8 +90,9 @@ export default function AuditPage() {
   const used = [...new Set(db.all('activity_logs').map((a) => a.action.split('.')[0]))];
 
   const onExport = () =>
-    downloadCSV(
-      `audit-log-${today()}.csv`,
+    void exportXlsx(
+      `audit-log-${today()}.xlsx`,
+      { title: 'AUDIT LOG SIIPB', subtitle: [db.data.settings.institution, `${rows.length} catatan · diekspor ${fmtDateTime(new Date().toISOString())}`], sheetName: 'Audit log' },
       [
         { key: 'waktu', label: 'Waktu' },
         { key: 'pengguna', label: 'Pengguna' },
@@ -119,7 +121,7 @@ export default function AuditPage() {
         desc="Setiap perubahan penting tercatat: siapa, kapan, tindakan, data lama dan data baru. Catatan tidak dapat diubah atau dihapus."
         actions={
           <Button icon="download" onClick={onExport}>
-            Ekspor CSV
+            Ekspor Excel
           </Button>
         }
       />
@@ -138,8 +140,8 @@ export default function AuditPage() {
             onChange={(e) => set('group', e.target.value)}
             options={[{ value: '', label: 'Semua tindakan' }, ...used.map((g) => ({ value: g, label: GROUPS[g] || g }))]}
           />
-          <input type="date" className="input" aria-label="Dari tanggal" value={f.from} onChange={(e) => set('from', e.target.value)} />
-          <input type="date" className="input" aria-label="Sampai tanggal" value={f.to} onChange={(e) => set('to', e.target.value)} />
+          <Input type="date" aria-label="Dari tanggal" value={f.from} onChange={(e) => set('from', e.target.value)} />
+          <Input type="date" aria-label="Sampai tanggal" value={f.to} onChange={(e) => set('to', e.target.value)} />
         </div>
         <div className="table-wrap">
           <table className="table">

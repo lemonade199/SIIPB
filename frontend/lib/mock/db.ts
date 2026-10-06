@@ -7,6 +7,7 @@
  */
 import { STORAGE_KEYS } from '@/lib/constants';
 import { setDayOffsetProvider } from '@/lib/date';
+import { migrate } from '@/lib/mock/defaults';
 import type { DbData, ID, Row, TableName } from '@/types';
 
 export const TABLES: TableName[] = [
@@ -38,6 +39,8 @@ let version = 0;
 let seeder: (() => void) | null = null;
 const listeners = new Set<Listener>();
 let onSaveError: ((msg: string) => void) | null = null;
+/** Mode api: data hanya cache di memori, tidak ditulis ke localStorage. */
+let persist = true;
 
 setDayOffsetProvider(() => Number(state?.settings?.demo_offset_days || 0));
 
@@ -64,6 +67,14 @@ export const db = {
     return () => listeners.delete(fn);
   },
   getVersion: () => version,
+  setPersist(v: boolean) {
+    persist = v;
+  },
+  /** Ganti seluruh data (dipakai sinkronisasi dari API). */
+  replace(next: DbData) {
+    state = next;
+    emit();
+  },
   onSaveError(fn: (msg: string) => void) {
     onSaveError = fn;
   },
@@ -92,11 +103,22 @@ export const db = {
     TABLES.forEach((t) => {
       if (!state![t]) (state as unknown as Record<string, unknown[]>)[t] = [];
     });
+    migrate(state);
     emit();
     return false;
   },
 
   save(): boolean {
+    if (!persist) {
+      // Mode api: data transaksi berasal dari server; hanya pengaturan lokal yang disimpan di browser.
+      try {
+        if (state) localStorage.setItem('siipb.api.settings', JSON.stringify(state.settings));
+      } catch {
+        /* abaikan */
+      }
+      emit();
+      return true;
+    }
     try {
       localStorage.setItem(STORAGE_KEYS.db, JSON.stringify(state));
       emit();

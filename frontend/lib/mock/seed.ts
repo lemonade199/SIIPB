@@ -3,14 +3,14 @@
  * riwayat, notifikasi, dan audit log konsisten dengan aturan bisnis.
  */
 import { addDays, atTime, pad, toDateStr } from '@/lib/date';
-import { PERMISSIONS } from '@/lib/constants';
 import { db, TABLES } from '@/lib/mock/db';
+import { defaultRoles, defaultSettings, defaultTemplates } from '@/lib/mock/defaults';
 import { audit } from '@/services/audit';
 import { createBorrowing } from '@/services/borrowing';
 import { movement } from '@/services/inventory';
 import { createReturn, type ReturnItemInput } from '@/services/return';
 import { runScheduler } from '@/services/scheduler';
-import type { Borrowing, Condition, DbData, EmailTemplate, ID, ItemStatus } from '@/types';
+import type { Borrowing, Condition, DbData, ID, ItemStatus } from '@/types';
 
 export function seedDatabase() {
   const T = toDateStr(new Date());
@@ -23,26 +23,7 @@ export function seedDatabase() {
   });
   db.data = data;
 
-  const allPerms = PERMISSIONS.map((p) => p.key);
-  data.roles = [
-    { id: 1, code: 'admin', name: 'Administrator', description: 'Pengaturan sistem, pengguna, role, permission, seluruh data.', permissions: allPerms.slice(), system: true },
-    {
-      id: 2,
-      code: 'petugas',
-      name: 'Petugas Sarpras/IT',
-      description: 'Mengelola inventaris, mencatat peminjaman/pengembalian, monitoring, laporan.',
-      system: true,
-      permissions: ['dashboard.view', 'inventory.view', 'inventory.manage', 'masterdata.manage', 'borrowing.view', 'borrowing.manage', 'return.manage', 'monitoring.view', 'notification.view', 'notification.manage', 'qr.manage', 'report.view', 'report.export'],
-    },
-    {
-      id: 3,
-      code: 'pimpinan',
-      name: 'Pimpinan',
-      description: 'Melihat dashboard, laporan, monitoring dan eskalasi.',
-      system: true,
-      permissions: ['dashboard.view', 'inventory.view', 'borrowing.view', 'monitoring.view', 'notification.view', 'report.view', 'report.export'],
-    },
-  ];
+  data.roles = defaultRoles();
   data.users = [
     { id: 1, name: 'Administrator Sistem', username: 'admin', email: 'admin@siipb.local', password: 'admin123', role_id: 1, active: true, login_method: 'LOKAL', phone: '', last_login: at(-1, '16:40'), created_at: at(-200) },
     { id: 2, name: 'Rina Kartika', username: 'petugas', email: 'rina.kartika@siipb.local', password: 'petugas123', role_id: 2, active: true, login_method: 'LOKAL + SSO', phone: 'ext. 1021', last_login: at(-1, '07:55'), created_at: at(-180) },
@@ -117,7 +98,7 @@ export function seedDatabase() {
     location_id: r[9],
     condition_status: r[10],
     item_status: r[11],
-    photo: null,
+    photos: [],
     notes: r[12],
     active: true,
     created_at: atTime(`${r[6]}-02-14`, '08:00'),
@@ -127,64 +108,9 @@ export function seedDatabase() {
     data.item_movements.push({ id: data.item_movements.length + 1, item_id: it.id, type: 'DICATAT', from_status: null, to_status: 'TERSEDIA', note: 'Data awal inventaris', user_id: 1, at: it.created_at });
   });
 
-  data.settings = {
-    institution: 'Instansi Contoh',
-    unit_sarpras: 'Bagian Sarana & Prasarana / IT',
-    staff_email: 'sarpras@siipb.local',
-    staff_phone: 'ext. 1020',
-    return_location: 'Ruang Sarpras, Gedung A Lt. 1',
-    smtp: { host: 'smtp.siipb.local', port: 587, username: 'no-reply@siipb.local', encryption: 'STARTTLS', from_name: 'SIIPB Sarpras', from_email: 'no-reply@siipb.local', simulate_failure: false },
-    scheduler: { enabled: true, time: '08:00', timezone: 'Asia/Jakarta', last_run_date: null },
-    checkout_notify: true,
-    return_notify: true,
-    rules: [
-      { event: 'H-3', days: -3, active: true, to: ['peminjam'], template: 'tpl_h_min3', desc: 'Pengingat batas pengembalian' },
-      { event: 'H-1', days: -1, active: true, to: ['peminjam'], template: 'tpl_h_min1', desc: 'Pengingat satu hari sebelum jatuh tempo' },
-      { event: 'H', days: 0, active: true, to: ['peminjam'], template: 'tpl_h', desc: 'Hari ini batas pengembalian' },
-      { event: 'H+1', days: 1, active: true, to: ['peminjam'], template: 'tpl_h_plus1', desc: 'Pemberitahuan sudah terlambat' },
-      { event: 'H+3', days: 3, active: true, to: ['peminjam', 'petugas'], template: 'tpl_h_plus3', desc: 'Eskalasi keterlambatan' },
-      { event: 'H+7', days: 7, active: true, to: ['peminjam', 'petugas', 'pimpinan'], template: 'tpl_h_plus7', desc: 'Eskalasi lanjutan' },
-    ],
-    security: { jwt_access_minutes: 15, jwt_refresh_days: 7, session_hours: 8, oidc_enabled: true, oidc_issuer: 'https://sso.siipb.local/realms/instansi', oidc_client_id: 'siipb-web', upload_max_mb: 2, upload_types: 'JPG, PNG, WEBP' },
-    backup: {
-      schedule: 'Harian 01.00 WIB',
-      retention_days: 14,
-      history: [
-        { at: at(-2, '01:00'), type: 'Terjadwal', size_kb: 412, status: 'SUKSES', by: 'system' },
-        { at: at(-1, '01:00'), type: 'Terjadwal', size_kb: 418, status: 'SUKSES', by: 'system' },
-      ],
-      last_restore_test: at(-15, '10:00'),
-    },
-    demo_offset_days: 0,
-  };
+  data.settings = defaultSettings(at);
 
-  const tpl = (code: string, name: string, subject: string, body: string): EmailTemplate => ({
-    id: data.email_templates.length + 1,
-    code,
-    name,
-    subject,
-    body,
-    updated_at: at(-60),
-  });
-  const FOOT =
-    '\n\nKontak petugas: {{nama_petugas}} ({{kontak_petugas}})\nTempat pengembalian: {{lokasi_pengembalian}}\n\nEmail ini dikirim otomatis oleh SIIPB {{nama_instansi}}. Anda tidak perlu login, mengisi formulir, atau membalas email ini.';
-  const push = (t: EmailTemplate) => data.email_templates.push(t);
-  push(tpl('tpl_checkout', 'Konfirmasi peminjaman', '[SIIPB] Peminjaman {{kode_transaksi}} — kembalikan paling lambat {{batas_kembali}}',
-    'Yth. {{nama_peminjam}},\n\nPetugas Sarpras/IT telah mencatat peminjaman barang atas nama Anda:\n\n{{daftar_barang}}\n\nTanggal peminjaman : {{tanggal_pinjam}}\nBatas pengembalian : {{batas_kembali}}\nTujuan             : {{tujuan}}\n\nMohon kembalikan barang sebelum batas waktu. Kondisi dan kelengkapan barang akan diperiksa saat pengembalian.' + FOOT));
-  push(tpl('tpl_h_min3', 'Pengingat H-3', '[SIIPB] Pengingat: batas pengembalian {{kode_transaksi}} tinggal 3 hari',
-    'Yth. {{nama_peminjam}},\n\nBarang berikut harus dikembalikan paling lambat {{batas_kembali}} (3 hari lagi):\n\n{{daftar_barang}}' + FOOT));
-  push(tpl('tpl_h_min1', 'Pengingat H-1', '[SIIPB] Besok batas pengembalian {{kode_transaksi}}',
-    'Yth. {{nama_peminjam}},\n\nBesok, {{batas_kembali}}, adalah batas pengembalian barang berikut:\n\n{{daftar_barang}}' + FOOT));
-  push(tpl('tpl_h', 'Hari ini jatuh tempo', '[SIIPB] Hari ini batas pengembalian {{kode_transaksi}}',
-    'Yth. {{nama_peminjam}},\n\nHari ini, {{batas_kembali}}, adalah batas pengembalian barang berikut:\n\n{{daftar_barang}}\n\nMohon diserahkan ke petugas hari ini.' + FOOT));
-  push(tpl('tpl_h_plus1', 'Terlambat H+1', '[SIIPB] Peminjaman {{kode_transaksi}} terlambat {{hari_terlambat}} hari',
-    'Yth. {{nama_peminjam}},\n\nBatas pengembalian barang berikut telah lewat ({{batas_kembali}}). Saat ini terlambat {{hari_terlambat}} hari:\n\n{{daftar_barang}}\n\nMohon segera mengembalikan barang.' + FOOT));
-  push(tpl('tpl_h_plus3', 'Eskalasi H+3', '[SIIPB] ESKALASI: {{kode_transaksi}} terlambat {{hari_terlambat}} hari',
-    'Yth. {{nama_peminjam}},\n(tembusan: Petugas Sarpras/IT)\n\nPeminjaman {{kode_transaksi}} telah terlambat {{hari_terlambat}} hari dari batas {{batas_kembali}}:\n\n{{daftar_barang}}\n\nPetugas akan menindaklanjuti keterlambatan ini.' + FOOT));
-  push(tpl('tpl_h_plus7', 'Eskalasi lanjutan H+7', '[SIIPB] ESKALASI LANJUTAN: {{kode_transaksi}} terlambat {{hari_terlambat}} hari',
-    'Yth. {{nama_peminjam}},\n(tembusan: Petugas Sarpras/IT dan Pimpinan)\n\nPeminjaman {{kode_transaksi}} telah terlambat {{hari_terlambat}} hari dari batas {{batas_kembali}}:\n\n{{daftar_barang}}\n\nKeterlambatan ini telah dilaporkan kepada pimpinan unit.' + FOOT));
-  push(tpl('tpl_return', 'Konfirmasi pengembalian', '[SIIPB] Pengembalian {{kode_transaksi}} telah diterima',
-    'Yth. {{nama_peminjam}},\n\nPetugas telah menerima pengembalian barang berikut pada {{tanggal_kembali}}:\n\n{{daftar_barang_kembali}}\n\nTerima kasih.' + FOOT));
+  data.email_templates = defaultTemplates(at);
 
   seedHistory(d, at);
   data.activity_logs.sort((a, b) => a.at.localeCompare(b.at));

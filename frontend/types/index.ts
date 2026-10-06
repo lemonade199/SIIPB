@@ -120,7 +120,8 @@ export interface Item {
   location_id: ID;
   condition_status: Condition;
   item_status: ItemStatus;
-  photo: string | null;
+  /** Foto barang (tabel item_photos). Indeks 0 = foto utama. */
+  photos: string[];
   notes: string;
   active: boolean;
   created_at: string;
@@ -302,7 +303,19 @@ export interface BackupEntry {
   by: string;
 }
 
+export interface ParameterDef {
+  label: string;
+  desc: string;
+}
+
+/** Parameter status & kondisi (master data). Kode tetap karena terikat aturan bisnis; label & keterangan dapat diubah. */
+export interface Parameters {
+  item_status: Record<ItemStatus, ParameterDef>;
+  condition: Record<Condition, ParameterDef>;
+}
+
 export interface Settings {
+  parameters: Parameters;
   institution: string;
   unit_sarpras: string;
   staff_email: string;

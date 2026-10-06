@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
+import { isApiMode } from '@/lib/config';
 import { db } from '@/lib/mock/db';
 import { addDays, fmtDate, fmtDateTime, today } from '@/lib/date';
-import { CONDITIONS, EVENT_LABEL } from '@/lib/constants';
+import { EVENT_LABEL } from '@/lib/constants';
 import { useAuth } from '@/hooks/use-auth';
 import { useTitle } from '@/hooks/use-title';
 import { Badge } from '@/components/ui/badge';
@@ -18,7 +19,7 @@ import { EmailPreview } from '@/components/domain/email-preview';
 import { NotFoundView } from '@/components/layout/app-shell';
 import { useConfirm, useToast } from '@/components/providers/feedback-provider';
 import { cancelBorrowing, checkout } from '@/services/borrowing';
-import { borrowView, detailsOf, emp, isActive, item as getItem, itemsOf, returnOf, unit, user as getUser, userName } from '@/services/lookup';
+import { borrowView, detailsOf, emp, isActive, item as getItem, itemsOf, returnOf, unit, user as getUser, userName, conditionLabel } from '@/services/lookup';
 import type { ID } from '@/types';
 
 export default function BorrowDetailPage() {
@@ -184,7 +185,7 @@ export default function BorrowDetailPage() {
                             </div>
                           </div>
                         </td>
-                        <td>{CONDITIONS[d.item_condition_out] || '—'}</td>
+                        <td>{conditionLabel(d.item_condition_out)}</td>
                         <td>
                           {rd ? (
                             <>
@@ -295,7 +296,15 @@ export default function BorrowDetailPage() {
                         <span className="small" style={{ flex: 1 }}>
                           {fmtDate(date)}
                         </span>
-                        {sent ? <Badge status={sent.status} /> : passed ? <Badge status="DILEWATI">TIDAK DIKIRIM</Badge> : <Badge status="MENUNGGU">TERJADWAL</Badge>}
+                        {isApiMode ? (
+                          <span className="small muted">{passed ? 'diproses server' : 'terjadwal'}</span>
+                        ) : sent ? (
+                          <Badge status={sent.status} />
+                        ) : passed ? (
+                          <Badge status="DILEWATI">TIDAK DIKIRIM</Badge>
+                        ) : (
+                          <Badge status="MENUNGGU">TERJADWAL</Badge>
+                        )}
                       </li>
                     );
                   })}
