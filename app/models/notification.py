@@ -1,0 +1,61 @@
+"""notifications — logical notification with frozen subject/body snapshot."""
+from __future__ import annotations
+
+from datetime import datetime
+from typing import TYPE_CHECKING
+
+from sqlalchemy import CheckConstraint, ForeignKey, String, Text, text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.models.base import Base, BigIntU, CreatedAtMixin, DateTime6, IdMixin, table_args
+from app.models.enums import NotificationChannel, NotificationStatus, check_in
+
+if TYPE_CHECKING:
+    from app.models.borrower import Borrower
+    from app.models.email_delivery import EmailDelivery
+    from app.models.notification_event import NotificationEvent
+    from app.models.notification_log import NotificationLog
+    from app.models.notification_template import NotificationTemplate
+
+
+class Notification(IdMixin, CreatedAtMixin, Base):
+    __tablename__ = "notifications"
+    __table_args__ = table_args(
+        CheckConstraint(check_in("channel", NotificationChannel), name="channel"),
+        CheckConstraint(check_in("status", NotificationStatus), name="status"),
+    )
+
+    event_id: Mapped[int] = mapped_column(
+        BigIntU, ForeignKey("notification_events.id", ondelete="RESTRICT"), index=True
+    )
+    borrower_id: Mapped[int] = mapped_column(
+        BigIntU, ForeignKey("borrowers.id", ondelete="RESTRICT"), index=True
+    )
+    template_id: Mapped[int] = mapped_column(
+        BigIntU, ForeignKey("notification_templates.id", ondelete="RESTRICT"), index=True
+    )
+    channel: Mapped[str] = mapped_column(
+        String(20),
+        default=NotificationChannel.EMAIL.value,
+        server_default=text(f"'{NotificationChannel.EMAIL.value}'"),
+    )
+    recipient: Mapped[str] = mapped_column(String(255))
+    subject: Mapped[str | None] = mapped_column(String(255))
+    body_snapshot: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(
+        String(30),
+        default=NotificationStatus.QUEUED.value,
+        server_default=text(f"'{NotificationStatus.QUEUED.value}'"),
+        index=True,
+    )
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime6)
+
+    event: Mapped[NotificationEvent] = relationship(back_populates="notifications")
+    borrower: Mapped[Borrower] = relationship(back_populates="notifications")
+    template: Mapped[NotificationTemplate] = relationship(back_populates="notifications")
+    logs: Mapped[list[NotificationLog]] = relationship(
+        back_populates="notification", order_by="NotificationLog.created_at"
+    )
+    deliveries: Mapped[list[EmailDelivery]] = relationship(
+        back_populates="notification", order_by="EmailDelivery.attempt_number"
+    )
