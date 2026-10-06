@@ -60,3 +60,9 @@ Jalankan test suite integritas skema (12 skenario pengujian):
 ```bash
 python scripts/verify_schema.py
 ```
+
+### 6. Impor Langsung Dump SQL (Alternatif)
+Dump lengkap skema database tersedia di dalam folder [database/](file:///c:/SIIPB/database):
+```bash
+mariadb -u root -p siipb < database/SIIPB.sql
+```
