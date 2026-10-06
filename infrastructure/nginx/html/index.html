@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SIIPB — Sistem Informasi Inventaris & Peminjaman Barang</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-color: #0b0f19;
+      --card-bg: rgba(17, 24, 39, 0.7);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --accent: #10b981;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.12) 0px, transparent 50%);
+    }
+
+    .container {
+      max-width: 900px;
+      width: 100%;
+      text-align: center;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      color: #34d399;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    .badge::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      background-color: #10b981;
+      border-radius: 50%;
+      box-shadow: 0 0 10px #10b981;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    h1 {
+      font-size: 2.75rem;
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -0.025em;
+      margin-bottom: 14px;
+      background: linear-gradient(135deg, #ffffff 30%, #93c5fd 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    p.subtitle {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      max-width: 650px;
+      margin: 0 auto 36px auto;
+      line-height: 1.6;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 18px;
+      margin-bottom: 40px;
+      text-align: left;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 24px;
+      backdrop-filter: blur(12px);
+      text-decoration: none;
+      color: inherit;
+      transition: all 0.25s ease;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(59, 130, 246, 0.4);
+      box-shadow: 0 12px 30px -10px rgba(59, 130, 246, 0.2);
+    }
+
+    .card-icon {
+      font-size: 1.75rem;
+      margin-bottom: 14px;
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-desc {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .arrow {
+      color: var(--primary);
+      transition: transform 0.2s ease;
+    }
+
+    .card:hover .arrow {
+      transform: translateX(4px);
+    }
+
+    .tech-stack {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      padding-top: 20px;
+      border-top: 1px solid var(--card-border);
+    }
+
+    .tech-pill {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.04);
+      padding: 4px 12px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    footer {
+      margin-top: 32px;
+      font-size: 0.85rem;
+      color: rgba(156, 163, 175, 0.6);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="badge">Layanan Docker Container Siap Digunakan</div>
+    <h1>SIIPB Portal Server</h1>
+    <p class="subtitle">Sistem Informasi Inventaris Barang, Peminjaman, dan Pengembalian Barang berbasis REST API dengan Concurrency Row-Locking & Task Scheduler.</p>
+
+    <div class="grid">
+      <a href="/api/docs" class="card">
+        <div>
+          <div class="card-icon">📖</div>
+          <div class="card-title">
+            Swagger API Docs
+            <span class="arrow">&rarr;</span>
+          </div>
+          <div class="card-desc">Dokumentasi interaktif OpenAPI untuk mencoba seluruh 46 endpoint REST API v1 langsung dari browser.</div>
+        </div>
+      </a>
+
+      <a href="/api/health" class="card" target="_blank">
+        <div>
+          <div class="card-icon">📡</div>
+          <div class="card-title">
+            Health Check API
+            <span class="arrow">&rarr;</span>
+          </div>
+          <div class="card-desc">Pemeriksaan ketersediaan server backend Flask dan koneksi basis data MariaDB 13 secara real-time.</div>
+        </div>
+      </a>
+
+      <a href="/api/v1/dashboard/summary" class="card" target="_blank">
+        <div>
+          <div class="card-icon">📊</div>
+          <div class="card-title">
+            Dashboard Summary
+            <span class="arrow">&rarr;</span>
+          </div>
+          <div class="card-desc">Endpoint live analytics statistik aset, peminjaman aktif, keterlambatan, dan laporan insiden.</div>
+        </div>
+      </a>
+    </div>
+
+    <div class="tech-stack">
+      <span class="tech-pill">Python 3.12</span>
+      <span class="tech-pill">Flask REST API</span>
+      <span class="tech-pill">MariaDB 13</span>
+      <span class="tech-pill">SQLAlchemy 2.0</span>
+      <span class="tech-pill">Redis 7</span>
+      <span class="tech-pill">Celery 5.3</span>
+      <span class="tech-pill">Celery Beat</span>
+      <span class="tech-pill">Nginx 1.25</span>
+      <span class="tech-pill">Docker Compose</span>
+    </div>
+
+    <footer>
+      SIIPB Enterprise Asset Management &copy; 2026. All rights reserved.
+    </footer>
+  </div>
+
+</body>
+</html>
