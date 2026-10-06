@@ -1,0 +1,136 @@
+version: "3.9"
+
+services:
+  # 1. MariaDB Existing Database Service
+  mariadb:
+    image: mariadb:11.4
+    container_name: siipb_mariadb
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: "123"
+      MYSQL_DATABASE: "siipb"
+      TZ: "Asia/Jakarta"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./database/SIIPB.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+    ports:
+      - "3306:3306"
+    networks:
+      - siipb_net
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 2. Redis Message Broker & Cache
+  redis:
+    image: redis:7-alpine
+    container_name: siipb_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - siipb_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # 3. Backend Flask REST API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: siipb_backend
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      DATABASE_URL: "mariadb+pymysql://root:123@mariadb:3306/siipb?charset=utf8mb4"
+      REDIS_URL: "redis://redis:6379/0"
+      CELERY_BROKER_URL: "redis://redis:6379/0"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/0"
+      SECRET_KEY: "siipb-production-secret-key-change-in-env"
+      JWT_SECRET_KEY: "siipb-jwt-secret-key-change-in-env"
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - siipb_net
+
+  # 4. Celery Async Task Worker (SMTP Email & Background Jobs)
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: siipb_celery_worker
+    restart: unless-stopped
+    command: ["celery", "-A", "celery_app.celery", "worker", "--loglevel=info", "--concurrency=4"]
+    environment:
+      APP_ENV: production
+      DATABASE_URL: "mariadb+pymysql://root:123@mariadb:3306/siipb?charset=utf8mb4"
+      REDIS_URL: "redis://redis:6379/0"
+      CELERY_BROKER_URL: "redis://redis:6379/0"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/0"
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - siipb_net
+
+  # 5. Celery Beat Scheduler (Due dates, Reminders, Overdue tracking)
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: siipb_celery_beat
+    restart: unless-stopped
+    command: ["celery", "-A", "celery_app.celery", "beat", "--loglevel=info"]
+    environment:
+      APP_ENV: production
+      DATABASE_URL: "mariadb+pymysql://root:123@mariadb:3306/siipb?charset=utf8mb4"
+      REDIS_URL: "redis://redis:6379/0"
+      CELERY_BROKER_URL: "redis://redis:6379/0"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/0"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - siipb_net
+
+  # 6. Nginx Web Server & Reverse Proxy
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: siipb_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - uploads_data:/app/uploads:ro
+    depends_on:
+      - backend
+    networks:
+      - siipb_net
+
+volumes:
+  mariadb_data:
+  redis_data:
+  uploads_data:
+
+networks:
+  siipb_net:
+    driver: bridge
