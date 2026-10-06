@@ -21,7 +21,7 @@ frontend/
 ├── app/
 │   ├── layout.tsx              # root: FeedbackProvider (toast/confirm) + DataProvider
 │   ├── page.tsx                # redirect ke halaman awal sesuai role
-│   ├── (auth)/login/           # login lokal + simulasi SSO OIDC
+│   ├── login/                  # login lokal + simulasi SSO OIDC
 │   └── (app)/                  # area terautentikasi (AppShell: sidebar, topbar, RBAC per rute)
 │       ├── dashboard/  inventaris/[id]/ubah  inventaris/baru
 │       ├── peminjaman/[id]/ubah  peminjaman/baru
