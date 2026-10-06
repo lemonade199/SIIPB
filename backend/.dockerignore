@@ -1,0 +1,27 @@
+# Git & IDE
+.git
+.gitignore
+.vscode
+.idea
+*.swp
+*.swo
+
+# Python virtual environment & cache
+.venv
+venv
+ENV
+env/
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# Testing & Coverage
+.pytest_cache
+.coverage
+htmlcov
+
+# Local uploads & environment files
+uploads
+*.log
+.env

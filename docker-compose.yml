@@ -1,14 +1,14 @@
 version: "3.9"
 
 services:
-  # 1. MariaDB Existing Database Service
+  # 1. MariaDB Database Service (Initializes 26 existing tables from database/SIIPB.sql)
   mariadb:
     image: mariadb:11.4
     container_name: siipb_mariadb
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: "123"
-      MYSQL_DATABASE: "siipb"
+      MYSQL_ROOT_PASSWORD: "${DB_PASSWORD:-123}"
+      MYSQL_DATABASE: "${DB_NAME:-siipb}"
       TZ: "Asia/Jakarta"
     volumes:
       - mariadb_data:/var/lib/mysql
@@ -49,12 +49,18 @@ services:
     restart: unless-stopped
     environment:
       APP_ENV: production
-      DATABASE_URL: "mariadb+pymysql://root:123@mariadb:3306/siipb?charset=utf8mb4"
+      DATABASE_URL: "mariadb+pymysql://root:${DB_PASSWORD:-123}@mariadb:3306/${DB_NAME:-siipb}?charset=utf8mb4"
       REDIS_URL: "redis://redis:6379/0"
       CELERY_BROKER_URL: "redis://redis:6379/0"
       CELERY_RESULT_BACKEND: "redis://redis:6379/0"
-      SECRET_KEY: "siipb-production-secret-key-change-in-env"
-      JWT_SECRET_KEY: "siipb-jwt-secret-key-change-in-env"
+      SECRET_KEY: "${SECRET_KEY:-siipb-production-secret-key-change-in-env}"
+      JWT_SECRET_KEY: "${JWT_SECRET_KEY:-siipb-jwt-secret-key-change-in-env}"
+      SMTP_HOST: "${SMTP_HOST:-smtp.gmail.com}"
+      SMTP_PORT: "${SMTP_PORT:-587}"
+      SMTP_USERNAME: "${SMTP_USERNAME:-}"
+      SMTP_PASSWORD: "${SMTP_PASSWORD:-}"
+      SMTP_SENDER_EMAIL: "${SMTP_SENDER_EMAIL:-sarpras@siipb.sch.id}"
+      SMTP_SENDER_NAME: "${SMTP_SENDER_NAME:-SIIPB Sarpras IT}"
     volumes:
       - uploads_data:/app/uploads
     depends_on:
@@ -75,10 +81,16 @@ services:
     command: ["celery", "-A", "celery_app.celery", "worker", "--loglevel=info", "--concurrency=4"]
     environment:
       APP_ENV: production
-      DATABASE_URL: "mariadb+pymysql://root:123@mariadb:3306/siipb?charset=utf8mb4"
+      DATABASE_URL: "mariadb+pymysql://root:${DB_PASSWORD:-123}@mariadb:3306/${DB_NAME:-siipb}?charset=utf8mb4"
       REDIS_URL: "redis://redis:6379/0"
       CELERY_BROKER_URL: "redis://redis:6379/0"
       CELERY_RESULT_BACKEND: "redis://redis:6379/0"
+      SMTP_HOST: "${SMTP_HOST:-smtp.gmail.com}"
+      SMTP_PORT: "${SMTP_PORT:-587}"
+      SMTP_USERNAME: "${SMTP_USERNAME:-}"
+      SMTP_PASSWORD: "${SMTP_PASSWORD:-}"
+      SMTP_SENDER_EMAIL: "${SMTP_SENDER_EMAIL:-sarpras@siipb.sch.id}"
+      SMTP_SENDER_NAME: "${SMTP_SENDER_NAME:-SIIPB Sarpras IT}"
     volumes:
       - uploads_data:/app/uploads
     depends_on:
@@ -99,7 +111,7 @@ services:
     command: ["celery", "-A", "celery_app.celery", "beat", "--loglevel=info"]
     environment:
       APP_ENV: production
-      DATABASE_URL: "mariadb+pymysql://root:123@mariadb:3306/siipb?charset=utf8mb4"
+      DATABASE_URL: "mariadb+pymysql://root:${DB_PASSWORD:-123}@mariadb:3306/${DB_NAME:-siipb}?charset=utf8mb4"
       REDIS_URL: "redis://redis:6379/0"
       CELERY_BROKER_URL: "redis://redis:6379/0"
       CELERY_RESULT_BACKEND: "redis://redis:6379/0"
@@ -120,6 +132,7 @@ services:
       - "80:80"
     volumes:
       - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infrastructure/nginx/html:/usr/share/nginx/html:ro
       - uploads_data:/app/uploads:ro
     depends_on:
       - backend
