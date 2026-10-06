@@ -1,10 +1,9 @@
 /** Laporan: inventaris, peminjaman, pengembalian, keterlambatan, kerusakan & kehilangan. */
 import { db } from '@/lib/mock/db';
 import { fmtDate, localDate, nowISO } from '@/lib/date';
-import { CONDITIONS } from '@/lib/constants';
 import { clone, rupiah } from '@/lib/utils';
 import { audit } from '@/services/audit';
-import { borrowView, cat, emp, item, itemsOf, loc, returnDetails, unit, userName } from '@/services/lookup';
+import { borrowView, cat, emp, item, itemsOf, loc, returnDetails, unit, userName, conditionLabel } from '@/services/lookup';
 import { currentUser } from '@/services/session';
 import type { Borrowing, Item, ReportFilters, ReportType } from '@/types';
 
@@ -45,7 +44,7 @@ export function buildReport(type: ReportType, f: Partial<ReportFilters> = {}): R
         sumber: it.acquisition_source,
         nilai: it.acquisition_value,
         lokasi: loc(it.location_id)?.name,
-        kondisi: CONDITIONS[it.condition_status] || '—',
+        kondisi: conditionLabel(it.condition_status),
         status: it.item_status,
       }));
     return {
@@ -184,7 +183,7 @@ export function buildReport(type: ReportType, f: Partial<ReportFilters> = {}): R
         kategori: cat(it.category_id)?.name,
         lokasi: loc(it.location_id)?.name,
         status: it.item_status,
-        kondisi: CONDITIONS[it.condition_status] || '—',
+        kondisi: conditionLabel(it.condition_status),
         sejak: mv ? fmtDate(localDate(mv.at)) : '—',
         keterangan: mv ? mv.note : '',
         nilai: it.acquisition_value,

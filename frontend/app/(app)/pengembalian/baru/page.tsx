@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Input } from '@/components/ui/input';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { db } from '@/lib/mock/db';
@@ -11,6 +12,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useTitle } from '@/hooks/use-title';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Card } from '@/components/ui/card';
 import { Field, SelectField, TextareaField, TextField } from '@/components/ui/form';
 import { Icon } from '@/components/ui/icon';
@@ -18,7 +20,9 @@ import { Alert, Avatar, Empty, KV, PageHead, Thumb } from '@/components/ui/misc'
 import { BorrowBadge, DueText, LateText } from '@/components/domain/borrow-status';
 import { useToast } from '@/components/providers/feedback-provider';
 import { activeBorrowings, borrowingByCode, borrowView, detailsOf, emp, isActive, item as getItem, itemByCode, itemsOf, returnDetails, unit } from '@/services/lookup';
-import { createReturn, type ReturnItemInput } from '@/services/return';
+import { type ReturnItemInput } from '@/services/return';
+import * as repo from '@/services/repo';
+import { CAPABILITIES } from '@/lib/config';
 import type { Borrowing, ID, ReturnConditionKey } from '@/types';
 
 export default function ReturnFormPage() {
@@ -80,10 +84,10 @@ function Picker() {
         <div className="toolbar">
           <div className="grow">
             <Icon name="search" size={16} />
-            <input className="input" placeholder="Cari nama peminjam, kode PJM-…, atau kode barang INV-…" aria-label="Cari transaksi aktif" autoComplete="off" value={q} onChange={(e) => setQ(e.target.value)} />
+            <Input placeholder="Cari nama peminjam, kode PJM-…, atau kode barang INV-…" aria-label="Cari transaksi aktif" autoComplete="off" value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
-          <input
-            className="input mono"
+          <Input
+            className="font-mono"
             placeholder="Pindai QR barang + Enter"
             aria-label="Pindai QR barang"
             style={{ width: 260 }}
@@ -170,12 +174,16 @@ function ReturnForm({ b }: { b: Borrowing }) {
   const patch = (id: ID, p: Partial<ReturnItemInput>) => setDetails((d) => ({ ...d, [id]: { ...d[id], ...p } }));
   const late = returnDate ? Math.max(0, diffDays(b.due_date, returnDate)) : 0;
 
-  const onSubmit = (ev: React.FormEvent) => {
+  const [saving, setSaving] = useState(false);
+  const onSubmit = async (ev: React.FormEvent) => {
     ev.preventDefault();
+    if (saving) return;
     const payload = Object.fromEntries(
       Object.entries(details).map(([k, d]) => [k, { ...d, complete: d.condition === 'HILANG' ? false : d.complete }]),
     ) as Record<ID, ReturnItemInput>;
-    const r = createReturn({ borrowing_id: b.id, return_date: returnDate, details: payload, notes, send_confirmation: sendConfirm });
+    setSaving(true);
+    const r = await repo.createReturn({ borrowing_id: b.id, return_date: returnDate, details: payload, notes, send_confirmation: sendConfirm });
+    setSaving(false);
     if (!r.ok) return setError(r.error);
     const changed = returnDetails(r.ret)
       .map((x) => `${getItem(x.item_id)?.item_code} → ${RETURN_CONDITIONS.find((c) => c.key === x.condition_after)?.item_status}`)
@@ -258,7 +266,7 @@ function ReturnForm({ b }: { b: Borrowing }) {
                           />
                           <Field label="Kelengkapan">
                             <label className="check" style={{ minHeight: 38, alignItems: 'center' }}>
-                              <input type="checkbox" checked={d.complete} disabled={d.condition === 'HILANG'} onChange={(ev) => patch(it.id, { complete: ev.target.checked })} /> Lengkap sesuai saat diserahkan
+                              <Checkbox checked={d.complete} disabled={d.condition === 'HILANG'} onCheckedChange={(c) => patch(it.id, { complete: c === true })} /> Lengkap sesuai saat diserahkan
                             </label>
                           </Field>
                           {showMissing && (
@@ -290,11 +298,20 @@ function ReturnForm({ b }: { b: Borrowing }) {
 
             <Card title="Data pengembalian">
               <div className="form-grid">
-                <TextField label="Tanggal pengembalian" type="date" required min={b.borrow_date} value={returnDate} onChange={(ev) => setReturnDate(ev.target.value)} />
+                <TextField
+                  label="Tanggal pengembalian"
+                  type="date"
+                  required
+                  min={b.borrow_date}
+                  value={returnDate}
+                  readOnly={!CAPABILITIES.returnDate}
+                  hint={CAPABILITIES.returnDate ? undefined : 'Dicatat otomatis oleh server saat disimpan.'}
+                  onChange={(ev) => setReturnDate(ev.target.value)}
+                />
                 <TextField label="Diterima oleh" value={user?.name ?? ''} readOnly />
                 <TextareaField label="Catatan" full rows={2} value={notes} onChange={(ev) => setNotes(ev.target.value)} />
                 <label className="check full">
-                  <input type="checkbox" checked={sendConfirm} disabled={!s.return_notify} onChange={(ev) => setSendConfirm(ev.target.checked)} />
+                  <Checkbox checked={sendConfirm} disabled={!s.return_notify} onCheckedChange={(c) => setSendConfirm(c === true)} />
                   <span>
                     Kirim konfirmasi pengembalian ke {e?.email}
                     {!s.return_notify && <span className="muted"> (dinonaktifkan di Pengaturan)</span>}
@@ -333,8 +350,8 @@ function ReturnForm({ b }: { b: Borrowing }) {
                 </Alert>
               )}
               <div className="stack" style={{ gap: 8, marginTop: 14 }}>
-                <Button type="submit" variant="primary" icon="check" block>
-                  Simpan Pengembalian
+                <Button type="submit" variant="primary" icon="check" block disabled={saving}>
+                  {saving ? 'Menyimpan…' : 'Simpan Pengembalian'}
                 </Button>
                 <Button block href={`/peminjaman/${b.id}`}>
                   Batal

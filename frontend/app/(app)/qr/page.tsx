@@ -1,15 +1,16 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
+import { Input } from '@/components/ui/input';
 import { useEffect, useRef, useState } from 'react';
 import { db } from '@/lib/mock/db';
 import { fmtDate } from '@/lib/date';
-import { CONDITIONS } from '@/lib/constants';
 import { cn, match, stripQrPrefix } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { useTitle } from '@/hooks/use-title';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Card } from '@/components/ui/card';
 import { Alert, Empty, PageHead, Thumb } from '@/components/ui/misc';
 import { QrCode } from '@/components/ui/qr-code';
@@ -17,7 +18,7 @@ import { DueText } from '@/components/domain/borrow-status';
 import { useToast } from '@/components/providers/feedback-provider';
 import { audit } from '@/services/audit';
 import { qrPayload } from '@/services/inventory';
-import { activeBorrowingOfItem, emp, isBorrowable, item as getItem, itemByCode, loc } from '@/services/lookup';
+import { activeBorrowingOfItem, emp, isBorrowable, item as getItem, itemByCode, loc, conditionLabel } from '@/services/lookup';
 import type { ID } from '@/types';
 
 interface DetectedBarcode {
@@ -110,8 +111,8 @@ export default function QrPage() {
               <div className="stack" style={{ gap: 10 }}>
                 <div className="field">
                   <label htmlFor="qr-in">Kode dari pemindai</label>
-                  <input
-                    className="input mono"
+                  <Input
+                    className="font-mono"
                     id="qr-in"
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
@@ -148,11 +149,11 @@ export default function QrPage() {
           <div className="split" style={{ gridTemplateColumns: '320px minmax(0,1fr)' }}>
             <div className="no-print">
               <Card title="Pilih barang">
-                <input className="input" placeholder="Cari barang…" aria-label="Cari barang" style={{ marginBottom: 10 }} value={q} onChange={(e) => setQ(e.target.value)} />
+                <Input placeholder="Cari barang…" aria-label="Cari barang" style={{ marginBottom: 10 }} value={q} onChange={(e) => setQ(e.target.value)} />
                 <div className="pick-list" style={{ maxHeight: 460 }}>
                   {list.map((i) => (
                     <label key={i.id} className={cn(selected.has(i.id) && 'sel')}>
-                      <input type="checkbox" checked={selected.has(i.id)} onChange={(e) => toggle(i.id, e.target.checked)} />
+                      <Checkbox checked={selected.has(i.id)} onCheckedChange={(c) => toggle(i.id, c === true)} />
                       <span style={{ flex: 1, minWidth: 0 }}>
                         <b>{i.item_name}</b> <span className="mono small muted">{i.item_code}</span>
                       </span>
@@ -239,7 +240,7 @@ function ScanResult({ raw }: { raw: string }) {
           <div className="row" style={{ gap: 8, margin: '8px 0' }}>
             <Badge status={it.item_status} />
             <span className="small muted">
-              {loc(it.location_id)?.name} · {CONDITIONS[it.condition_status]}
+              {loc(it.location_id)?.name} · {conditionLabel(it.condition_status)}
             </span>
           </div>
           {activeB && (

@@ -1,7 +1,7 @@
 /** Lookup & tampilan turunan (setara query helper / serializer di backend). */
 import { db } from '@/lib/mock/db';
 import { diffDays, localDate, relDue, today as todayStr, type RelDue } from '@/lib/date';
-import type { Borrowing, BorrowDisplay, ID, Item, Return } from '@/types';
+import type { Borrowing, BorrowDisplay, Condition, ID, Item, ItemStatus, Return } from '@/types';
 
 export const cat = (id: ID | null | undefined) => db.get('categories', id);
 export const loc = (id: ID | null | undefined) => db.get('locations', id);
@@ -54,3 +54,8 @@ export const isDueSoon = (b: Borrowing, today = todayStr()) => {
   const n = relDue(b.due_date, today).n;
   return n >= 0 && n <= 3;
 };
+
+/* ---------- Parameter status & kondisi (master data) ---------- */
+export const conditionLabel = (c: Condition | null | undefined) => (c ? db.data.settings.parameters?.condition[c]?.label || c : '—');
+export const statusLabel = (s: ItemStatus) => db.data.settings.parameters?.item_status[s]?.label || s;
+export const statusDesc = (s: ItemStatus) => db.data.settings.parameters?.item_status[s]?.desc || '';

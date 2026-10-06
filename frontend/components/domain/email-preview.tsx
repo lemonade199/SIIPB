@@ -1,6 +1,7 @@
 'use client';
 
 import { db } from '@/lib/mock/db';
+import * as repo from '@/services/repo';
 import { fmtDateTime } from '@/lib/date';
 import { EVENT_LABEL } from '@/lib/constants';
 import { useAuth } from '@/hooks/use-auth';
@@ -9,7 +10,6 @@ import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/dialog';
 import { Icon } from '@/components/ui/icon';
 import { useToast } from '@/components/providers/feedback-provider';
-import { retryNotification } from '@/services/notification';
 import type { ID } from '@/types';
 
 /** Pratinjau email yang diterima peminjam / petugas / pimpinan + log pengiriman SMTP. */
@@ -34,8 +34,8 @@ export function EmailPreview({ id, onClose }: { id: ID | null; onClose: () => vo
             <Button
               variant="primary"
               icon="send"
-              onClick={() => {
-                const res = retryNotification(n.id);
+              onClick={async () => {
+                const res = await repo.retryNotification(n.id);
                 onClose();
                 toast(res.ok ? 'Email berhasil dikirim ulang.' : 'Pengiriman ulang masih gagal. Periksa konfigurasi SMTP.', res.ok ? 'ok' : 'err');
               }}

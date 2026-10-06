@@ -4,6 +4,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { cn, initials, type Page } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Icon, type IconName } from '@/components/ui/icon';
+import { Input } from '@/components/ui/input';
 import type { Item } from '@/types';
 
 /* ---------- Alert ---------- */
@@ -11,7 +12,7 @@ export type AlertType = 'info' | 'warn' | 'danger' | 'ok';
 const ALERT_ICON: Record<AlertType, IconName> = { info: 'info', warn: 'alert', danger: 'alert', ok: 'checkCircle' };
 export function Alert({ type = 'info', icon, children, className }: { type?: AlertType; icon?: IconName; children: ReactNode; className?: string }) {
   return (
-    <div className={cn('alert', `alert-${type}`, className)} role={type === 'danger' ? 'alert' : undefined}>
+    <div data-slot="alert" className={cn('alert', `alert-${type}`, className)} role={type === 'danger' ? 'alert' : undefined}>
       <Icon name={icon || ALERT_ICON[type]} />
       <div>{children}</div>
     </div>
@@ -55,7 +56,7 @@ export function Thumb({ item }: { item?: Item | null }) {
   return (
     <span className="thumb">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      {item?.photo ? <img src={item.photo} alt="" /> : <Icon name="image" />}
+      {item?.photos?.[0] ? <img src={item.photos[0]} alt="" /> : <Icon name="image" />}
     </span>
   );
 }
@@ -98,30 +99,15 @@ export function Pager<T>({ page, label = 'data', onPage }: { page: Page<T>; labe
   );
 }
 
-/* ---------- Tabs ---------- */
-export interface TabDef<K extends string> {
-  key: K;
-  label: ReactNode;
-  count?: number;
-}
-export function Tabs<K extends string>({ tabs, value, onChange, className, label }: { tabs: TabDef<K>[]; value: K; onChange: (k: K) => void; className?: string; label?: string }) {
-  return (
-    <div className={cn('tabs', className)} style={{ padding: '0 12px' }} role="tablist" aria-label={label}>
-      {tabs.map((t) => (
-        <button key={t.key} type="button" role="tab" aria-selected={value === t.key} className={cn(value === t.key && 'active')} onClick={() => onChange(t.key)}>
-          {t.label} {t.count !== undefined && <span className="pill">{t.count}</span>}
-        </button>
-      ))}
-    </div>
-  );
-}
+/* ---------- Tabs (shadcn/Radix) ---------- */
+export { Tabs, type TabDef } from '@/components/ui/tabs';
 
 /* ---------- Toolbar search ---------- */
 export function SearchInput({ value, onChange, placeholder, label, autoFocus }: { value: string; onChange: (v: string) => void; placeholder: string; label?: string; autoFocus?: boolean }) {
   return (
     <div className="grow">
       <Icon name="search" size={16} />
-      <input className="input" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label={label || placeholder} autoFocus={autoFocus} />
+      <Input className="pl-[34px]" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label={label || placeholder} autoFocus={autoFocus} />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { CAPABILITIES } from '@/lib/config';
 import { db } from '@/lib/mock/db';
 import { fmtDateTime } from '@/lib/date';
 import { PERMISSIONS } from '@/lib/constants';
@@ -88,6 +89,7 @@ export default function ProfilPage() {
               <div className="code-block">{session.token}</div>
             </Card>
           )}
+          {CAPABILITIES.changePassword && (
           <Card title="Ganti kata sandi" desc="Untuk login lokal. Di backend, kata sandi disimpan dalam bentuk hash.">
             <form className="stack" style={{ gap: 12 }} noValidate onSubmit={onSubmit}>
               <TextField label="Kata sandi lama" type="password" required value={pw.old} error={errors.old} onChange={(e) => setPw({ ...pw, old: e.target.value })} />
@@ -108,6 +110,7 @@ export default function ProfilPage() {
               </div>
             </form>
           </Card>
+          )}
         </div>
       </div>
     </>

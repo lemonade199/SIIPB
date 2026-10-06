@@ -2,10 +2,10 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { db } from '@/lib/mock/db';
 import { fmtDate, fmtDateTime } from '@/lib/date';
-import { CONDITIONS, ITEM_STATUS, NOT_BORROWABLE } from '@/lib/constants';
+import { ITEM_STATUS, NOT_BORROWABLE } from '@/lib/constants';
 import { capitalize, rupiah } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { useTitle } from '@/hooks/use-title';
@@ -14,13 +14,17 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Modal } from '@/components/ui/dialog';
 import { SelectField, TextareaField } from '@/components/ui/form';
-import { Alert, Empty, KV, PageHead, Photo } from '@/components/ui/misc';
+import { Alert, Empty, KV, PageHead } from '@/components/ui/misc';
+import { PhotoGallery } from '@/components/domain/photo-gallery';
 import { QrCode } from '@/components/ui/qr-code';
 import { BorrowBadge, DueText } from '@/components/domain/borrow-status';
 import { NotFoundView } from '@/components/layout/app-shell';
 import { useConfirm, useToast } from '@/components/providers/feedback-provider';
-import { qrPayload, setItemActive, setItemStatus } from '@/services/inventory';
-import { activeBorrowingOfItem, cat, emp, isBorrowable, item as getItem, loc, userName } from '@/services/lookup';
+import { qrPayload } from '@/services/inventory';
+import * as repo from '@/services/repo';
+import { CAPABILITIES, isApiMode } from '@/lib/config';
+import { statusDesc, statusLabel } from '@/services/lookup';
+import { activeBorrowingOfItem, cat, emp, isBorrowable, item as getItem, loc, userName, conditionLabel } from '@/services/lookup';
 import type { ItemStatus } from '@/types';
 
 export default function ItemDetailPage() {
@@ -33,6 +37,12 @@ export default function ItemDetailPage() {
   const [statusOpen, setStatusOpen] = useState(false);
   const [newStatus, setNewStatus] = useState<ItemStatus>('TERSEDIA');
   const [note, setNote] = useState('');
+  const itemId = it?.id;
+
+  // Mode api: riwayat pergerakan diambil dari GET /assets/{id}/history saat halaman dibuka.
+  useEffect(() => {
+    if (isApiMode && itemId) repo.loadItemHistory(itemId).catch(() => undefined);
+  }, [itemId]);
 
   if (!it) return <NotFoundView text="Barang tidak ditemukan." />;
 
@@ -52,8 +62,8 @@ export default function ItemDetailPage() {
     setNote('');
     setStatusOpen(true);
   };
-  const saveStatus = () => {
-    const r = setItemStatus(it.id, newStatus, note);
+  const saveStatus = async () => {
+    const r = await repo.setItemStatus(it.id, newStatus, note);
     if (!r.ok) return toast(r.error, 'err');
     setStatusOpen(false);
     toast(`Status ${it.item_code} menjadi ${newStatus}.`);
@@ -68,7 +78,7 @@ export default function ItemDetailPage() {
       danger: true,
     });
     if (!reason) return;
-    const r = setItemActive(it.id, false, String(reason));
+    const r = await repo.setItemActive(it.id, false, String(reason));
     if (!r.ok) return toast(r.error, 'err');
     toast('Barang dinonaktifkan.');
   };
@@ -99,7 +109,7 @@ export default function ItemDetailPage() {
                 Ubah
               </Button>
             )}
-            {canManage && it.active && it.item_status !== 'DIPINJAM' && (
+            {canManage && CAPABILITIES.manualItemStatus && it.active && it.item_status !== 'DIPINJAM' && (
               <Button icon="refresh" onClick={openStatus}>
                 Ubah status
               </Button>
@@ -112,8 +122,9 @@ export default function ItemDetailPage() {
               ) : (
                 <Button
                   icon="refresh"
-                  onClick={() => {
-                    setItemActive(it.id, true, 'Diaktifkan kembali');
+                  onClick={async () => {
+                    const r = await repo.setItemActive(it.id, true, 'Diaktifkan kembali');
+                    if (!r.ok) return toast(r.error, 'err');
                     toast('Barang diaktifkan kembali.');
                   }}
                 >
@@ -139,7 +150,7 @@ export default function ItemDetailPage() {
         <div className="stack">
           <Card title="Atribut inventaris">
             <div className="grid items-start gap-5 md:grid-cols-[240px_minmax(0,1fr)]">
-              <Photo src={it.photo} alt={`Foto ${it.item_name}`} />
+              <PhotoGallery key={it.id} photos={it.photos} alt={`Foto ${it.item_name}`} />
               <KV
                 items={[
                   ['Kode barang', <span key="k" className="mono">{it.item_code}</span>],
@@ -156,7 +167,7 @@ export default function ItemDetailPage() {
                       {l?.name} <span className="muted small">· {l?.building}</span>
                     </>,
                   ],
-                  ['Kondisi', CONDITIONS[it.condition_status] || '—'],
+                  ['Kondisi', conditionLabel(it.condition_status)],
                   [
                     'Status',
                     <>
@@ -289,7 +300,8 @@ export default function ItemDetailPage() {
             required
             value={newStatus}
             onChange={(e) => setNewStatus(e.target.value as ItemStatus)}
-            options={ITEM_STATUS.filter((s) => s !== 'DIPINJAM').map((s) => ({ value: s, label: s }))}
+            options={ITEM_STATUS.filter((s) => s !== 'DIPINJAM').map((s) => ({ value: s, label: `${s} — ${statusLabel(s)}` }))}
+            hint={statusDesc(newStatus)}
           />
           <TextareaField label="Keterangan" rows={2} placeholder="mis. dikirim ke vendor untuk servis" value={note} onChange={(e) => setNote(e.target.value)} />
           <Alert type="info">Status DIPINJAM hanya diberikan melalui checkout peminjaman. Perubahan dicatat pada riwayat dan audit log.</Alert>

@@ -1,6 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import { CAPABILITIES } from '@/lib/config';
+import { Input } from '@/components/ui/input';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { db } from '@/lib/mock/db';
@@ -12,6 +14,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useTitle } from '@/hooks/use-title';
 import { Badge, Tag } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Card } from '@/components/ui/card';
 import { Modal } from '@/components/ui/dialog';
 import { Field, SelectField, Switch, TextareaField, TextField } from '@/components/ui/form';
@@ -39,7 +42,8 @@ export default function PengaturanPage() {
   useTitle('Pengaturan');
   const params = useSearchParams();
   const t = params.get('tab') as Tab | null;
-  const tab: Tab = t && TABS.some((x) => x[0] === t) ? t : 'umum';
+  const tabs = TABS.filter(([k]) => CAPABILITIES.scheduler || k !== 'demo');
+  const tab: Tab = t && tabs.some((x) => x[0] === t) ? t : 'umum';
   const s = db.data.settings;
 
   return (
@@ -47,7 +51,7 @@ export default function PengaturanPage() {
       <PageHead crumb="Beranda / Administrasi" title="Pengaturan" desc="Konfigurasi SMTP, template, aturan notifikasi, keamanan, dan backup." />
       <div className="split" style={{ gridTemplateColumns: '230px minmax(0,1fr)' }}>
         <nav className="card" style={{ padding: 8 }} aria-label="Bagian pengaturan">
-          {TABS.map(([k, l, ic]) => (
+          {tabs.map(([k, l, ic]) => (
             <Link
               key={k}
               href={`/pengaturan?tab=${k}`}
@@ -58,7 +62,7 @@ export default function PengaturanPage() {
                 padding: '9px 12px',
                 borderRadius: 8,
                 textDecoration: 'none',
-                color: tab === k ? 'var(--fg)' : 'var(--muted)',
+                color: tab === k ? 'var(--fg)' : 'var(--muted-foreground)',
                 background: tab === k ? 'var(--hover)' : 'transparent',
                 fontWeight: tab === k ? 600 : 500,
                 flexWrap: 'nowrap',
@@ -70,6 +74,12 @@ export default function PengaturanPage() {
           ))}
         </nav>
         <div className="stack">
+          {!CAPABILITIES.serverSettings && (
+            <Alert type="warn">
+              Backend belum menyediakan endpoint pengaturan. Perubahan di halaman ini disimpan di browser ini saja; konfigurasi SMTP, JWT, dan jadwal Celery di server diatur lewat
+              environment variable backend.
+            </Alert>
+          )}
           {tab === 'umum' && <Umum key="umum" s={s} />}
           {tab === 'smtp' && <Smtp key="smtp" s={s} />}
           {tab === 'notifikasi' && <Notifikasi key="notif" s={s} />}
@@ -160,7 +170,7 @@ function Smtp({ s }: { s: Settings }) {
           </Alert>
         </div>
         <label className="check full">
-          <input type="checkbox" checked={v.simulate_failure} onChange={(e) => setV({ ...v, simulate_failure: e.target.checked })} />
+          <Checkbox checked={v.simulate_failure} onCheckedChange={(c) => setV({ ...v, simulate_failure: c === true })} />
           <span>
             Simulasikan kegagalan SMTP <span className="muted small">(untuk mencoba status GAGAL dan kirim ulang)</span>
           </span>
@@ -220,13 +230,13 @@ function Notifikasi({ s }: { s: Settings }) {
             options={['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura'].map((x) => ({ value: x, label: x }))}
           />
           <label className="check">
-            <input type="checkbox" checked={v.enabled} onChange={(e) => setV({ ...v, enabled: e.target.checked })} /> Scheduler aktif
+            <Checkbox checked={v.enabled} onCheckedChange={(c) => setV({ ...v, enabled: c === true })} /> Scheduler aktif
           </label>
           <label className="check">
-            <input type="checkbox" checked={v.checkout_notify} onChange={(e) => setV({ ...v, checkout_notify: e.target.checked })} /> Kirim email saat checkout
+            <Checkbox checked={v.checkout_notify} onCheckedChange={(c) => setV({ ...v, checkout_notify: c === true })} /> Kirim email saat checkout
           </label>
           <label className="check">
-            <input type="checkbox" checked={v.return_notify} onChange={(e) => setV({ ...v, return_notify: e.target.checked })} /> Izinkan konfirmasi pengembalian
+            <Checkbox checked={v.return_notify} onCheckedChange={(c) => setV({ ...v, return_notify: c === true })} /> Izinkan konfirmasi pengembalian
           </label>
           <SaveBtn />
         </form>
@@ -254,14 +264,12 @@ function Notifikasi({ s }: { s: Settings }) {
                   <td className="small">{r.desc}</td>
                   {(['peminjam', 'petugas', 'pimpinan'] as RecipientKind[]).map((to) => (
                     <td key={to} className="center">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={r.to.includes(to)}
                         disabled={to === 'peminjam'}
                         aria-label={`${r.event} ke ${to}`}
-                        style={{ width: 17, height: 17, accentColor: 'var(--primary)' }}
-                        onChange={(e) => {
-                          const rr = setRuleRecipient(i, to, e.target.checked);
+                        onCheckedChange={(c) => {
+                          const rr = setRuleRecipient(i, to, c === true);
                           toast(`Penerima ${rr.event}: ${rr.to.join(' + ')}.`);
                         }}
                       />
@@ -272,8 +280,8 @@ function Notifikasi({ s }: { s: Settings }) {
                     <Switch
                       checked={r.active}
                       aria-label={`Aktifkan ${r.event}`}
-                      onChange={(e) => {
-                        const rr = setRuleActive(i, e.target.checked);
+                      onCheckedChange={(c) => {
+                        const rr = setRuleActive(i, c);
                         toast(`Aturan ${rr.event} ${rr.active ? 'diaktifkan' : 'dinonaktifkan'}.`);
                       }}
                     />
@@ -419,12 +427,12 @@ function Keamanan({ s }: { s: Settings }) {
         <TextField label="Sesi antarmuka (jam)" type="number" min={1} value={v.session_hours} onChange={num('session_hours')} />
         <TextField label="Batas ukuran unggahan foto (MB)" type="number" min={1} max={10} value={v.upload_max_mb} onChange={num('upload_max_mb')} />
         <label className="check full">
-          <input type="checkbox" checked={v.oidc_enabled} onChange={(e) => setV({ ...v, oidc_enabled: e.target.checked })} /> Aktifkan login SSO (OAuth 2.0 + OpenID Connect)
+          <Checkbox checked={v.oidc_enabled} onCheckedChange={(c) => setV({ ...v, oidc_enabled: c === true })} /> Aktifkan login SSO (OAuth 2.0 + OpenID Connect)
         </label>
         <TextField label="Issuer / Identity Provider" mono full value={v.oidc_issuer} onChange={(e) => setV({ ...v, oidc_issuer: e.target.value })} />
         <TextField label="Client ID" mono value={v.oidc_client_id} onChange={(e) => setV({ ...v, oidc_client_id: e.target.value })} />
         <Field label="Client secret">
-          <input className="input" value="disimpan di secret manager" readOnly aria-label="Client secret" />
+          <Input value="disimpan di secret manager" readOnly aria-label="Client secret" />
         </Field>
         <div className="full">
           <Alert type="info">
@@ -582,7 +590,7 @@ function Demo({ s }: { s: Settings }) {
           </Button>
         </div>
         <label className="check" style={{ marginTop: 14 }}>
-          <input type="checkbox" checked={runAfter} onChange={(e) => setRunAfter(e.target.checked)} /> Jalankan pemeriksaan scheduler setelah menggeser tanggal
+          <Checkbox checked={runAfter} onCheckedChange={(c) => setRunAfter(c === true)} /> Jalankan pemeriksaan scheduler setelah menggeser tanggal
         </label>
         {s.demo_offset_days !== 0 && <p className="small muted" style={{ marginTop: 8 }}>Tanggal demo aktif: semua tampilan memakai tanggal yang digeser.</p>}
       </Card>

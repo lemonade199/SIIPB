@@ -1,11 +1,12 @@
 'use client';
 
 import Link from 'next/link';
+import { CAPABILITIES } from '@/lib/config';
 import { useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
 import { db } from '@/lib/mock/db';
-import { fmtDate, fmtDateTime, relDue, today } from '@/lib/date';
-import { downloadCSV } from '@/lib/file';
+import { fmtDate, fmtDateTime, localDate, relDue, today } from '@/lib/date';
+import { exportXlsx } from '@/lib/export';
 import { match, paginate } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { patchFilter, usePersistentState } from '@/hooks/use-persistent-state';
@@ -19,11 +20,12 @@ import { Empty, PageHead, Pager, SearchInput, Tabs } from '@/components/ui/misc'
 import { BorrowBadge, DueText } from '@/components/domain/borrow-status';
 import { useToast } from '@/components/providers/feedback-provider';
 import { stats } from '@/services/dashboard';
-import { activeBorrowings, borrowView, emp, itemsOf, unit } from '@/services/lookup';
+import { activeBorrowings, borrowView, cat, conditionLabel, emp, itemsOf, loc, unit } from '@/services/lookup';
 import { lastSchedulerRun, runScheduler } from '@/services/scheduler';
-import type { Borrowing } from '@/types';
+import type { Borrowing, ItemStatus } from '@/types';
 
-type Tab = 'aktif' | 'jatuh_tempo' | 'terlambat';
+type Tab = 'aktif' | 'jatuh_tempo' | 'terlambat' | 'rusak_hilang';
+const BROKEN: ItemStatus[] = ['RUSAK', 'RUSAK_BERAT', 'DALAM_PERBAIKAN', 'HILANG'];
 interface Filter {
   tab: Tab;
   q: string;
@@ -80,8 +82,9 @@ export default function MonitoringPage() {
   const run = lastSchedulerRun();
 
   const onExport = () =>
-    downloadCSV(
-      `monitoring-${f.tab}-${td}.csv`,
+    void exportXlsx(
+      `monitoring-${f.tab}-${td}.xlsx`,
+      { title: 'MONITORING PEMINJAMAN', subtitle: [db.data.settings.institution, `Kategori: ${f.tab.replace('_', ' ')} · per ${fmtDate(td, true)}`], sheetName: 'Monitoring' },
       [
         { key: 'kode', label: 'Kode' },
         { key: 'peminjam', label: 'Peminjam' },
@@ -122,10 +125,10 @@ export default function MonitoringPage() {
         desc="Pantau barang yang sedang dipinjam, akan jatuh tempo, dan terlambat."
         actions={
           <>
-            <Button icon="download" onClick={onExport}>
-              Ekspor CSV
+            <Button icon="download" onClick={onExport} disabled={f.tab === 'rusak_hilang'}>
+              Ekspor Excel
             </Button>
-            {can('notification.manage') && (
+            {CAPABILITIES.scheduler && can('notification.manage') && (
               <Button icon="play" variant="primary" onClick={onRun}>
                 Jalankan pemeriksaan
               </Button>
@@ -155,8 +158,13 @@ export default function MonitoringPage() {
             { key: 'aktif', label: 'Semua aktif', count: cnt.aktif },
             { key: 'jatuh_tempo', label: 'Jatuh tempo ≤ 3 hari', count: cnt.jatuh_tempo },
             { key: 'terlambat', label: 'Terlambat', count: cnt.terlambat },
+            { key: 'rusak_hilang', label: 'Rusak / hilang', count: db.where('items', (i) => i.active && BROKEN.includes(i.item_status)).length },
           ]}
         />
+        {f.tab === 'rusak_hilang' ? (
+          <BrokenItems q={f.q} category={f.category} onQ={(v) => set('q', v)} onCategory={(v) => set('category', v)} />
+        ) : (
+          <>
         <div className="toolbar">
           <SearchInput value={f.q} onChange={(v) => set('q', v)} placeholder="Cari kode, peminjam, NIP, barang…" label="Cari" />
           <Select aria-label="Unit kerja" value={f.unit} onChange={(e) => set('unit', e.target.value)} options={toOptions(db.all('units'), 'Semua unit kerja')} />
@@ -257,11 +265,86 @@ export default function MonitoringPage() {
           </table>
         </div>
         <Pager page={p} label="transaksi" onPage={(n) => set('page', n)} />
+          </>
+        )}
       </section>
       <p className="small muted" style={{ marginTop: 12 }}>
         <Icon name="info" size={14} className="inline align-[-2px]" /> Status TERLAMBAT ditetapkan oleh scheduler setiap hari pukul {db.data.settings.scheduler.time} WIB. Transaksi yang sudah dikembalikan tidak pernah menjadi
         terlambat.
       </p>
+    </>
+  );
+}
+
+/** Barang rusak, dalam perbaikan, dan hilang (cakupan monitoring dokumen bagian 3). */
+function BrokenItems({ q, category, onQ, onCategory }: { q: string; category: string; onQ: (v: string) => void; onCategory: (v: string) => void }) {
+  const { can } = useAuth();
+  const rows = db
+    .where('items', (i) => i.active && BROKEN.includes(i.item_status) && (!category || i.category_id === Number(category)) && match(q, i.item_code, i.item_name, i.brand))
+    .sort((a, b) => a.item_code.localeCompare(b.item_code));
+  const since = (id: number, status: ItemStatus) =>
+    db.where('item_movements', (m) => m.item_id === id && m.to_status === status).sort((a, b) => b.at.localeCompare(a.at))[0];
+  return (
+    <>
+      <div className="toolbar">
+        <SearchInput value={q} onChange={onQ} placeholder="Cari kode, nama, merek…" label="Cari barang" />
+        <Select aria-label="Kategori barang" value={category} onChange={(e) => onCategory(e.target.value)} options={toOptions(db.all('categories'), 'Semua kategori')} />
+        <span className="small muted">Barang dengan status ini tidak dapat dipinjam sampai statusnya dipulihkan.</span>
+      </div>
+      <div className="table-wrap">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Barang</th>
+              <th>Kategori</th>
+              <th>Lokasi</th>
+              <th>Status</th>
+              <th>Kondisi</th>
+              <th>Sejak</th>
+              <th>Keterangan</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length ? (
+              rows.map((it) => {
+                const mv = since(it.id, it.item_status);
+                return (
+                  <tr key={it.id}>
+                    <td>
+                      <Link className="cell-title" href={`/inventaris/${it.id}`}>
+                        {it.item_name}
+                      </Link>
+                      <div className="cell-sub mono">{it.item_code}</div>
+                    </td>
+                    <td>{cat(it.category_id)?.name}</td>
+                    <td>{loc(it.location_id)?.name}</td>
+                    <td>
+                      <Badge status={it.item_status} />
+                    </td>
+                    <td>{conditionLabel(it.condition_status)}</td>
+                    <td className="nowrap small">{mv ? fmtDate(localDate(mv.at)) : '—'}</td>
+                    <td className="small" style={{ maxWidth: 280 }}>
+                      {mv?.note || '—'}
+                    </td>
+                    <td className="right nowrap">
+                      <Button size="sm" icon="eye" href={`/inventaris/${it.id}`}>
+                        {can('inventory.manage') ? 'Tindak lanjut' : 'Detail'}
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })
+            ) : (
+              <tr>
+                <td colSpan={8}>
+                  <Empty icon="checkCircle">Tidak ada barang rusak, dalam perbaikan, atau hilang.</Empty>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </>
   );
 }

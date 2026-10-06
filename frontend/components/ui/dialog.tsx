@@ -1,10 +1,47 @@
 'use client';
 
-import { useEffect, useId, useRef, type ReactNode } from 'react';
-import { createPortal } from 'react-dom';
+import { X } from 'lucide-react';
+import { Dialog as DialogPrimitive } from 'radix-ui';
+import type { ComponentProps, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 
+/* ---------- Primitif shadcn/ui Dialog (Radix) ---------- */
+export const Dialog = DialogPrimitive.Root;
+export const DialogTrigger = DialogPrimitive.Trigger;
+export const DialogClose = DialogPrimitive.Close;
+
+export function DialogContent({ className, children, ...props }: ComponentProps<typeof DialogPrimitive.Content>) {
+  return (
+    <DialogPrimitive.Portal>
+      <DialogPrimitive.Overlay data-slot="dialog-overlay" className="fixed inset-0 z-100 bg-[rgba(15,23,42,.45)] data-[state=open]:animate-[fade_.12s_ease-out]" />
+      <div className="pointer-events-none fixed inset-0 z-100 overflow-y-auto px-4 py-[6vh]">
+        <DialogPrimitive.Content
+          data-slot="dialog-content"
+          className={cn('modal pointer-events-auto mx-auto w-full outline-none data-[state=open]:animate-[pop_.14s_ease-out]', className)}
+          {...props}
+        >
+          {children}
+        </DialogPrimitive.Content>
+      </div>
+    </DialogPrimitive.Portal>
+  );
+}
+
+export function DialogHeader({ title, desc }: { title: ReactNode; desc?: ReactNode }) {
+  return (
+    <div className="modal-head">
+      <div>
+        <DialogPrimitive.Title data-slot="dialog-title">{title}</DialogPrimitive.Title>
+        {desc ? <DialogPrimitive.Description data-slot="dialog-description">{desc}</DialogPrimitive.Description> : <DialogPrimitive.Description className="sr-only">{title}</DialogPrimitive.Description>}
+      </div>
+      <DialogPrimitive.Close className="grid size-8 place-items-center rounded-lg hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/25 outline-none" aria-label="Tutup">
+        <X size={18} strokeWidth={1.8} />
+      </DialogPrimitive.Close>
+    </div>
+  );
+}
+
+/* ---------- Pembungkus praktis yang dipakai halaman ---------- */
 interface ModalProps {
   open: boolean;
   onClose: () => void;
@@ -15,53 +52,15 @@ interface ModalProps {
   children?: ReactNode;
 }
 
-/** Dialog modal (setara shadcn <Dialog>): Esc & klik latar menutup, fokus kembali ke pemicu. */
+/** Modal SIIPB di atas shadcn Dialog: Esc/klik latar menutup, fokus terkunci & kembali ke pemicu. */
 export function Modal({ open, onClose, title, desc, size = 'md', footer, children }: ModalProps) {
-  const ref = useRef<HTMLDivElement>(null);
-  const titleId = useId();
-  const closeRef = useRef(onClose);
-  useEffect(() => {
-    closeRef.current = onClose;
-  });
-
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.activeElement as HTMLElement | null;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeRef.current();
-    };
-    document.addEventListener('keydown', onKey);
-    const t = setTimeout(() => {
-      const f = ref.current?.querySelector<HTMLElement>('input:not([type=hidden]):not([disabled]), select, textarea, .modal-foot .btn-primary');
-      f?.focus();
-    }, 30);
-    return () => {
-      clearTimeout(t);
-      document.removeEventListener('keydown', onKey);
-      prev?.focus?.();
-    };
-  }, [open]);
-
-  if (!open || typeof document === 'undefined') return null;
-  return createPortal(
-    <div
-      className="modal-backdrop"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div ref={ref} className={cn('modal', size === 'lg' && 'lg')} role="dialog" aria-modal="true" aria-labelledby={titleId}>
-        <div className="modal-head">
-          <div>
-            <h2 id={titleId}>{title}</h2>
-            {desc && <p>{desc}</p>}
-          </div>
-          <Button variant="ghost" size="sm" iconOnly icon="x" title="Tutup" onClick={onClose} />
-        </div>
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className={cn(size === 'lg' && 'lg')}>
+        <DialogHeader title={title} desc={desc} />
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-foot">{footer}</div>}
-      </div>
-    </div>,
-    document.body,
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Input } from '@/components/ui/input';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
 import { db } from '@/lib/mock/db';
@@ -92,11 +93,11 @@ export default function PeminjamanPage() {
           <label className="small muted" htmlFor="pj-from">
             Dari
           </label>
-          <input type="date" className="input" id="pj-from" value={f.from} onChange={(e) => set('from', e.target.value)} />
+          <Input type="date" id="pj-from" value={f.from} onChange={(e) => set('from', e.target.value)} />
           <label className="small muted" htmlFor="pj-to">
             s.d.
           </label>
-          <input type="date" className="input" id="pj-to" value={f.to} onChange={(e) => set('to', e.target.value)} />
+          <Input type="date" id="pj-to" value={f.to} onChange={(e) => set('to', e.target.value)} />
         </div>
         <div className="table-wrap">
           <table className="table">

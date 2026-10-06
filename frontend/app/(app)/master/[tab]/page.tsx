@@ -5,17 +5,23 @@ import { useParams } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 import { db } from '@/lib/mock/db';
 import { relDue } from '@/lib/date';
+import { CONDITION_KEYS, ITEM_STATUS } from '@/lib/constants';
 import { cn, match } from '@/lib/utils';
 import { usePersistentState } from '@/hooks/use-persistent-state';
 import { useTitle } from '@/hooks/use-title';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Modal } from '@/components/ui/dialog';
-import { SelectField, TextField, toOptions } from '@/components/ui/form';
+import { SelectField, TextareaField, TextField, toOptions } from '@/components/ui/form';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { Alert, Empty, PageHead, SearchInput } from '@/components/ui/misc';
 import { useConfirm, useToast } from '@/components/providers/feedback-provider';
 import { activeBorrowings, unit } from '@/services/lookup';
-import { deleteMaster, MASTER, saveMaster, setMasterActive, type MasterForm, type MasterKey } from '@/services/master';
+import { updateParameter } from '@/services/settings';
+import { MASTER, type MasterForm, type MasterKey } from '@/services/master';
+import * as repo from '@/services/repo';
+import { CAPABILITIES } from '@/lib/config';
 import type { Category, Employee, FieldErrors, ID, Location, Unit } from '@/types';
 
 type AnyRow = Employee | Category | Location | Unit;
@@ -53,7 +59,7 @@ const VIEWS: Record<MasterKey, ViewDef> = {
         e.phone,
         act.length ? (
           <span key="a">
-            {act.length} transaksi {late > 0 && <span className="badge b-late">{late} terlambat</span>}
+            {act.length} transaksi {late > 0 && <Badge status="TERLAMBAT">{late} terlambat</Badge>}
           </span>
         ) : (
           <span key="a" className="muted">—</span>
@@ -149,8 +155,29 @@ const VIEWS: Record<MasterKey, ViewDef> = {
 
 export default function MasterPage() {
   const params = useParams<{ tab: string }>();
-  const key: MasterKey = params.tab in VIEWS ? (params.tab as MasterKey) : 'peminjam';
   useTitle('Master Data');
+  if (params.tab === 'parameter') return <ParameterView />;
+  const key: MasterKey = params.tab in VIEWS ? (params.tab as MasterKey) : 'peminjam';
+  return <MasterTableView key={key} tabKey={key} />;
+}
+
+function MasterNav({ active }: { active: string }) {
+  return (
+    <nav className="tabs" style={{ padding: '0 12px' }} aria-label="Jenis master data">
+      {(Object.keys(VIEWS) as MasterKey[]).map((k) => (
+        <Link key={k} href={`/master/${k}`} className={cn(k === active && 'active')} aria-current={k === active ? 'page' : undefined}>
+          <Icon name={VIEWS[k].icon} size={16} /> {VIEWS[k].label}{' '}
+          <span className="pill">{(db.all(MASTER[k].table) as AnyRow[]).filter((r) => r.active).length}</span>
+        </Link>
+      ))}
+      <Link href="/master/parameter" className={cn(active === 'parameter' && 'active')} aria-current={active === 'parameter' ? 'page' : undefined}>
+        <Icon name="settings" size={16} /> Status &amp; Kondisi <span className="pill">{ITEM_STATUS.length + CONDITION_KEYS.length}</span>
+      </Link>
+    </nav>
+  );
+}
+
+function MasterTableView({ tabKey: key }: { tabKey: MasterKey }) {
   const toast = useToast();
   const confirm = useConfirm();
   const [f, setF] = usePersistentState('md.filter', { q: '', inactive: false });
@@ -165,10 +192,15 @@ export default function MasterPage() {
     setErrors({});
     setEditing({ row, form: row ? V.toForm(row) : { ...V.blank } });
   };
-  const save = () => {
+  const editable = CAPABILITIES.masterEdit[key];
+  const save = async () => {
     if (!editing) return;
-    const r = saveMaster(key, editing.form, editing.row?.id ?? null);
-    if (!r.ok) return setErrors(r.errors);
+    const r = await repo.saveMaster(key, editing.form, editing.row?.id ?? null);
+    if (!r.ok) {
+      setErrors(r.errors || {});
+      if (!r.errors || !Object.keys(r.errors).length) toast(r.error, 'err');
+      return;
+    }
     setEditing(null);
     toast(`Data ${D.noun} disimpan.`);
   };
@@ -176,13 +208,13 @@ export default function MasterPage() {
     if (key === 'peminjam' && activeBorrowings().some((b) => b.employee_id === r.id)) return toast('Peminjam masih memiliki pinjaman aktif.', 'err');
     const ok = await confirm({ title: `Nonaktifkan ${D.noun}?`, message: `${r.name} tidak akan muncul sebagai pilihan baru. Data lama tetap tersimpan.`, confirmText: 'Nonaktifkan', danger: true });
     if (!ok) return;
-    const res = setMasterActive(key, r.id, false);
+    const res = await repo.setMasterActive(key, r.id, false);
     if (!res.ok) toast(res.error, 'err');
   };
   const remove = async (r: AnyRow) => {
     const ok = await confirm({ title: `Hapus ${D.noun}?`, message: `${r.name} belum pernah dipakai sehingga dapat dihapus permanen.`, confirmText: 'Hapus', danger: true });
     if (!ok) return;
-    const res = deleteMaster(key, r.id as ID);
+    const res = await repo.deleteMaster(key, r.id as ID);
     if (!res.ok) return toast(res.error, 'err');
     toast('Data dihapus.');
   };
@@ -200,21 +232,14 @@ export default function MasterPage() {
         }
       />
       <section className="card">
-        <nav className="tabs" style={{ padding: '0 12px' }} aria-label="Jenis master data">
-          {(Object.keys(VIEWS) as MasterKey[]).map((k) => (
-            <Link key={k} href={`/master/${k}`} className={cn(k === key && 'active')} aria-current={k === key ? 'page' : undefined}>
-              <Icon name={VIEWS[k].icon} size={16} /> {VIEWS[k].label}{' '}
-              <span className="pill">{(db.all(MASTER[k].table) as AnyRow[]).filter((r) => r.active).length}</span>
-            </Link>
-          ))}
-        </nav>
+        <MasterNav active={key} />
         <div style={{ padding: '14px 20px 0' }}>
           <Alert type="info">{V.desc}</Alert>
         </div>
         <div className="toolbar">
           <SearchInput value={f.q} onChange={(v) => setF((p) => ({ ...p, q: v }))} placeholder={`Cari ${D.noun}…`} label="Cari" />
           <label className="check small">
-            <input type="checkbox" checked={f.inactive} onChange={(e) => setF((p) => ({ ...p, inactive: e.target.checked }))} /> Tampilkan nonaktif
+            <Checkbox checked={f.inactive} onCheckedChange={(c) => setF((p) => ({ ...p, inactive: c === true }))} /> Tampilkan nonaktif
           </label>
         </div>
         <div className="table-wrap">
@@ -235,15 +260,29 @@ export default function MasterPage() {
                       <td key={i}>{c}</td>
                     ))}
                     <td className="right nowrap">
-                      <Button size="sm" iconOnly icon="pencil" title="Ubah" onClick={() => openForm(r)} />{' '}
-                      {r.active ? (
-                        <Button size="sm" iconOnly icon="archive" title="Nonaktifkan" onClick={() => deactivate(r)} />
+                      {editable ? (
+                        <>
+                          <Button size="sm" iconOnly icon="pencil" title="Ubah" onClick={() => openForm(r)} />{' '}
+                          {r.active ? (
+                            <Button size="sm" iconOnly icon="archive" title="Nonaktifkan" onClick={() => deactivate(r)} />
+                          ) : (
+                            <Button
+                              size="sm"
+                              onClick={async () => {
+                                const res = await repo.setMasterActive(key, r.id, true);
+                                if (!res.ok) toast(res.error, 'err');
+                              }}
+                            >
+                              Aktifkan
+                            </Button>
+                          )}{' '}
+                          {!D.used(r.id) && <Button size="sm" iconOnly icon="trash" variant="danger" title="Hapus (belum pernah dipakai)" onClick={() => remove(r)} />}
+                        </>
                       ) : (
-                        <Button size="sm" onClick={() => setMasterActive(key, r.id, true)}>
-                          Aktifkan
-                        </Button>
-                      )}{' '}
-                      {!D.used(r.id) && <Button size="sm" iconOnly icon="trash" variant="danger" title="Hapus (belum pernah dipakai)" onClick={() => remove(r)} />}
+                        <span className="small muted" title="Backend belum menyediakan endpoint ubah/hapus untuk data ini">
+                          hanya tambah
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -282,6 +321,127 @@ export default function MasterPage() {
           >
             {V.form(editing.form, (k, val) => setEditing((s) => (s ? { ...s, form: { ...s.form, [k]: val } } : s)), errors, editing.row)}
           </form>
+        )}
+      </Modal>
+    </>
+  );
+}
+
+/* ---------- Parameter status & kondisi ---------- */
+type ParamKind = 'item_status' | 'condition';
+
+function ParameterView() {
+  const toast = useToast();
+  const [edit, setEdit] = useState<{ kind: ParamKind; code: string; label: string; desc: string } | null>(null);
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const params = db.data.settings.parameters;
+  const items = db.where('items', (i) => i.active);
+
+  const save = () => {
+    if (!edit) return;
+    const r = updateParameter(edit.kind, edit.code, edit.label, edit.desc);
+    if (!r.ok) return setErrors(r.errors);
+    setEdit(null);
+    toast(`Parameter ${edit.code} disimpan.`);
+  };
+  const open = (kind: ParamKind, code: string) => {
+    const p = (params[kind] as Record<string, { label: string; desc: string }>)[code];
+    setErrors({});
+    setEdit({ kind, code, label: p.label, desc: p.desc });
+  };
+
+  return (
+    <>
+      <PageHead crumb="Beranda / Master Data" title="Master Data" desc="Data referensi untuk inventaris dan transaksi." />
+      <section className="card">
+        <MasterNav active="parameter" />
+        <div style={{ padding: '14px 20px' }}>
+          <Alert type="info">
+            Kode status dan kondisi bersifat tetap karena terikat aturan bisnis (mis. <b>RUSAK_BERAT</b>, <b>HILANG</b>, <b>DALAM_PERBAIKAN</b> tidak dapat dipinjam). Label dan keterangan dapat
+            disesuaikan dan dipakai di seluruh tampilan serta laporan.
+          </Alert>
+        </div>
+        <div className="px-5 pb-2 text-[15px] font-semibold">Status barang</div>
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Kode</th>
+                <th>Label</th>
+                <th>Keterangan</th>
+                <th>Dapat dipinjam</th>
+                <th>Jumlah barang</th>
+                <th className="right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ITEM_STATUS.map((code) => (
+                <tr key={code}>
+                  <td>
+                    <Badge status={code} />
+                  </td>
+                  <td className="strong">{params.item_status[code].label}</td>
+                  <td className="small">{params.item_status[code].desc}</td>
+                  <td>{code === 'TERSEDIA' ? <span className="text-ok">Ya</span> : <span className="muted">Tidak</span>}</td>
+                  <td className="mono">{items.filter((i) => i.item_status === code).length}</td>
+                  <td className="right">
+                    <Button size="sm" iconOnly icon="pencil" title={`Ubah ${code}`} onClick={() => open('item_status', code)} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="px-5 pt-5 pb-2 text-[15px] font-semibold">Kondisi barang</div>
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Kode</th>
+                <th>Label</th>
+                <th>Keterangan</th>
+                <th>Jumlah barang</th>
+                <th className="right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {CONDITION_KEYS.map((code) => (
+                <tr key={code}>
+                  <td>
+                    <Badge status={code} />
+                  </td>
+                  <td className="strong">{params.condition[code].label}</td>
+                  <td className="small">{params.condition[code].desc}</td>
+                  <td className="mono">{items.filter((i) => i.condition_status === code).length}</td>
+                  <td className="right">
+                    <Button size="sm" iconOnly icon="pencil" title={`Ubah ${code}`} onClick={() => open('condition', code)} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <Modal
+        open={!!edit}
+        onClose={() => setEdit(null)}
+        title={`Ubah parameter ${edit?.code ?? ''}`}
+        desc={edit?.kind === 'item_status' ? 'Status barang' : 'Kondisi barang'}
+        footer={
+          <>
+            <Button onClick={() => setEdit(null)}>Batal</Button>
+            <Button variant="primary" icon="check" onClick={save}>
+              Simpan
+            </Button>
+          </>
+        }
+      >
+        {edit && (
+          <div className="stack" style={{ gap: 12 }}>
+            <TextField label="Kode" mono value={edit.code} readOnly hint="Kode tidak dapat diubah." />
+            <TextField label="Label tampilan" required value={edit.label} error={errors.label} onChange={(e) => setEdit({ ...edit, label: e.target.value })} />
+            <TextareaField label="Keterangan" rows={2} value={edit.desc} onChange={(e) => setEdit({ ...edit, desc: e.target.value })} />
+          </div>
         )}
       </Modal>
     </>

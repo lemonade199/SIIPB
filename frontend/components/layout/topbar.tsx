@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Input } from '@/components/ui/input';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { db } from '@/lib/mock/db';
@@ -8,7 +9,7 @@ import { fmtDate, fmtDateTime, offsetDays, today } from '@/lib/date';
 import { EVENT_LABEL } from '@/lib/constants';
 import { cn, stripQrPrefix } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
-import { Button } from '@/components/ui/button';
+import { Button, buttonClass } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { StatIcon } from '@/components/ui/card';
 import { inbox, markAllRead, markRead } from '@/services/notification';
@@ -50,13 +51,13 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
 
   return (
     <header className="topbar">
-      <Button variant="ghost" iconOnly icon="menu" className="menu-btn" title="Buka menu" onClick={onMenu} />
+      <Button variant="ghost" iconOnly icon="menu" className="menu-btn min-[901px]:hidden" title="Buka menu" onClick={onMenu} />
       <form className="search" role="search" onSubmit={onSearch}>
         <label className="sr-only" htmlFor="gs">
           Cari
         </label>
         <Icon name="search" size={17} />
-        <input className="input" id="gs" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari / pindai kode barang atau transaksi (INV-…, PJM-…)" autoComplete="off" />
+        <Input className="pl-9" id="gs" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari / pindai kode barang atau transaksi (INV-…, PJM-…)" autoComplete="off" />
       </form>
       <span className="spacer" />
       <span className={cn('date-chip', off && 'demo')} title={off ? `Mode demo: tanggal sistem digeser ${off} hari` : 'Tanggal sistem'}>
@@ -65,7 +66,7 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
         {off !== 0 && <span>· demo {off > 0 ? '+' : ''}{off} hr</span>}
       </span>
       <div className="bell" ref={bellRef}>
-        <button type="button" className="btn btn-ghost btn-icon" aria-label={`Notifikasi (${unread} belum dibaca)`} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <button type="button" className={buttonClass({ variant: 'ghost', iconOnly: true, className: 'relative' })} aria-label={`Notifikasi (${unread} belum dibaca)`} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
           <Icon name="bell" size={20} />
           {unread > 0 && <span className="dot">{unread}</span>}
         </button>

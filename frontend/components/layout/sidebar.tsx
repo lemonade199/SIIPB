@@ -10,7 +10,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { Icon } from '@/components/ui/icon';
 import { Avatar } from '@/components/ui/misc';
 import { useConfirm } from '@/components/providers/feedback-provider';
-import { logout } from '@/services/auth';
+import { logout } from '@/services/repo';
 import { activeBorrowings } from '@/services/lookup';
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
@@ -25,7 +25,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
   const onLogout = async () => {
     if (await confirm({ title: 'Keluar dari SIIPB?', message: 'Sesi (token JWT) Anda akan diakhiri.', confirmText: 'Keluar' })) {
-      logout();
+      await logout();
       router.replace('/login');
     }
   };

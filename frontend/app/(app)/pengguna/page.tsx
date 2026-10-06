@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { CAPABILITIES } from '@/lib/config';
 import { db } from '@/lib/mock/db';
 import { fmtDateTime } from '@/lib/date';
 import { PERMISSIONS } from '@/lib/constants';
@@ -10,7 +11,7 @@ import { useTitle } from '@/hooks/use-title';
 import { Badge, Tag } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/dialog';
-import { SelectField, Switch, TextareaField, TextField } from '@/components/ui/form';
+import { Checkbox, SelectField, Switch, TextareaField, TextField } from '@/components/ui/form';
 import { Icon } from '@/components/ui/icon';
 import { Alert, Avatar, PageHead, Tabs } from '@/components/ui/misc';
 import { useConfirm, useToast } from '@/components/providers/feedback-provider';
@@ -74,7 +75,7 @@ export default function PenggunaPage() {
         title="Pengguna & Role"
         desc="Pengguna internal dan hak aksesnya. Peminjam bukan pengguna sistem."
         actions={
-          tab === 'users' ? (
+          !CAPABILITIES.userAdmin ? undefined : tab === 'users' ? (
             <Button variant="primary" icon="plus" onClick={() => openUser(null)}>
               Tambah pengguna
             </Button>
@@ -92,6 +93,12 @@ export default function PenggunaPage() {
           )
         }
       />
+      {!CAPABILITIES.userAdmin && (
+        <Alert type="warn" className="mb-4">
+          Backend belum menyediakan endpoint <span className="mono">/api/v1/users</span> dan <span className="mono">/roles</span>. Halaman ini hanya menampilkan akun Anda dan izin yang diterima dari
+          token JWT; pengelolaan pengguna & role dilakukan di server.
+        </Alert>
+      )}
       <section className="card">
         <Tabs
           value={tab}
@@ -150,8 +157,12 @@ export default function PenggunaPage() {
                       </td>
                       <td className="small nowrap">{fmtDateTime(u.last_login)}</td>
                       <td className="right nowrap">
-                        <Button size="sm" iconOnly icon="pencil" title="Ubah" onClick={() => openUser(u)} />{' '}
-                        <Button size="sm" iconOnly icon="key" title="Reset kata sandi" onClick={() => onReset(u)} />
+                        {CAPABILITIES.userAdmin && (
+                          <>
+                            <Button size="sm" iconOnly icon="pencil" title="Ubah" onClick={() => openUser(u)} />{' '}
+                            <Button size="sm" iconOnly icon="key" title="Reset kata sandi" onClick={() => onReset(u)} />
+                          </>
+                        )}
                       </td>
                     </tr>
                   );
@@ -241,12 +252,7 @@ export default function PenggunaPage() {
                 />
               )}
               <label className="check full">
-                <input
-                  type="checkbox"
-                  checked={userForm.v.active}
-                  disabled={userForm.existing?.id === me.id}
-                  onChange={(e) => setU('active', e.target.checked)}
-                />{' '}
+                <Checkbox checked={userForm.v.active} disabled={userForm.existing?.id === me.id} onCheckedChange={(c) => setU('active', c === true)} />{' '}
                 Akun aktif
               </label>
             </div>
@@ -306,7 +312,7 @@ function GroupRows({
   return (
     <>
       <tr>
-        <td colSpan={roles.length + 1} style={{ background: '#f9fafb', fontWeight: 600, fontSize: 12, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--muted)' }}>
+        <td colSpan={roles.length + 1} style={{ background: '#f9fafb', fontWeight: 600, fontSize: 12, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--muted-foreground)' }}>
           {group}
         </td>
       </tr>
@@ -322,10 +328,10 @@ function GroupRows({
                 title={`${r.name}: ${p.label}`}
                 aria-label={`${r.name} — ${p.label}`}
                 checked={r.permissions.includes(p.key)}
-                disabled={r.code === 'admin'}
-                onChange={(e) => {
-                  setRolePermission(r.id, p.key, e.target.checked);
-                  onToggle(r.name, e.target.checked, p.key);
+                disabled={r.code === 'admin' || !CAPABILITIES.userAdmin}
+                onCheckedChange={(c) => {
+                  setRolePermission(r.id, p.key, c);
+                  onToggle(r.name, c, p.key);
                 }}
               />
             </td>

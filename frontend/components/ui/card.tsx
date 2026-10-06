@@ -1,8 +1,32 @@
 import Link from 'next/link';
-import type { CSSProperties, ReactNode } from 'react';
+import type { ComponentProps, CSSProperties, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { Icon, type IconName } from '@/components/ui/icon';
 
+/* ---------- Primitif shadcn/ui Card ---------- */
+export function CardRoot({ className, ...props }: ComponentProps<'section'>) {
+  return <section data-slot="card" className={cn('card min-w-0 rounded-xl border border-border bg-card text-card-foreground shadow-[var(--shadow)]', className)} {...props} />;
+}
+export function CardHeader({ className, ...props }: ComponentProps<'div'>) {
+  return <div data-slot="card-header" className={cn('flex flex-wrap items-start justify-between gap-2.5 px-5 pt-4', className)} {...props} />;
+}
+export function CardTitle({ className, ...props }: ComponentProps<'div'>) {
+  return <div data-slot="card-title" className={cn('text-[15.5px] font-semibold', className)} {...props} />;
+}
+export function CardDescription({ className, ...props }: ComponentProps<'div'>) {
+  return <div data-slot="card-description" className={cn('mt-0.5 text-[13px] text-muted-foreground', className)} {...props} />;
+}
+export function CardAction({ className, ...props }: ComponentProps<'div'>) {
+  return <div data-slot="card-action" className={cn('actions', className)} {...props} />;
+}
+export function CardContent({ className, ...props }: ComponentProps<'div'>) {
+  return <div data-slot="card-content" className={cn('px-5 pt-4 pb-5', className)} {...props} />;
+}
+export function CardFooter({ className, ...props }: ComponentProps<'div'>) {
+  return <div data-slot="card-footer" className={cn('flex flex-wrap justify-end gap-2 border-t border-border px-5 py-3', className)} {...props} />;
+}
+
+/* ---------- Pembungkus praktis ---------- */
 interface CardProps {
   title?: ReactNode;
   desc?: ReactNode;
@@ -18,19 +42,19 @@ interface CardProps {
 
 export function Card({ title, desc, actions, footer, flush, className, bodyClassName, style, children }: CardProps) {
   return (
-    <section className={cn('card', className)} style={style}>
+    <CardRoot className={className} style={style}>
       {title !== undefined && (
-        <div className="card-header">
+        <CardHeader>
           <div>
-            <div className="card-title">{title}</div>
-            {desc && <div className="card-desc">{desc}</div>}
+            <CardTitle>{title}</CardTitle>
+            {desc && <CardDescription>{desc}</CardDescription>}
           </div>
-          {actions && <div className="actions">{actions}</div>}
-        </div>
+          {actions && <CardAction>{actions}</CardAction>}
+        </CardHeader>
       )}
-      <div className={cn('card-body', flush && 'flush', bodyClassName)}>{children}</div>
-      {footer && <div className="card-foot">{footer}</div>}
-    </section>
+      <CardContent className={cn(flush && 'px-0 pt-3 pb-0', bodyClassName)}>{children}</CardContent>
+      {footer && <CardFooter>{footer}</CardFooter>}
+    </CardRoot>
   );
 }
 
@@ -85,10 +109,12 @@ export function StatTile({
     </>
   );
   return href ? (
-    <Link className="card stat" href={href}>
+    <Link className="card stat" href={href} data-slot="card">
       {content}
     </Link>
   ) : (
-    <div className="card stat">{content}</div>
+    <div className="card stat" data-slot="card">
+      {content}
+    </div>
   );
 }

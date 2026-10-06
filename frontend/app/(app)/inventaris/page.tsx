@@ -4,16 +4,17 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/mock/db';
-import { CONDITIONS, ITEM_STATUS } from '@/lib/constants';
+import { ITEM_STATUS , CONDITION_KEYS} from '@/lib/constants';
 import { cn, match, paginate } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { patchFilter, usePersistentState } from '@/hooks/use-persistent-state';
 import { useTitle } from '@/hooks/use-title';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, toOptions } from '@/components/ui/form';
 import { Alert, Empty, PageHead, Pager, SearchInput, Thumb } from '@/components/ui/misc';
-import { cat, loc } from '@/services/lookup';
+import { cat, loc, conditionLabel } from '@/services/lookup';
 import type { Condition, ID, ItemStatus } from '@/types';
 
 interface Filter {
@@ -117,10 +118,10 @@ export default function InventarisPage() {
               aria-label="Kondisi"
               value={f.condition}
               onChange={(e) => set('condition', e.target.value as Condition | '')}
-              options={[{ value: '', label: 'Semua kondisi' }, ...Object.entries(CONDITIONS).map(([k, v]) => ({ value: k, label: v }))]}
+              options={[{ value: '', label: 'Semua kondisi' }, ...CONDITION_KEYS.map((k) => ({ value: k, label: conditionLabel(k) }))]}
             />
             <label className="check small">
-              <input type="checkbox" checked={f.inactive} onChange={(e) => set('inactive', e.target.checked)} /> Tampilkan nonaktif
+              <Checkbox checked={f.inactive} onCheckedChange={(c) => set('inactive', c === true)} /> Tampilkan nonaktif
             </label>
           </div>
           {selected.size > 0 && (
@@ -142,12 +143,7 @@ export default function InventarisPage() {
                 <tr>
                   {canQR && (
                     <th>
-                      <input
-                        type="checkbox"
-                        aria-label="Pilih semua di halaman ini"
-                        checked={allOnPage}
-                        onChange={(e) => p.rows.forEach((r) => toggle(r.id, e.target.checked))}
-                      />
+                      <Checkbox aria-label="Pilih semua di halaman ini" checked={allOnPage} onCheckedChange={(c) => p.rows.forEach((r) => toggle(r.id, c === true))} />
                     </th>
                   )}
                   <th>Barang</th>
@@ -166,7 +162,7 @@ export default function InventarisPage() {
                       <tr key={it.id}>
                         {canQR && (
                           <td style={{ width: 36 }}>
-                            <input type="checkbox" checked={selected.has(it.id)} onChange={(e) => toggle(it.id, e.target.checked)} aria-label={`Pilih ${it.item_code}`} />
+                            <Checkbox checked={selected.has(it.id)} onCheckedChange={(c) => toggle(it.id, c === true)} aria-label={`Pilih ${it.item_code}`} />
                           </td>
                         )}
                         <td>
@@ -185,7 +181,7 @@ export default function InventarisPage() {
                           {l?.name}
                           <div className="cell-sub">{l?.building}</div>
                         </td>
-                        <td>{CONDITIONS[it.condition_status] || '—'}</td>
+                        <td>{conditionLabel(it.condition_status)}</td>
                         <td>
                           <Badge status={it.item_status} /> {!it.active && <Badge status="NONAKTIF" />}
                         </td>

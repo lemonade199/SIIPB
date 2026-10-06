@@ -16,7 +16,10 @@ import { Icon, type IconName } from '@/components/ui/icon';
 import { Alert, Avatar } from '@/components/ui/misc';
 import { useToast } from '@/components/providers/feedback-provider';
 import { schedulerToastText } from '@/components/providers/data-provider';
-import { login, loginSSO } from '@/services/auth';
+import { loginSSO } from '@/services/auth';
+import { authApi } from '@/services/api/endpoints';
+import * as repo from '@/services/repo';
+import { isApiMode } from '@/lib/config';
 import { role, user as userById } from '@/services/lookup';
 import { autoScheduler } from '@/services/scheduler';
 import { can } from '@/services/session';
@@ -38,6 +41,7 @@ export default function LoginPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
   const [ssoOpen, setSsoOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
   const settings = db.data.settings;
   const oidc = useMemo(() => ({ state: uid(), nonce: uid() }), []);
 
@@ -48,25 +52,32 @@ export default function LoginPage() {
 
   const afterLogin = (u: User, via?: string) => {
     toast(via ? `Masuk melalui SSO sebagai ${u.name}.` : `Selamat datang, ${u.name}.`);
-    const res = autoScheduler();
+    const res = isApiMode ? null : autoScheduler();
     if (res && (res.sent || res.late_marked)) setTimeout(() => toast(schedulerToastText(res, settings.scheduler.time), 'warn'), 500);
     router.replace(homeFor((p) => can(p, u)));
   };
 
-  const submit = (username: string, password: string) => {
+  const submit = async (username: string, password: string) => {
     const errs: Record<string, string> = {};
     if (!username.trim()) errs.username = 'Wajib diisi.';
     if (!password) errs.password = 'Wajib diisi.';
     setErrors(errs);
     setError('');
     if (Object.keys(errs).length) return;
-    const r = login(username, password);
+    setBusy(true);
+    const r = await repo.login(username, password);
+    setBusy(false);
     if (!r.ok) return setError(r.error);
     afterLogin(r.user);
   };
 
   const onSSO = () => {
     if (!settings.security.oidc_enabled) return toast('SSO/OIDC belum diaktifkan oleh administrator.', 'warn');
+    if (isApiMode) {
+      // Alur OAuth 2.0 / OIDC ditangani backend (Authlib): state & nonce divalidasi di server.
+      window.location.href = authApi.ssoUrl();
+      return;
+    }
     setSsoOpen(true);
   };
 
@@ -105,7 +116,7 @@ export default function LoginPage() {
             </li>
           ))}
         </ul>
-        <span style={{ marginTop: 'auto', fontSize: 12, color: '#8191a8' }}>Mockup fungsional · data tersimpan di browser ini</span>
+        <span style={{ marginTop: 'auto', fontSize: 12, color: '#8191a8' }}>{isApiMode ? 'Terhubung ke Flask REST API' : 'Mode demo · data tersimpan di browser ini'}</span>
       </div>
 
       <div className="login-main">
@@ -141,8 +152,8 @@ export default function LoginPage() {
               error={errors.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
             />
-            <Button type="submit" variant="primary" icon="lock" block>
-              Masuk
+            <Button type="submit" variant="primary" icon="lock" block disabled={busy}>
+              {busy ? 'Memeriksa…' : 'Masuk'}
             </Button>
           </form>
           <div className="or">atau</div>
@@ -151,10 +162,10 @@ export default function LoginPage() {
           </Button>
           <div className="card" style={{ padding: '14px 16px' }}>
             <div className="label" style={{ marginBottom: 8 }}>
-              Akun demo
+              {isApiMode ? 'Akun seed backend (scripts/seed_data.py)' : 'Akun demo'}
             </div>
             <div className="demo-acc">
-              {DEMO_ACCOUNTS.map((a) => (
+              {DEMO_ACCOUNTS.filter((a) => !isApiMode || a.username !== 'pimpinan').map((a) => (
                 <button
                   key={a.username}
                   type="button"

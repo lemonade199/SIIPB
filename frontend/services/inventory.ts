@@ -31,7 +31,7 @@ export function movement(
 
 export function genItemCode(categoryId: ID) {
   const c = cat(categoryId);
-  const prefix = `INV-${c ? c.code : 'GEN'}-`;
+  const prefix = `INV-${c ? c.code.replace(/^CAT-/i, '') : 'GEN'}-`;
   const max = db
     .where('items', (i) => i.item_code.startsWith(prefix))
     .reduce((m, i) => Math.max(m, Number(i.item_code.slice(prefix.length)) || 0), 0);
@@ -51,7 +51,8 @@ export interface ItemInput {
   acquisition_source: string;
   acquisition_value: string | number;
   notes: string;
-  photo?: string | null;
+  /** Foto barang; indeks 0 = foto utama. */
+  photos?: string[];
 }
 
 export function saveItem(p: ItemInput, id?: ID | null): FormResult<{ item: Item }> {
@@ -87,7 +88,7 @@ export function saveItem(p: ItemInput, id?: ID | null): FormResult<{ item: Item 
   let saved: Item;
   if (id) {
     const old = clone(item(id)!);
-    saved = db.update('items', id, { ...row, ...(p.photo !== undefined ? { photo: p.photo } : {}) })!;
+    saved = db.update('items', id, { ...row, ...(p.photos !== undefined ? { photos: p.photos } : {}) })!;
     if (old.location_id !== row.location_id)
       movement(saved, 'PINDAH_LOKASI', null, null, `${loc(old.location_id)?.name} → ${loc(row.location_id)?.name}`);
     const changed: Record<string, unknown> = {};
@@ -98,9 +99,9 @@ export function saveItem(p: ItemInput, id?: ID | null): FormResult<{ item: Item 
         before[k] = old[k];
       }
     });
-    if (p.photo !== undefined && p.photo !== old.photo) {
-      changed.photo = p.photo ? 'foto diperbarui' : 'foto dihapus';
-      before.photo = old.photo ? 'ada' : 'tidak ada';
+    if (p.photos !== undefined && JSON.stringify(p.photos) !== JSON.stringify(old.photos)) {
+      changed.foto = `${p.photos.length} foto`;
+      before.foto = `${old.photos.length} foto`;
     }
     audit('item.update', 'items', saved.id, before, changed);
   } else {
@@ -109,7 +110,7 @@ export function saveItem(p: ItemInput, id?: ID | null): FormResult<{ item: Item 
       item_status: 'TERSEDIA',
       active: true,
       created_at: nowISO(),
-      photo: p.photo ?? null,
+      photos: p.photos ?? [],
     });
     movement(saved, 'DICATAT', null, 'TERSEDIA', 'Barang baru dicatat');
     audit('item.create', 'items', saved.id, null, { kode: saved.item_code, nama: saved.item_name });
@@ -147,5 +148,7 @@ export function setItemActive(id: ID, active: boolean, reason = ''): Result {
   db.save();
   return { ok: true };
 }
+
+export const MAX_PHOTOS = 5;
 
 export const qrPayload = (it: Item) => `SIIPB:${it.item_code}`;

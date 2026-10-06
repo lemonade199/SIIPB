@@ -1,23 +1,26 @@
 'use client';
 
 import Link from 'next/link';
+import { Input } from '@/components/ui/input';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { db } from '@/lib/mock/db';
 import { addDays, diffDays, fmtDate, relDue, today } from '@/lib/date';
-import { CONDITIONS } from '@/lib/constants';
 import { capitalize, cn, match, stripQrPrefix } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { useTitle } from '@/hooks/use-title';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Card } from '@/components/ui/card';
 import { Field, Select, TextareaField, TextField, toOptions } from '@/components/ui/form';
 import { Icon } from '@/components/ui/icon';
 import { Alert, Avatar, Empty, KV, PageHead, Thumb } from '@/components/ui/misc';
 import { useToast } from '@/components/providers/feedback-provider';
-import { checkout, createBorrowing, genCode, updateDraft, type BorrowingSaveResult } from '@/services/borrowing';
-import { activeBorrowings, borrowableItems, detailsOf, emp, isBorrowable, item as getItem, itemByCode, loc, unit } from '@/services/lookup';
+import { checkout, genCode, updateDraft, type BorrowingSaveResult } from '@/services/borrowing';
+import * as repo from '@/services/repo';
+import { CAPABILITIES, isApiMode } from '@/lib/config';
+import { activeBorrowings, borrowableItems, detailsOf, emp, isBorrowable, item as getItem, itemByCode, loc, unit, conditionLabel } from '@/services/lookup';
 import type { FieldErrors, ID, Item } from '@/types';
 
 const STEPS = ['Pilih peminjam', 'Pilih barang', 'Jadwal & tujuan', 'Simpan & checkout'];
@@ -62,6 +65,7 @@ export function BorrowForm({ id }: { id?: ID }) {
   const [itemCat, setItemCat] = useState('');
   const [scan, setScan] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [saving, setSaving] = useState(false);
 
   if (id && (!editing || editing.status !== 'DRAF'))
     return (
@@ -99,7 +103,8 @@ export function BorrowForm({ id }: { id?: ID }) {
     setScan('');
   };
 
-  const submit = (doCheckout: boolean) => {
+  const submit = async (doCheckout: boolean) => {
+    if (saving) return;
     const payload = { employee_id: employeeId, item_ids: itemIds, ...form };
     let r: BorrowingSaveResult;
     if (id) {
@@ -108,7 +113,11 @@ export function BorrowForm({ id }: { id?: ID }) {
         const c = checkout(r.borrowing.id);
         r = c.ok ? { ok: true, borrowing: c.borrowing, notification: c.notification } : { ok: false, errors: { item_ids: c.error } };
       }
-    } else r = createBorrowing(payload, { checkout: doCheckout });
+    } else {
+      setSaving(true);
+      r = await repo.createBorrowing(payload, doCheckout);
+      setSaving(false);
+    }
     if (!r.ok) {
       setErrors(r.errors);
       return;
@@ -171,7 +180,7 @@ export function BorrowForm({ id }: { id?: ID }) {
                               NIP {x.nip} · {unit(x.unit_id)?.name} · {x.email}
                             </span>
                           </span>
-                          {late > 0 && <span className="badge b-late">{late} terlambat</span>}
+                          {late > 0 && <Badge status="TERLAMBAT">{late} terlambat</Badge>}
                         </label>
                       );
                     })
@@ -217,7 +226,7 @@ export function BorrowForm({ id }: { id?: ID }) {
                 />
                 <div className="row">
                   <div style={{ flex: 1, minWidth: 200 }}>
-                    <input className="input" placeholder="Cari barang tersedia…" aria-label="Cari barang tersedia" value={itemQ} onChange={(ev) => setItemQ(ev.target.value)} />
+                    <Input placeholder="Cari barang tersedia…" aria-label="Cari barang tersedia" value={itemQ} onChange={(ev) => setItemQ(ev.target.value)} />
                   </div>
                   <Select style={{ width: 'auto' }} aria-label="Filter kategori" value={itemCat} onChange={(ev) => setItemCat(ev.target.value)} options={toOptions(db.all('categories'), 'Semua kategori')} />
                 </div>
@@ -227,12 +236,12 @@ export function BorrowForm({ id }: { id?: ID }) {
                       const on = itemIds.includes(i.id);
                       return (
                         <label key={i.id} className={cn(on && 'sel')}>
-                          <input type="checkbox" checked={on} onChange={(ev) => toggleItem(i.id, ev.target.checked)} />
+                          <Checkbox checked={on} onCheckedChange={(c) => toggleItem(i.id, c === true)} />
                           <Thumb item={i} />
                           <span style={{ flex: 1, minWidth: 0 }}>
                             <b>{i.item_name}</b>
                             <span className="cell-sub" style={{ display: 'block' }}>
-                              <span className="mono">{i.item_code}</span> · {loc(i.location_id)?.name} · {CONDITIONS[i.condition_status]}
+                              <span className="mono">{i.item_code}</span> · {loc(i.location_id)?.name} · {conditionLabel(i.condition_status)}
                             </span>
                           </span>
                           <Badge status={i.item_status} />
@@ -279,7 +288,7 @@ export function BorrowForm({ id }: { id?: ID }) {
                   onChange={(ev) => setForm({ ...form, borrow_date: ev.target.value })}
                 />
                 <Field label="Batas pengembalian" required error={errors.due_date} htmlFor="f-due" hint={dur === null ? undefined : dur < 0 ? 'Batas kembali sebelum tanggal pinjam.' : `Durasi ${dur} hari · jatuh pada ${fmtDate(due, true)}`}>
-                  <input id="f-due" type="date" className={cn('input', errors.due_date && 'invalid')} value={form.due_date} onChange={(ev) => setForm({ ...form, due_date: ev.target.value })} />
+                  <Input id="f-due" type="date" className="w-full" aria-invalid={!!errors.due_date || undefined} value={form.due_date} onChange={(ev) => setForm({ ...form, due_date: ev.target.value })} />
                   <div className="row" style={{ gap: 6 }}>
                     {[1, 3, 7, 14].map((n) => (
                       <Button key={n} size="sm" onClick={() => setForm({ ...form, due_date: addDays(form.borrow_date || today(), n) })}>
@@ -313,7 +322,7 @@ export function BorrowForm({ id }: { id?: ID }) {
               <KV
                 one
                 items={[
-                  ['Kode transaksi', <span key="c" className="mono">{editing ? editing.code : genCode('borrowings', 'PJM', borrow || today())}</span>],
+                  ['Kode transaksi', <span key="c" className="mono">{editing ? editing.code : isApiMode ? 'Dibuat server (TX-…)' : genCode('borrowings', 'PJM', borrow || today())}</span>],
                   ['Petugas', user.name],
                   ['Peminjam', e ? e.name : <span key="p" className="muted">Belum dipilih</span>],
                   ['Jumlah barang', `${itemIds.length} barang`],
@@ -329,12 +338,14 @@ export function BorrowForm({ id }: { id?: ID }) {
                 </Alert>
               )}
               <div className="stack" style={{ gap: 8, marginTop: 14 }}>
-                <Button variant="primary" icon="check" block onClick={() => submit(true)}>
-                  Simpan &amp; Serahkan (Checkout)
+                <Button variant="primary" icon="check" block disabled={saving} onClick={() => submit(true)}>
+                  {saving ? 'Menyimpan…' : 'Simpan & Serahkan (Checkout)'}
                 </Button>
-                <Button block onClick={() => submit(false)}>
-                  {editing ? 'Simpan draf' : 'Simpan sebagai draf'}
-                </Button>
+                {CAPABILITIES.drafts && (
+                  <Button block disabled={saving} onClick={() => submit(false)}>
+                    {editing ? 'Simpan draf' : 'Simpan sebagai draf'}
+                  </Button>
+                )}
                 <p className="small muted">
                   Checkout memvalidasi ketersediaan, mengubah status barang menjadi <b>DIPINJAM</b>, mengirim email ke peminjam, dan mencatat audit log.
                 </p>
