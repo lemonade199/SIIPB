@@ -3,7 +3,6 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { db } from '@/lib/mock/db';
-import { DEMO_ACCOUNTS } from '@/lib/constants';
 import { homeFor } from '@/lib/navigation';
 import { uid } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
@@ -32,9 +31,6 @@ const FEATURES: [IconName, string, string][] = [
   ['bell', 'Pengingat otomatis', 'Email H-3, H-1, H, H+1 serta eskalasi H+3 dan H+7.'],
   ['shield', 'Aman & dapat ditelusuri', 'RBAC, JWT, SSO OIDC, audit log, dan backup.'],
 ];
-
-/** Mode api: daftar akun awal hanya ditampilkan bila NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS=true (jangan di production). */
-const SHOW_DEMO = !isApiMode || process.env.NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS === 'true';
 
 export default function LoginPage() {
   useTitle('Masuk');
@@ -193,30 +189,6 @@ export default function LoginPage() {
           <Button icon="key" block onClick={onSSO}>
             Masuk dengan SSO Organisasi
           </Button>
-          {SHOW_DEMO && (
-          <div className="card" style={{ padding: '14px 16px' }}>
-            <div className="label" style={{ marginBottom: 8 }}>
-              {isApiMode ? 'Akun awal (scripts/seed_data.py) — ganti kata sandi setelah login' : 'Akun demo'}
-            </div>
-            <div className="demo-acc">
-              {DEMO_ACCOUNTS.map((a) => (
-                <button
-                  key={a.username}
-                  type="button"
-                  onClick={() => {
-                    setForm({ username: a.username, password: a.password });
-                    submit(a.username, a.password);
-                  }}
-                >
-                  <span>
-                    <b>{a.username}</b> <span className="muted small">/ {a.password}</span>
-                  </span>
-                  <Tag>{a.role}</Tag>
-                </button>
-              ))}
-            </div>
-          </div>
-          )}
           <Alert type="info">
             Peminjam <b>tidak perlu login</b>. Informasi peminjaman, pengingat, dan pemberitahuan keterlambatan dikirim otomatis ke email peminjam.
           </Alert>
