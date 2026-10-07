@@ -60,7 +60,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                       </span>
                     )}
                     {it.count === 'drafts' && drafts > 0 && (
-                      <span className="count" style={{ background: '#c7d2e6', color: '#14213a' }} title={`${drafts} draf belum diserahkan`}>
+                      <span className="count" style={{ background: '#c8d9e6', color: '#2f4156' }} title={`${drafts} draf belum diserahkan`}>
                         {drafts}
                       </span>
                     )}

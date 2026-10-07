@@ -58,7 +58,7 @@ export function EmailPreview({ id, onClose }: { id: ID | null; onClose: () => vo
           <span className="subj">{n.subject}</span>
         </div>
         <div className="email-brand">
-          <Icon name="box" /> SIIPB <span style={{ fontWeight: 400, color: '#aebbd0', fontSize: 13 }}>{s.institution}</span>
+          <Icon name="box" /> SIIPB <span style={{ fontWeight: 400, color: '#c8d9e6', fontSize: 13 }}>{s.institution}</span>
         </div>
         <div className="email-body">{n.body}</div>
       </div>

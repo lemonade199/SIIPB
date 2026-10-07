@@ -13,7 +13,7 @@ export const DialogClose = DialogPrimitive.Close;
 export function DialogContent({ className, children, ...props }: ComponentProps<typeof DialogPrimitive.Content>) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay data-slot="dialog-overlay" className="fixed inset-0 z-100 bg-[rgba(15,23,42,.45)] data-[state=open]:animate-[fade_.12s_ease-out]" />
+      <DialogPrimitive.Overlay data-slot="dialog-overlay" className="fixed inset-0 z-100 bg-[rgba(47,65,86,.5)] data-[state=open]:animate-[fade_.12s_ease-out]" />
       <div className="pointer-events-none fixed inset-0 z-100 overflow-y-auto px-4 py-[6vh]">
         <DialogPrimitive.Content
           data-slot="dialog-content"

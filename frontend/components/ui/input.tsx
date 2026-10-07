@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 
 /** Kelas dasar kontrol form (shadcn/ui). */
 export const controlClass =
-  'w-full min-w-0 rounded-lg border border-input bg-card px-[11px] text-sm text-foreground outline-none transition-[border-color,box-shadow] placeholder:text-subtle focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/15 disabled:cursor-not-allowed disabled:opacity-60 read-only:bg-[#f8f9fb] aria-invalid:border-destructive';
+  'w-full min-w-0 rounded-lg border border-input bg-card px-[11px] text-sm text-foreground outline-none transition-[border-color,box-shadow] placeholder:text-subtle focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/15 disabled:cursor-not-allowed disabled:opacity-60 read-only:bg-[#f7f9fb] aria-invalid:border-destructive';
 
 /** shadcn/ui Input. */
 export function Input({ className, type, ...props }: ComponentProps<'input'>) {

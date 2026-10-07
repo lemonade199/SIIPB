@@ -211,7 +211,7 @@ function ReturnForm({ b }: { b: Borrowing }) {
       <form noValidate onSubmit={onSubmit}>
         <div className="split-wide">
           <div className="stack">
-            <section className="card" style={{ borderColor: v.lateDays ? '#f3cdbe' : 'var(--border)', background: v.lateDays ? '#fff9f6' : '#fff' }}>
+            <section className="card" style={{ borderColor: v.lateDays ? '#ebc6c6' : 'var(--border)', background: v.lateDays ? '#fbf5f5' : '#fff' }}>
               <div className="card-body row between">
                 <div className="row" style={{ flexWrap: 'nowrap' }}>
                   <Avatar name={e?.name} />

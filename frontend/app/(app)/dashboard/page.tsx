@@ -21,12 +21,12 @@ import * as repo from '@/services/repo';
 import type { ItemStatus } from '@/types';
 
 const STAT_COLORS: Record<ItemStatus, string> = {
-  TERSEDIA: '#15803d',
-  DIPINJAM: '#1d4ed8',
-  RUSAK: '#b7791f',
-  RUSAK_BERAT: '#b91c1c',
-  DALAM_PERBAIKAN: '#6b3fa0',
-  HILANG: '#7f1d1d',
+  TERSEDIA: '#3d7a5c',
+  DIPINJAM: '#567c8d',
+  RUSAK: '#93682a',
+  RUSAK_BERAT: '#a0573a',
+  DALAM_PERBAIKAN: '#64598a',
+  HILANG: '#a63d3d',
 };
 
 export default function DashboardPage() {

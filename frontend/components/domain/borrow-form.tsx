@@ -192,7 +192,7 @@ export function BorrowForm({ id }: { id?: ID }) {
                 </div>
                 {errors.employee_id && <span className="err small" style={{ color: 'var(--danger)' }}>{errors.employee_id}</span>}
                 {e && (
-                  <div className="row" style={{ padding: 12, border: '1px solid #c8d6f5', background: '#f5f8fe', borderRadius: 10, flexWrap: 'nowrap' }}>
+                  <div className="row" style={{ padding: 12, border: '1px solid #c8d9e6', background: '#f3f7fa', borderRadius: 10, flexWrap: 'nowrap' }}>
                     <Avatar name={e.name} />
                     <div style={{ minWidth: 0 }}>
                       <b>{e.name}</b>
