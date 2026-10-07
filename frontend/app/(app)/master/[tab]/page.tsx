@@ -18,7 +18,6 @@ import { Icon, type IconName } from '@/components/ui/icon';
 import { Alert, Empty, PageHead, SearchInput } from '@/components/ui/misc';
 import { useConfirm, useToast } from '@/components/providers/feedback-provider';
 import { activeBorrowings, unit } from '@/services/lookup';
-import { updateParameter } from '@/services/settings';
 import { MASTER, type MasterForm, type MasterKey } from '@/services/master';
 import * as repo from '@/services/repo';
 import { CAPABILITIES } from '@/lib/config';
@@ -337,9 +336,9 @@ function ParameterView() {
   const params = db.data.settings.parameters;
   const items = db.where('items', (i) => i.active);
 
-  const save = () => {
+  const save = async () => {
     if (!edit) return;
-    const r = updateParameter(edit.kind, edit.code, edit.label, edit.desc);
+    const r = await repo.updateParameter(edit.kind, edit.code, edit.label, edit.desc);
     if (!r.ok) return setErrors(r.errors);
     setEdit(null);
     toast(`Parameter ${edit.code} disimpan.`);

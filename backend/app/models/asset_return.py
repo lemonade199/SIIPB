@@ -58,6 +58,8 @@ class ReturnItem(IdMixin, CreatedAtMixin, Base):
     )
     final_condition: Mapped[str] = mapped_column(String(20))
     completeness: Mapped[str | None] = mapped_column(Text)
+    # Status aset setelah pengembalian (RUSAK / RUSAK_BERAT / DALAM_PERBAIKAN / ...).
+    asset_status_after: Mapped[str | None] = mapped_column(String(30))
     notes: Mapped[str | None] = mapped_column(Text)
 
     return_: Mapped[Return] = relationship(back_populates="items")

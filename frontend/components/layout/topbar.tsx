@@ -12,7 +12,8 @@ import { useAuth } from '@/hooks/use-auth';
 import { Button, buttonClass } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { StatIcon } from '@/components/ui/card';
-import { inbox, markAllRead, markRead } from '@/services/notification';
+import { inbox } from '@/services/notification';
+import * as repo from '@/services/repo';
 import { borrowingByCode, emp, itemByCode, returnByCode } from '@/services/lookup';
 
 export function Topbar({ onMenu }: { onMenu: () => void }) {
@@ -74,7 +75,7 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
           <div className="dropdown">
             <div className="dropdown-head">
               <b>Notifikasi untuk Anda</b>
-              <button type="button" className="link-btn" onClick={() => markAllRead(user)}>
+              <button type="button" className="link-btn" onClick={() => void repo.markAllRead(user)}>
                 Tandai semua dibaca
               </button>
             </div>
@@ -84,7 +85,7 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
                   const b = db.get('borrowings', n.borrowing_id);
                   const isUnread = !n.read_by.includes(user.id);
                   const go = () => {
-                    markRead(n.id, user.id);
+                    void repo.markRead(n.id, user.id);
                     setOpen(false);
                     router.push(b ? `/peminjaman/${b.id}` : '/notifikasi');
                   };

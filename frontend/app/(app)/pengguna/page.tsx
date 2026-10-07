@@ -16,7 +16,8 @@ import { Icon } from '@/components/ui/icon';
 import { Alert, Avatar, PageHead, Tabs } from '@/components/ui/misc';
 import { useConfirm, useToast } from '@/components/providers/feedback-provider';
 import { role } from '@/services/lookup';
-import { createRole, resetPassword, saveUser, setRolePermission, type UserInput } from '@/services/users';
+import { type UserInput } from '@/services/users';
+import * as repo from '@/services/repo';
 import type { FieldErrors, LoginMethod, Role, User } from '@/types';
 
 type Tab = 'users' | 'roles';
@@ -47,9 +48,9 @@ export default function PenggunaPage() {
     });
   };
   const setU = <K extends keyof UserInput>(k: K, val: UserInput[K]) => setUserForm((s) => (s ? { ...s, v: { ...s.v, [k]: val } } : s));
-  const saveU = () => {
+  const saveU = async () => {
     if (!userForm) return;
-    const r = saveUser(userForm.v, userForm.existing, me.id);
+    const r = await repo.saveUser(userForm.v, userForm.existing, me.id);
     if (!r.ok) return setErrors(r.errors);
     setUserForm(null);
     toast('Data pengguna disimpan.');
@@ -57,12 +58,13 @@ export default function PenggunaPage() {
   const onReset = async (u: User) => {
     const ok = await confirm({ title: 'Reset kata sandi?', message: `Kata sandi sementara untuk ${u.name} akan dibuat dan ditampilkan sekali.`, confirmText: 'Reset' });
     if (!ok) return;
-    const pw = resetPassword(u.id);
+    const pw = await repo.resetPassword(u.id);
     if (pw) setTempPw({ name: u.name, pw });
+    else toast('Reset kata sandi gagal.', 'err');
   };
-  const saveRole = () => {
+  const saveRole = async () => {
     if (!roleForm) return;
-    const r = createRole(roleForm.name, roleForm.description);
+    const r = await repo.createRole(roleForm.name, roleForm.description);
     if (!r.ok) return setErrors(r.errors);
     setRoleForm(null);
     toast('Role ditambahkan. Atur permission-nya pada matriks.');
@@ -93,12 +95,6 @@ export default function PenggunaPage() {
           )
         }
       />
-      {!CAPABILITIES.userAdmin && (
-        <Alert type="warn" className="mb-4">
-          Backend belum menyediakan endpoint <span className="mono">/api/v1/users</span> dan <span className="mono">/roles</span>. Halaman ini hanya menampilkan akun Anda dan izin yang diterima dari
-          token JWT; pengelolaan pengguna & role dilakukan di server.
-        </Alert>
-      )}
       <section className="card">
         <Tabs
           value={tab}
@@ -197,7 +193,7 @@ export default function PenggunaPage() {
                 </thead>
                 <tbody>
                   {groups.map((g) => (
-                    <GroupRows key={g} group={g} roles={roles} onToggle={(roleName, granted, permKey) => toast(`${roleName}: ${granted ? 'diberi' : 'dicabut'} izin ${permKey}.`)} />
+                    <GroupRows key={g} group={g} roles={roles} onToggle={(roleName, granted, permKey) => toast(`${roleName}: ${granted ? 'diberi' : 'dicabut'} izin ${permKey}.`)} onError={(m) => toast(m, 'err')} />
                   ))}
                 </tbody>
               </table>
@@ -304,10 +300,12 @@ function GroupRows({
   group,
   roles,
   onToggle,
+  onError,
 }: {
   group: string;
   roles: Role[];
   onToggle: (roleName: string, granted: boolean, permKey: string) => void;
+  onError: (message: string) => void;
 }) {
   return (
     <>
@@ -329,9 +327,10 @@ function GroupRows({
                 aria-label={`${r.name} — ${p.label}`}
                 checked={r.permissions.includes(p.key)}
                 disabled={r.code === 'admin' || !CAPABILITIES.userAdmin}
-                onCheckedChange={(c) => {
-                  setRolePermission(r.id, p.key, c);
-                  onToggle(r.name, c, p.key);
+                onCheckedChange={async (c) => {
+                  const res = await repo.setRolePermission(r.id, p.key, c);
+                  if (res.ok) onToggle(r.name, c, p.key);
+                  else onError(res.error);
                 }}
               />
             </td>

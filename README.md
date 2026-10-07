@@ -56,9 +56,9 @@ graph TD
     Nginx -->|Static Assets| Frontend[Frontend Next.js / Web SPA]
     Nginx -->|API Requests /api/v1| FlaskApp[Flask REST API Engine]
     
-    FlaskApp -->|ORM SQLAlchemy 2.x & Row Locking| DB[(MariaDB 13 Database - 26 Tabel)]
+    FlaskApp -->|ORM SQLAlchemy 2.x & Row Locking| DB[(MariaDB 11 - 29 Tabel)]
     FlaskApp -->|Message Broker & Token Cache| Redis[(Redis In-Memory Cache)]
-    FlaskApp -->|File & Media Storage| S3Storage[(MinIO / S3 Object Storage)]
+    FlaskApp -->|Foto barang & backup| Storage[(Volume uploads / backups)]
     
     Redis --> CeleryWorker[Celery Async Worker]
     CeleryWorker -->|SMTP Protocol| EmailServer[SMTP Email Gateway]
@@ -108,117 +108,101 @@ graph TD
 
 ```text
 SIIPB/
-├── backend/                      # 🐍 REST API Service, Business Logic, & Celery Worker
+├── backend/                      # 🐍 Flask REST API, aturan bisnis, Celery worker & beat
 │   ├── app/
-│   │   ├── middleware/           # Proteksi endpoint & RBAC authorization
-│   │   ├── models/               # Pemetaan 26 tabel database (SQLAlchemy 2.x)
-│   │   ├── routes/               # Modular REST Blueprints (/api/v1/...)
-│   │   ├── schemas/              # Validasi payload request (Marshmallow)
-│   │   ├── services/             # Core business rules & row-locking transactions
-│   │   ├── tasks/                # Celery background email worker & beat scheduler
-│   │   └── utils/                # Security hashing & standard response formatters
-│   ├── tests/                    # Pengujian terotomatisasi pytest (16 test cases)
-│   ├── Dockerfile                # Kontainerisasi produksi (Gunicorn WSGI)
-│   ├── celery_app.py             # Entrypoint task queue & beat crontab
-│   └── run.py                    # Server runner
+│   │   ├── middleware/           # JWT + RBAC (izin dibaca ulang dari DB setiap permintaan)
+│   │   ├── models/               # 29 tabel (SQLAlchemy 2.x)
+│   │   ├── routes/               # Blueprint /api/v1/... (Swagger di /api/docs)
+│   │   ├── schemas/              # Validasi payload (Marshmallow)
+│   │   ├── services/             # Aturan bisnis, row locking, notifikasi, laporan, backup
+│   │   ├── tasks/                # Celery: email SMTP (retry), pemeriksaan jatuh tempo, backup
+│   │   └── utils/                # Keamanan (scrypt, JWT) & format respons
+│   ├── alembic/versions/         # Migrasi skema (f627… awal, a7c3… fitur Plan)
+│   ├── scripts/seed_data.py      # Seed idempoten (role, permission, template, akun awal)
+│   ├── tests/                    # pytest — database uji terpisah (siipb_test)
+│   ├── Dockerfile                # Gunicorn + WeasyPrint + mariadb-client
+│   └── docker-entrypoint.sh      # alembic upgrade head + seed sebelum start
 │
-├── frontend/                     # ⚛️ Portal Antarmuka Web (Next.js + TypeScript)
-│   └── README.md                 # Panduan implementasi UI
+├── frontend/                     # ⚛️ Next.js 16 + React 19 + TypeScript + Tailwind + shadcn/ui
+│   ├── app/ components/ lib/ services/ hooks/ types/
+│   ├── tests/                    # Vitest (unit) & Playwright (UI mock + integrasi API)
+│   └── Dockerfile                # build standalone
 │
-├── database/                     # 🗄️ Database Master & Migrasi
-│   ├── SIIPB.sql                 # DDL 26 tabel MariaDB 13 siap produksi
-│   └── README.md                 # Dokumentasi skema dan kamus data
-│
-├── infrastructure/               # 🌐 Konfigurasi Jaringan & Web Server
-│   └── nginx/nginx.conf          # Reverse proxy, caching, compression & rate limit
-│
-├── docs/                         # 📚 Arsip Dokumentasi & Spesifikasi
-│   ├── api_specification.md      # Kontrak API Frontend <-> Backend
-│   └── architecture.md           # Desain teknis sistem
-│
-├── docker-compose.yml            # Orkestrasi multi-kontainer satu klik
-└── README.md                     # Dokumentasi eksekutif proyek
+├── database/SIIPB.sql            # Referensi skema terbaru (hasil alembic upgrade head)
+├── infrastructure/
+│   ├── nginx/nginx.conf          # / → Next.js, /api → Flask, /uploads → volume, rate limit login
+│   ├── nginx/nginx.https.conf    # Varian HTTPS (HSTS, TLS 1.2/1.3)
+│   └── scripts/                  # backup_db.sh & restore_db.sh
+├── docs/                         # Spesifikasi API & arsitektur
+├── .github/workflows/ci.yml      # CI: pytest, lint/typecheck/vitest/build, Playwright, docker build
+├── docker-compose.yml            # Nginx, Next.js, Flask, MariaDB, Redis, Celery worker & beat
+└── .env.example                  # Contoh konfigurasi (rahasia tidak di-commit)
 ```
 
 ---
 
-## 7. Matriks Kesesuaian Teknologi
+## 7. Matriks Kesesuaian Teknologi (dokumen Plan §8)
 
-| Komponen Arsitektur | Teknologi Terpilih | Justifikasi Teknis |
+| Komponen | Teknologi | Status |
 | :--- | :--- | :--- |
-| **Backend Framework** | **Python 3.12 + Flask** | Ringan, modular, berperforma tinggi, dan minim *overhead*. |
-| **Database Engine** | **MariaDB 13 (InnoDB)** | Kepatuhan ACID penuh, row locking cepat, dan integritas foreign key ketat. |
-| **Database ORM** | **SQLAlchemy 2.0** | Standar modern Python ORM dengan tipe data deklaratif dan kontrol transaksi presisi. |
-| **Skema Migrasi** | **Alembic** | Version-controlled database migration tanpa risiko data corrupt. |
-| **Asynchronous Queue** | **Celery + Redis** | Memisahkan pengiriman email dan pekerjaan berat agar respons API instan (<50ms). |
-| **Otomasi Scheduler** | **Celery Beat** | Pemantauan berkala independen tanpa memerlukan cron job OS manual. |
-| **Dokumentasi API** | **OpenAPI / Swagger** | Dokumentasi interaktif otomatis dan siap uji bagi tim pengembang. |
-| **Reverse Proxy** | **Nginx 1.25** | Kompresi Gzip, proteksi serangan, dan terminasi proxy terpusat. |
-| **Kontainerisasi** | **Docker & Compose** | Lingkungan replikatif, mudah dipindahkan antar-server, dan siap scale-out. |
+| Frontend | Next.js + React + TypeScript, Tailwind CSS + shadcn/ui | ✅ `frontend/` |
+| Backend & API | Python 3.12 + Flask, REST + JSON | ✅ `backend/app/routes` |
+| Dokumentasi API | OpenAPI / Swagger (flasgger) | ✅ `/api/docs` |
+| Database & ORM | MariaDB 11.x + SQLAlchemy 2.x, migrasi Alembic | ✅ |
+| Autentikasi & SSO | JWT (access + refresh, rotasi saat ganti sandi), OAuth 2.0/OIDC (Authlib, state/nonce) | ✅ |
+| Otorisasi | RBAC 16 permission, role dapat diatur dari UI | ✅ |
+| Queue / Worker / Scheduler | Redis + Celery + Celery Beat | ✅ |
+| Email | SMTP (STARTTLS/SSL), kata sandi tersimpan terenkripsi | ✅ |
+| QR Code | Python `qrcode` (`/assets/{id}/qr`) + pemindai di UI | ✅ |
+| PDF / Excel | WeasyPrint / openpyxl (`/reports/{jenis}?format=pdf|xlsx`) | ✅ |
+| Pengujian | pytest, Vitest, Playwright | ✅ |
+| Web server & container | Nginx + Docker Compose | ✅ |
+| CI/CD | GitHub Actions | ✅ `.github/workflows/ci.yml` |
+| Penyimpanan berkas | Volume lokal `/app/uploads` (MinIO/S3 opsional — konfigurasi `S3_*`) | ⚠️ lokal |
 
 ---
 
 ## 8. Kesiapan Pengujian & Jaminan Mutu (QA)
 
-Sistem telah diuji secara menyeluruh menggunakan automated testing suite dengan **kelulusan 100%**:
+| Jenis (Plan §22) | Cakupan | Perintah |
+| :--- | :--- | :--- |
+| Unit & API test (backend) | 62 tes: auth/JWT/refresh/SSO code, RBAC per role, CRUD master, inventaris (foto, QR, status manual, alias `/items`), draf→checkout, pengembalian rusak/hilang, **notifikasi H-3…H+7 + eskalasi + anti-duplikat**, laporan PDF/Excel, pengaturan SMTP terenkripsi, audit log, backup | `cd backend && pytest` |
+| Concurrency test | 4 checkout bersamaan pada barang yang sama → tepat 1 berhasil (`SELECT … FOR UPDATE`) | termasuk di atas |
+| Unit test frontend | 41 tes: tanggal, aturan bisnis, mapper API, komponen | `cd frontend && npm test` |
+| UI test (mode mock) | 7 skenario Playwright | `npm run test:e2e` |
+| Integrasi frontend ↔ API | 4 skenario Playwright (foto, draf/checkout/pengembalian, pengguna, pengaturan, scheduler, laporan, RBAC) — lulus langsung & lewat Nginx | `E2E_API=1 npx playwright test tests/e2e/api.spec.ts` |
 
-```text
-============================= test session starts =============================
-platform win32 -- Python 3.12.10, pytest-9.1.1
-rootdir: C:\SIIPB\backend
-
-tests/test_assets.py::test_list_assets PASSED                            [  6%]
-tests/test_assets.py::test_create_and_get_asset PASSED                   [ 12%]
-tests/test_assets.py::test_create_asset_duplicate_code PASSED            [ 18%]
-tests/test_auth.py::test_health_check PASSED                             [ 25%]
-tests/test_auth.py::test_login_success PASSED                            [ 31%]
-tests/test_auth.py::test_login_invalid_password PASSED                   [ 37%]
-tests/test_auth.py::test_get_me_profile PASSED                           [ 43%]
-tests/test_auth.py::test_refresh_token PASSED                            [ 50%]
-tests/test_borrowing.py::test_checkout_borrowing_workflow PASSED         [ 56%]
-tests/test_borrowing.py::test_checkout_invalid_dates PASSED              [ 62%]
-tests/test_concurrent_checkout.py::test_concurrent_checkout_prevents_double_lending PASSED [ 68%]
-tests/test_master.py::test_master_endpoints PASSED                       [ 75%]
-tests/test_master.py::test_create_and_manage_borrower PASSED             [ 81%]
-tests/test_master.py::test_dashboard_summary PASSED                      [ 87%]
-tests/test_returns.py::test_return_condition_baik PASSED                 [ 93%]
-tests/test_returns.py::test_return_condition_rusak_and_repair_lifecycle PASSED [100%]
-
-============================= 16 passed in 0.65s ==============================
-```
-
-> **Catatan Penting Pengujian Konkurensi:**
-> Tes `test_concurrent_checkout.py` mensimulasikan dua thread simultan yang mengeksekusi checkout pada satu aset di milidetik yang sama. Hasil pengujian membuktikan transaksi pertama berhasil dicatat, dan transaksi kedua ditolak secara aman karena unit telah terkunci (`DIPINJAM`), membuktikan kekebalan sistem dari anomali data ganda.
+Database uji dibuat ulang otomatis (`siipb_test`: DROP → `alembic upgrade head` → seed), sehingga database pengembangan tidak tersentuh.
 
 ---
 
 ## 9. Panduan Deployment & Operasional
 
-### A. Deployment Satu Perintah (Docker Compose)
-Seluruh ekosistem (MariaDB, Redis, Backend API, Celery Worker, Celery Beat, dan Nginx) dapat dijalankan serentak:
-
+### A. Docker Compose (production)
 ```bash
+cp .env.example .env        # ganti semua nilai "ganti-…" (DB, SECRET_KEY, JWT_SECRET_KEY, SEED_ADMIN_PASSWORD)
 docker compose up -d --build
 ```
-Layanan akan beroperasi di port:
-- **Web Service & Reverse Proxy:** `http://<IP-SERVER>:80`
-- **Swagger API Docs:** `http://<IP-SERVER>:80/api/docs`
-- **Health Check:** `http://<IP-SERVER>:80/api/health`
+- Aplikasi: `http://<server>` (HTTPS: `NGINX_CONF=nginx.https.conf` + sertifikat di `infrastructure/nginx/certs/`)
+- Swagger: `/api/docs` · Health check: `/api/health`
+- Container `backend` menjalankan `alembic upgrade head` + seed (akun `admin` dengan `SEED_ADMIN_PASSWORD`) sebelum start.
+- Backup: otomatis tiap hari 01.00 (Celery Beat, volume `backups_data`), manual dari **Pengaturan → Backup**, atau `infrastructure/scripts/backup_db.sh`. Pemulihan: `infrastructure/scripts/restore_db.sh <berkas>`.
+- Rollback: `docker compose down` → checkout tag sebelumnya → `alembic downgrade <revisi>` bila perlu → `docker compose up -d --build`.
 
-### B. Menjalankan Manual di Lingkungan Pengembang
+### B. Pengembangan lokal
 ```bash
-# 1. Masuk ke direktori backend & aktifkan environment
-cd backend
-python -m venv .venv
-.\.venv\Scripts\activate       # Windows (atau 'source .venv/bin/activate' di Linux)
+# Backend (MariaDB & Redis berjalan lokal)
+cd backend && python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-
-# 2. Jalankan Server API
-python run.py
-
-# 3. Jalankan Background Worker (Terminal Terpisah)
-celery -A celery_app.celery worker --loglevel=info
+alembic upgrade head && python scripts/seed_data.py               # admin/admin123, petugas/petugas123, pimpinan/pimpinan123
+python run.py                                                     # http://localhost:5000/api/docs
+celery -A celery_app.celery worker --loglevel=info                # opsional (tanpa worker: NOTIFICATION_DISPATCH=sync)
 celery -A celery_app.celery beat --loglevel=info
+
+# Frontend
+cd frontend && npm install
+cp .env.example .env    # NEXT_PUBLIC_DATA_SOURCE=api, NEXT_PUBLIC_API_BASE_URL=http://localhost:5000/api/v1
+npm run dev             # http://localhost:3000  (tanpa backend: NEXT_PUBLIC_DATA_SOURCE=mock)
 ```
 
 ---
@@ -226,7 +210,8 @@ celery -A celery_app.celery beat --loglevel=info
 ## 10. Dokumentasi API & Kontak
 
 - **Spesifikasi Lengkap REST API:** Kunjungi endpoint `/api/docs` saat server aktif untuk melihat antarmuka Swagger UI interaktif yang memuat seluruh parameter, model payload, dan skema respons.
-- **Repository Git:** [GitHub lemonade199/SIIPB](https://github.com/lemonade199/SIIPB.git) (Branch `main`).
+- **Daftar endpoint:** [`docs/api_specification.md`](docs/api_specification.md).
+- **Repository Git:** [GitHub lemonade199/SIIPB](https://github.com/lemonade199/SIIPB.git).
 
 ---
 

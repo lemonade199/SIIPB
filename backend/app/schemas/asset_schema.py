@@ -5,7 +5,7 @@ from app.models.enums import AssetCondition, AssetStatus
 
 
 class AssetCreateSchema(Schema):
-    inventory_code = fields.String(required=True, validate=validate.Length(min=3, max=50))
+    inventory_code = fields.String(required=False, allow_none=True, validate=validate.Length(max=50))
     category_id = fields.Integer(required=True)
     location_id = fields.Integer(allow_none=True, required=False)
     owner_unit_id = fields.Integer(allow_none=True, required=False)
@@ -17,9 +17,10 @@ class AssetCreateSchema(Schema):
     photo_path = fields.String(allow_none=True, required=False, validate=validate.Length(max=500))
     purchase_date = fields.Date(allow_none=True, required=False)
     acquisition_cost = fields.Decimal(allow_none=True, required=False, validate=validate.Range(min=0))
+    acquisition_source = fields.String(allow_none=True, required=False, validate=validate.Length(max=150))
     status = fields.String(
         required=False,
-        validate=validate.OneOf([s.value for s in AssetStatus]),
+        validate=validate.OneOf(["TERSEDIA", "RUSAK", "RUSAK_BERAT", "DALAM_PERBAIKAN", "HILANG"]),
         load_default=AssetStatus.TERSEDIA.value,
     )
     condition = fields.String(
@@ -42,9 +43,18 @@ class AssetUpdateSchema(Schema):
     photo_path = fields.String(allow_none=True, required=False, validate=validate.Length(max=500))
     purchase_date = fields.Date(allow_none=True, required=False)
     acquisition_cost = fields.Decimal(allow_none=True, required=False, validate=validate.Range(min=0))
+    acquisition_source = fields.String(allow_none=True, required=False, validate=validate.Length(max=150))
     condition = fields.String(
         required=False,
         validate=validate.OneOf([c.value for c in AssetCondition]),
     )
     is_active = fields.Boolean(required=False)
     reason = fields.String(allow_none=True, required=False)
+
+
+class AssetStatusSchema(Schema):
+    status = fields.String(
+        required=True,
+        validate=validate.OneOf(["TERSEDIA", "RUSAK", "RUSAK_BERAT", "DALAM_PERBAIKAN", "HILANG"]),
+    )
+    reason = fields.String(required=False, allow_none=True, validate=validate.Length(max=500))

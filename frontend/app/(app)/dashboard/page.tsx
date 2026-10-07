@@ -16,7 +16,8 @@ import { BorrowBadge, DueText } from '@/components/domain/borrow-status';
 import { useToast } from '@/components/providers/feedback-provider';
 import { stats } from '@/services/dashboard';
 import { emp, itemsOf, userName } from '@/services/lookup';
-import { lastSchedulerRun, runScheduler } from '@/services/scheduler';
+import { lastSchedulerRun } from '@/services/scheduler';
+import * as repo from '@/services/repo';
 import type { ItemStatus } from '@/types';
 
 const STAT_COLORS: Record<ItemStatus, string> = {
@@ -44,8 +45,10 @@ export default function DashboardPage() {
   const sc = db.data.settings.scheduler;
   const acts = db.all('activity_logs').slice(-6).reverse();
 
-  const onRun = () => {
-    const r = runScheduler({ trigger: 'manual', user_id: user.id });
+  const onRun = async () => {
+    const res = await repo.runScheduler();
+    if (!res.ok) return toast(res.error, 'err');
+    const r = res.result;
     toast(`Pemeriksaan selesai: ${r.checked} diperiksa, ${r.late_marked} menjadi TERLAMBAT, ${r.sent} terkirim, ${r.skipped} dilewati (sudah pernah dikirim).`);
   };
 

@@ -36,6 +36,7 @@ class User(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
     # NULL for SSO/OIDC-only accounts.
     password_hash: Mapped[str | None] = mapped_column(String(255))
     full_name: Mapped[str] = mapped_column(String(150))
+    phone: Mapped[str | None] = mapped_column(String(30))
     unit_id: Mapped[int | None] = mapped_column(
         BigIntU, ForeignKey("organizational_units.id", ondelete="RESTRICT"), index=True
     )

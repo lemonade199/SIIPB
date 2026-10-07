@@ -1,148 +1,161 @@
-version: "3.9"
+# ==========================================================================
+# SIIPB — arsitektur production (dokumen Plan §9 & §23)
+# Pengguna → Nginx → Next.js (frontend) / Flask REST API → MariaDB
+# Flask ↔ Redis; Celery Worker (email SMTP) & Celery Beat (jatuh tempo, backup)
+#
+#   cp .env.example .env    # isi rahasia (WAJIB diganti)
+#   docker compose up -d --build
+#   buka http://localhost   (Swagger: http://localhost/api/docs)
+# ==========================================================================
+
+x-backend-env: &backend-env
+  APP_ENV: production
+  APP_DEBUG: "false"
+  DATABASE_URL: "mariadb+pymysql://${DB_USER:-siipb}:${DB_PASSWORD:?isi DB_PASSWORD di .env}@mariadb:3306/${DB_NAME:-siipb}?charset=utf8mb4"
+  REDIS_URL: "redis://redis:6379/0"
+  CELERY_BROKER_URL: "redis://redis:6379/0"
+  CELERY_RESULT_BACKEND: "redis://redis:6379/1"
+  CELERY_TIMEZONE: "${TZ:-Asia/Jakarta}"
+  NOTIFICATION_DISPATCH: celery
+  SECRET_KEY: "${SECRET_KEY:?isi SECRET_KEY di .env}"
+  JWT_SECRET_KEY: "${JWT_SECRET_KEY:?isi JWT_SECRET_KEY di .env}"
+  JWT_ACCESS_TTL_MINUTES: "${JWT_ACCESS_TTL_MINUTES:-30}"
+  JWT_REFRESH_TTL_DAYS: "${JWT_REFRESH_TTL_DAYS:-7}"
+  SMTP_HOST: "${SMTP_HOST:-}"
+  SMTP_PORT: "${SMTP_PORT:-587}"
+  SMTP_USERNAME: "${SMTP_USERNAME:-}"
+  SMTP_PASSWORD: "${SMTP_PASSWORD:-}"
+  SMTP_USE_TLS: "${SMTP_USE_TLS:-true}"
+  SMTP_SENDER_EMAIL: "${SMTP_SENDER_EMAIL:-no-reply@siipb.local}"
+  SMTP_SENDER_NAME: "${SMTP_SENDER_NAME:-SIIPB Sarpras IT}"
+  GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
+  GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+  CORS_ORIGINS: "${PUBLIC_URL:-http://localhost}"
+  FRONTEND_URL: "${PUBLIC_URL:-http://localhost}"
+  MAX_UPLOAD_MB: "${MAX_UPLOAD_MB:-5}"
+  UPLOAD_FOLDER: /app/uploads
+  BACKUP_FOLDER: /app/backups
+  TRUST_PROXY: "1"
+  TZ: "${TZ:-Asia/Jakarta}"
 
 services:
-  # 1. MariaDB Database Service (Initializes 26 existing tables from database/SIIPB.sql)
   mariadb:
     image: mariadb:11.4
     container_name: siipb_mariadb
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: "${DB_PASSWORD:-123}"
-      MYSQL_DATABASE: "${DB_NAME:-siipb}"
-      TZ: "Asia/Jakarta"
+      MARIADB_ROOT_PASSWORD: "${DB_ROOT_PASSWORD:?isi DB_ROOT_PASSWORD di .env}"
+      MARIADB_DATABASE: "${DB_NAME:-siipb}"
+      MARIADB_USER: "${DB_USER:-siipb}"
+      MARIADB_PASSWORD: "${DB_PASSWORD}"
+      TZ: "${TZ:-Asia/Jakarta}"
     volumes:
       - mariadb_data:/var/lib/mysql
-      - ./database/SIIPB.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
-    ports:
-      - "3306:3306"
-    networks:
-      - siipb_net
+      # Skema dibuat & diperbarui oleh Alembic (container backend: alembic upgrade head).
+      # database/SIIPB.sql hanya referensi/impor manual.
+    # Tidak dipublikasikan ke host. Untuk akses lokal: tambahkan "127.0.0.1:3306:3306".
+    networks: [siipb_net]
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
 
-  # 2. Redis Message Broker & Cache
   redis:
     image: redis:7-alpine
     container_name: siipb_redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redis_data:/data
-    networks:
-      - siipb_net
+    networks: [siipb_net]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
 
-  # 3. Backend Flask REST API
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    build: { context: ./backend, dockerfile: Dockerfile }
+    image: siipb-backend:latest
     container_name: siipb_backend
     restart: unless-stopped
     environment:
-      APP_ENV: production
-      DATABASE_URL: "mariadb+pymysql://root:${DB_PASSWORD:-123}@mariadb:3306/${DB_NAME:-siipb}?charset=utf8mb4"
-      REDIS_URL: "redis://redis:6379/0"
-      CELERY_BROKER_URL: "redis://redis:6379/0"
-      CELERY_RESULT_BACKEND: "redis://redis:6379/0"
-      SECRET_KEY: "${SECRET_KEY:-siipb-production-secret-key-change-in-env}"
-      JWT_SECRET_KEY: "${JWT_SECRET_KEY:-siipb-jwt-secret-key-change-in-env}"
-      SMTP_HOST: "${SMTP_HOST:-smtp.gmail.com}"
-      SMTP_PORT: "${SMTP_PORT:-587}"
-      SMTP_USERNAME: "${SMTP_USERNAME:-}"
-      SMTP_PASSWORD: "${SMTP_PASSWORD:-}"
-      SMTP_SENDER_EMAIL: "${SMTP_SENDER_EMAIL:-sarpras@siipb.sch.id}"
-      SMTP_SENDER_NAME: "${SMTP_SENDER_NAME:-SIIPB Sarpras IT}"
+      <<: *backend-env
+      RUN_MIGRATIONS: "1"          # alembic upgrade head + seed awal (idempoten)
+      SEED_DEMO_DATA: "${SEED_DEMO_DATA:-0}"
+      SEED_ADMIN_PASSWORD: "${SEED_ADMIN_PASSWORD:?isi SEED_ADMIN_PASSWORD di .env}"
+      SEED_PETUGAS_PASSWORD: "${SEED_PETUGAS_PASSWORD:-}"
+      SEED_PIMPINAN_PASSWORD: "${SEED_PIMPINAN_PASSWORD:-}"
     volumes:
       - uploads_data:/app/uploads
+      - backups_data:/app/backups
     depends_on:
-      mariadb:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - siipb_net
+      mariadb: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    networks: [siipb_net]
 
-  # 4. Celery Async Task Worker (SMTP Email & Background Jobs)
   celery_worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: siipb-backend:latest
     container_name: siipb_celery_worker
     restart: unless-stopped
     command: ["celery", "-A", "celery_app.celery", "worker", "--loglevel=info", "--concurrency=4"]
-    environment:
-      APP_ENV: production
-      DATABASE_URL: "mariadb+pymysql://root:${DB_PASSWORD:-123}@mariadb:3306/${DB_NAME:-siipb}?charset=utf8mb4"
-      REDIS_URL: "redis://redis:6379/0"
-      CELERY_BROKER_URL: "redis://redis:6379/0"
-      CELERY_RESULT_BACKEND: "redis://redis:6379/0"
-      SMTP_HOST: "${SMTP_HOST:-smtp.gmail.com}"
-      SMTP_PORT: "${SMTP_PORT:-587}"
-      SMTP_USERNAME: "${SMTP_USERNAME:-}"
-      SMTP_PASSWORD: "${SMTP_PASSWORD:-}"
-      SMTP_SENDER_EMAIL: "${SMTP_SENDER_EMAIL:-sarpras@siipb.sch.id}"
-      SMTP_SENDER_NAME: "${SMTP_SENDER_NAME:-SIIPB Sarpras IT}"
+    environment: *backend-env
     volumes:
       - uploads_data:/app/uploads
+      - backups_data:/app/backups
     depends_on:
-      mariadb:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - siipb_net
+      backend: { condition: service_healthy }
+    networks: [siipb_net]
 
-  # 5. Celery Beat Scheduler (Due dates, Reminders, Overdue tracking)
   celery_beat:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: siipb-backend:latest
     container_name: siipb_celery_beat
     restart: unless-stopped
-    command: ["celery", "-A", "celery_app.celery", "beat", "--loglevel=info"]
-    environment:
-      APP_ENV: production
-      DATABASE_URL: "mariadb+pymysql://root:${DB_PASSWORD:-123}@mariadb:3306/${DB_NAME:-siipb}?charset=utf8mb4"
-      REDIS_URL: "redis://redis:6379/0"
-      CELERY_BROKER_URL: "redis://redis:6379/0"
-      CELERY_RESULT_BACKEND: "redis://redis:6379/0"
+    command: ["celery", "-A", "celery_app.celery", "beat", "--loglevel=info", "--schedule=/tmp/celerybeat-schedule"]
+    environment: *backend-env
     depends_on:
-      mariadb:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - siipb_net
+      backend: { condition: service_healthy }
+    networks: [siipb_net]
 
-  # 6. Nginx Web Server & Reverse Proxy
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_DATA_SOURCE: api
+        NEXT_PUBLIC_API_BASE_URL: /api/v1
+        NEXT_PUBLIC_INSTITUTION: "${INSTITUTION_NAME:-}"
+        NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS: "${SHOW_DEMO_ACCOUNTS:-false}"
+    image: siipb-frontend:latest
+    container_name: siipb_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks: [siipb_net]
+
   nginx:
-    image: nginx:1.25-alpine
+    image: nginx:1.27-alpine
     container_name: siipb_nginx
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
     volumes:
-      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./infrastructure/nginx/html:/usr/share/nginx/html:ro
+      # HTTP: nginx.conf (bawaan). HTTPS production: NGINX_CONF=nginx.https.conf + sertifikat di infrastructure/nginx/certs
+      - ./infrastructure/nginx/${NGINX_CONF:-nginx.conf}:/etc/nginx/nginx.conf:ro
+      - ./infrastructure/nginx/certs:/etc/nginx/certs:ro
       - uploads_data:/app/uploads:ro
     depends_on:
+      - frontend
       - backend
-    networks:
-      - siipb_net
+    networks: [siipb_net]
 
 volumes:
   mariadb_data:
   redis_data:
   uploads_data:
+  backups_data:
 
 networks:
   siipb_net:

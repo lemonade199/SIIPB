@@ -24,7 +24,7 @@ swagger_template = {
     "swagger": "2.0",
     "info": {
         "title": "SIIPB API Specification",
-        "description": "Sistem Informasi Inventaris Barang, Peminjaman, dan Pengembalian Barang",
+        "description": "Sistem Informasi Inventaris Barang, Peminjaman, dan Pengembalian Barang. Login: POST /api/v1/auth/login lalu klik Authorize dan isi `Bearer <access_token>`.",
         "version": "1.0.0",
         "contact": {
             "name": "SIIPB Developer Team"

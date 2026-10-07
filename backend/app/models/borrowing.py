@@ -62,9 +62,17 @@ class Borrowing(IdMixin, TimestampMixin, Base):
         default=BorrowingStatus.AKTIF.value,
         server_default=text(f"'{BorrowingStatus.AKTIF.value}'"),
     )
+    # Draf -> checkout (penyerahan barang) dicatat terpisah dari pembuatan transaksi.
+    checked_out_at: Mapped[datetime | None] = mapped_column(DateTime6)
+    checked_out_by: Mapped[int | None] = mapped_column(
+        BigIntU, ForeignKey("users.id", ondelete="SET NULL"), index=True
+    )
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime6)
+    cancel_reason: Mapped[str | None] = mapped_column(Text)
 
     borrower: Mapped[Borrower] = relationship(back_populates="borrowings")
-    handler: Mapped[User] = relationship()
+    handler: Mapped[User] = relationship(foreign_keys=[handled_by])
+    checkout_user: Mapped[User | None] = relationship(foreign_keys=[checked_out_by])
     items: Mapped[list[BorrowingItem]] = relationship(back_populates="borrowing")
     returns: Mapped[list[Return]] = relationship(back_populates="borrowing")
     notification_events: Mapped[list[NotificationEvent]] = relationship(
@@ -94,7 +102,9 @@ class BorrowingItem(IdMixin, CreatedAtMixin, Base):
     asset_id: Mapped[int] = mapped_column(
         BigIntU, ForeignKey("assets.id", ondelete="RESTRICT"), index=True
     )
-    checked_out_at: Mapped[datetime] = mapped_column(DateTime6)
+    # NULL selama transaksi masih DRAF.
+    checked_out_at: Mapped[datetime | None] = mapped_column(DateTime6)
+    condition_out: Mapped[str | None] = mapped_column(String(20))
     notes: Mapped[str | None] = mapped_column(Text)
 
     borrowing: Mapped[Borrowing] = relationship(back_populates="items")

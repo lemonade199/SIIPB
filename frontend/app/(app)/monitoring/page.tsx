@@ -21,7 +21,8 @@ import { BorrowBadge, DueText } from '@/components/domain/borrow-status';
 import { useToast } from '@/components/providers/feedback-provider';
 import { stats } from '@/services/dashboard';
 import { activeBorrowings, borrowView, cat, conditionLabel, emp, itemsOf, loc, unit } from '@/services/lookup';
-import { lastSchedulerRun, runScheduler } from '@/services/scheduler';
+import { lastSchedulerRun } from '@/services/scheduler';
+import * as repo from '@/services/repo';
 import type { Borrowing, ItemStatus } from '@/types';
 
 type Tab = 'aktif' | 'jatuh_tempo' | 'terlambat' | 'rusak_hilang';
@@ -112,8 +113,10 @@ export default function MonitoringPage() {
       }),
     );
 
-  const onRun = () => {
-    const r = runScheduler({ trigger: 'manual', user_id: user.id });
+  const onRun = async () => {
+    const res = await repo.runScheduler();
+    if (!res.ok) return toast(res.error, 'err');
+    const r = res.result;
     toast(`Pemeriksaan selesai: ${r.checked} diperiksa, ${r.late_marked} menjadi TERLAMBAT, ${r.sent} email terkirim, ${r.skipped} dilewati (duplikat).`);
   };
 

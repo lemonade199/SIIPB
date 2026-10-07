@@ -1,7 +1,7 @@
 """File and evidence upload routes."""
 from flask import Blueprint, request
 
-from app.middleware.auth_middleware import jwt_required
+from app.middleware.auth_middleware import any_permission_required
 from app.services.storage_service import save_upload_file
 from app.utils.response import error_response, success_response
 
@@ -9,7 +9,7 @@ upload_bp = Blueprint("uploads", __name__, url_prefix="/api/v1/uploads")
 
 
 @upload_bp.post("")
-@jwt_required
+@any_permission_required("inventory.manage", "return.manage")
 def upload_file():
     """Upload photo evidence or document.
     ---

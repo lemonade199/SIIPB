@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { CAPABILITIES } from '@/lib/config';
+import { CAPABILITIES, isApiMode } from '@/lib/config';
 import { Input } from '@/components/ui/input';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useRef, useState } from 'react';
@@ -24,7 +24,8 @@ import { useConfirm, useToast } from '@/components/providers/feedback-provider';
 import { logout } from '@/services/auth';
 import { backupJSON, restoreJSON } from '@/services/backup';
 import { fillTemplate, templateVars } from '@/services/notification';
-import { recordBackup, recordRestoreTest, saveTemplate, setRuleActive, setRuleRecipient, shiftDemoDays, testSmtp, updateSettings } from '@/services/settings';
+import { recordBackup, recordRestoreTest, shiftDemoDays } from '@/services/settings';
+import * as repo from '@/services/repo';
 import type { EmailTemplate, RecipientKind, Settings } from '@/types';
 
 type Tab = 'umum' | 'smtp' | 'notifikasi' | 'template' | 'keamanan' | 'backup' | 'demo';
@@ -42,7 +43,7 @@ export default function PengaturanPage() {
   useTitle('Pengaturan');
   const params = useSearchParams();
   const t = params.get('tab') as Tab | null;
-  const tabs = TABS.filter(([k]) => CAPABILITIES.scheduler || k !== 'demo');
+  const tabs = TABS.filter(([k]) => CAPABILITIES.demoClock || k !== 'demo');
   const tab: Tab = t && tabs.some((x) => x[0] === t) ? t : 'umum';
   const s = db.data.settings;
 
@@ -74,12 +75,6 @@ export default function PengaturanPage() {
           ))}
         </nav>
         <div className="stack">
-          {!CAPABILITIES.serverSettings && (
-            <Alert type="warn">
-              Backend belum menyediakan endpoint pengaturan. Perubahan di halaman ini disimpan di browser ini saja; konfigurasi SMTP, JWT, dan jadwal Celery di server diatur lewat
-              environment variable backend.
-            </Alert>
-          )}
           {tab === 'umum' && <Umum key="umum" s={s} />}
           {tab === 'smtp' && <Smtp key="smtp" s={s} />}
           {tab === 'notifikasi' && <Notifikasi key="notif" s={s} />}
@@ -114,12 +109,12 @@ function Umum({ s }: { s: Settings }) {
       <form
         className="form-grid"
         noValidate
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
           if (!v.institution.trim()) return setErr('Wajib diisi.');
           setErr('');
-          updateSettings((x) => Object.assign(x, Object.fromEntries(Object.entries(v).map(([k, val]) => [k, val.trim()]))), 'umum', { instansi: v.institution.trim() });
-          toast('Pengaturan umum disimpan.');
+          const r = await repo.saveSettings(Object.fromEntries(Object.entries(v).map(([k, val]) => [k, val.trim()])), 'umum');
+          toast(r.ok ? 'Pengaturan umum disimpan.' : r.error, r.ok ? 'ok' : 'err');
         }}
       >
         <TextField label="Nama instansi" required value={v.institution} error={err} onChange={set('institution')} />
@@ -138,19 +133,21 @@ function Smtp({ s }: { s: Settings }) {
   const toast = useToast();
   const { user } = useAuth();
   const [v, setV] = useState({ ...s.smtp });
+  const [password, setPassword] = useState('');
+  const [testing, setTesting] = useState(false);
+  const passwordSet = (s.smtp as Settings['smtp'] & { password_set?: boolean }).password_set;
   return (
     <Card title="Server email (SMTP)">
       <form
         className="form-grid"
         noValidate
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
-          updateSettings(
-            (x) => Object.assign(x.smtp, { ...v, host: v.host.trim(), port: Number(v.port), username: v.username.trim(), from_name: v.from_name.trim(), from_email: v.from_email.trim() }),
-            'SMTP',
-            { host: v.host.trim(), simulasi_gagal: v.simulate_failure },
-          );
-          toast('Pengaturan SMTP disimpan.');
+          const smtp = { ...v, host: v.host.trim(), port: Number(v.port), username: v.username.trim(), from_name: v.from_name.trim(), from_email: v.from_email.trim() };
+          delete (smtp as { password_set?: boolean }).password_set;
+          const r = await repo.saveSettings({ smtp, smtp_password: password || undefined }, 'SMTP');
+          if (r.ok) setPassword('');
+          toast(r.ok ? 'Pengaturan SMTP disimpan.' : r.error, r.ok ? 'ok' : 'err');
         }}
       >
         <TextField label="Host" mono value={v.host} onChange={(e) => setV({ ...v, host: e.target.value })} />
@@ -164,9 +161,21 @@ function Smtp({ s }: { s: Settings }) {
         />
         <TextField label="Nama pengirim" value={v.from_name} onChange={(e) => setV({ ...v, from_name: e.target.value })} />
         <TextField label="Email pengirim" type="email" value={v.from_email} onChange={(e) => setV({ ...v, from_email: e.target.value })} />
+        {isApiMode && (
+          <TextField
+            label="Kata sandi SMTP"
+            type="password"
+            autoComplete="new-password"
+            value={password}
+            hint={passwordSet ? 'Sudah tersimpan (terenkripsi). Kosongkan bila tidak diubah.' : 'Belum diisi — email disimulasikan (mode pengembangan).'}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        )}
         <div className="full">
           <Alert type="info">
-            Kata sandi SMTP, JWT secret, OAuth client secret, dan kredensial MinIO disimpan sebagai environment variable / secret manager — tidak ditampilkan di antarmuka dan tidak masuk repository.
+            {isApiMode
+              ? 'Kata sandi SMTP disimpan terenkripsi di server dan tidak pernah dikirim kembali ke browser. JWT secret, OAuth client secret, dan kredensial database tetap diatur lewat environment variable / secret manager.'
+              : 'Kata sandi SMTP, JWT secret, OAuth client secret, dan kredensial MinIO disimpan sebagai environment variable / secret manager — tidak ditampilkan di antarmuka dan tidak masuk repository.'}
           </Alert>
         </div>
         <label className="check full">
@@ -181,12 +190,15 @@ function Smtp({ s }: { s: Settings }) {
           </Button>
           <Button
             icon="send"
-            onClick={() => {
-              const ok = testSmtp();
-              toast(ok ? `Email uji terkirim ke ${user?.email} melalui ${s.smtp.host}:${s.smtp.port}.` : 'Email uji gagal: koneksi SMTP ditolak.', ok ? 'ok' : 'err');
+            disabled={testing}
+            onClick={async () => {
+              setTesting(true);
+              const r = await repo.testSmtp();
+              setTesting(false);
+              toast(isApiMode ? r.message : r.ok ? `Email uji terkirim ke ${user?.email} melalui ${s.smtp.host}:${s.smtp.port}.` : 'Email uji gagal: koneksi SMTP ditolak.', r.ok ? 'ok' : 'err');
             }}
           >
-            Kirim email uji
+            {isApiMode ? 'Uji koneksi SMTP' : 'Kirim email uji'}
           </Button>
         </div>
       </form>
@@ -205,21 +217,15 @@ function Notifikasi({ s }: { s: Settings }) {
         <form
           className="form-grid"
           noValidate
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
             if (!/^\d{2}:\d{2}$/.test(v.time)) return setErr('Format jam HH:MM.');
             setErr('');
-            const old = s.scheduler.time;
-            updateSettings(
-              (x) => {
-                Object.assign(x.scheduler, { time: v.time, timezone: v.timezone, enabled: v.enabled });
-                x.checkout_notify = v.checkout_notify;
-                x.return_notify = v.return_notify;
-              },
+            const r = await repo.saveSettings(
+              { scheduler: { ...s.scheduler, time: v.time, timezone: v.timezone, enabled: v.enabled }, checkout_notify: v.checkout_notify, return_notify: v.return_notify },
               'penjadwal',
-              { jam_lama: old, jam_baru: v.time, aktif: v.enabled },
             );
-            toast('Pengaturan penjadwal disimpan.');
+            toast(r.ok ? 'Pengaturan penjadwal disimpan.' : r.error, r.ok ? 'ok' : 'err');
           }}
         >
           <TextField label="Jam pemeriksaan harian" type="time" value={v.time} error={err} onChange={(e) => setV({ ...v, time: e.target.value })} />
@@ -268,9 +274,10 @@ function Notifikasi({ s }: { s: Settings }) {
                         checked={r.to.includes(to)}
                         disabled={to === 'peminjam'}
                         aria-label={`${r.event} ke ${to}`}
-                        onCheckedChange={(c) => {
-                          const rr = setRuleRecipient(i, to, c === true);
-                          toast(`Penerima ${rr.event}: ${rr.to.join(' + ')}.`);
+                        onCheckedChange={async (c) => {
+                          const res = await repo.setRuleRecipient(i, to, c === true);
+                          const rr = db.data.settings.rules[i];
+                          toast(res.ok ? `Penerima ${rr.event}: ${rr.to.join(' + ')}.` : res.error, res.ok ? 'ok' : 'err');
                         }}
                       />
                     </td>
@@ -280,9 +287,10 @@ function Notifikasi({ s }: { s: Settings }) {
                     <Switch
                       checked={r.active}
                       aria-label={`Aktifkan ${r.event}`}
-                      onCheckedChange={(c) => {
-                        const rr = setRuleActive(i, c);
-                        toast(`Aturan ${rr.event} ${rr.active ? 'diaktifkan' : 'dinonaktifkan'}.`);
+                      onCheckedChange={async (c) => {
+                        const res = await repo.setRuleActive(i, c);
+                        const rr = db.data.settings.rules[i];
+                        toast(res.ok ? `Aturan ${rr.event} ${rr.active ? 'diaktifkan' : 'dinonaktifkan'}.` : res.error, res.ok ? 'ok' : 'err');
                       }}
                     />
                   </td>
@@ -358,10 +366,11 @@ function Templates() {
             <Button
               variant="primary"
               icon="check"
-              onClick={() => {
+              onClick={async () => {
                 if (!edit) return;
                 if (!edit.subject.trim()) return setErr('Wajib diisi.');
-                saveTemplate(edit.t.id, edit.subject, edit.body);
+                const r = await repo.saveTemplate(edit.t.id, edit.subject, edit.body);
+                if (!r.ok) return setErr(r.error);
                 setEdit(null);
                 toast('Template disimpan.');
               }}
@@ -413,13 +422,10 @@ function Keamanan({ s }: { s: Settings }) {
       <form
         className="form-grid"
         noValidate
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
-          updateSettings((x) => Object.assign(x.security, { ...v, oidc_issuer: v.oidc_issuer.trim(), oidc_client_id: v.oidc_client_id.trim() }), 'keamanan', {
-            sso: v.oidc_enabled,
-            access_token_menit: v.jwt_access_minutes,
-          });
-          toast('Pengaturan keamanan disimpan.');
+          const r = await repo.saveSettings({ security: { ...v, oidc_issuer: v.oidc_issuer.trim(), oidc_client_id: v.oidc_client_id.trim() } }, 'keamanan');
+          toast(r.ok ? 'Pengaturan keamanan disimpan.' : r.error, r.ok ? 'ok' : 'err');
         }}
       >
         <TextField label="Masa berlaku access token (menit)" type="number" min={5} value={v.jwt_access_minutes} onChange={num('jwt_access_minutes')} />
@@ -448,6 +454,7 @@ function Keamanan({ s }: { s: Settings }) {
 /* ---------- Backup ---------- */
 function Backup({ s }: { s: Settings }) {
   const toast = useToast();
+  const [busy, setBusy] = useState(false);
   const confirm = useConfirm();
   const { user } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -462,6 +469,23 @@ function Backup({ s }: { s: Settings }) {
             ['Jumlah backup', String(s.backup.history.length)],
           ]}
         />
+        {isApiMode ? (
+          <div className="row" style={{ marginTop: 14 }}>
+            <Button
+              variant="primary"
+              icon="database"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                const r = await repo.backupNow();
+                setBusy(false);
+                toast(r.message, r.ok ? 'ok' : 'err');
+              }}
+            >
+              {busy ? 'Membuat backup…' : 'Backup database sekarang'}
+            </Button>
+          </div>
+        ) : (
         <div className="row" style={{ marginTop: 14 }}>
           <Button
             variant="primary"
@@ -488,6 +512,7 @@ function Backup({ s }: { s: Settings }) {
             Catat uji restore
           </Button>
         </div>
+        )}
         <input
           ref={fileRef}
           type="file"
@@ -514,7 +539,14 @@ function Backup({ s }: { s: Settings }) {
           }}
         />
         <p className="small muted" style={{ marginTop: 10 }}>
-          Pada mockup, backup berisi seluruh data aplikasi dalam format JSON. Di production, backup MariaDB dijadwalkan dan diuji dengan restore berkala.
+          {isApiMode ? (
+            <>
+              Backup memakai <span className="mono">mariadb-dump</span> (gzip) dan dijadwalkan Celery Beat setiap hari 01.00. Pemulihan dilakukan administrator server dengan
+              <span className="mono"> infrastructure/scripts/restore_db.sh</span> agar tidak dapat dipicu dari browser.
+            </>
+          ) : (
+            'Pada mode demo, backup berisi seluruh data aplikasi dalam format JSON. Di production, backup MariaDB dijadwalkan dan diuji dengan restore berkala.'
+          )}
         </p>
       </Card>
       <Card title="Riwayat backup" flush>
@@ -527,6 +559,7 @@ function Backup({ s }: { s: Settings }) {
                 <th>Ukuran</th>
                 <th>Oleh</th>
                 <th>Status</th>
+                {isApiMode && <th />}
               </tr>
             </thead>
             <tbody>
@@ -542,6 +575,19 @@ function Backup({ s }: { s: Settings }) {
                     <td>
                       <Badge status={h.status} />
                     </td>
+                    {isApiMode && (
+                      <td className="right">
+                        {(h as typeof h & { file?: string }).file && h.status === 'SUKSES' && (
+                          <Button
+                            size="sm"
+                            icon="download"
+                            onClick={() => repo.downloadBackup((h as typeof h & { file: string }).file).catch((e: Error) => toast(e.message, 'err'))}
+                          >
+                            Unduh
+                          </Button>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))}
             </tbody>

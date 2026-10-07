@@ -32,3 +32,16 @@ htmlcov/
 uploads/
 backend/uploads/
 *.log
+
+# Backup database & sertifikat TLS
+backups/
+backend/backups/
+infrastructure/nginx/certs/*.pem
+infrastructure/nginx/certs/*.key
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/test-results/
+frontend/playwright-report/
+dump.rdb

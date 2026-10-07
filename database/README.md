@@ -8,13 +8,15 @@ Direktori ini berisi berkas skema dan dump database untuk sistem SIIPB (MariaDB 
 
 ```text
 database/
-├── SIIPB.sql               # Dump DDL skema database MariaDB 13 (26 tabel + alembic_version)
+├── SIIPB.sql               # Skema terbaru hasil `alembic upgrade head` (29 tabel + alembic_version, revisi a7c3e91d2b40)
 └── README.md               # Dokumentasi database dan panduan impor
 ```
 
 ---
 
-## 🗄️ Daftar Tabel (26 Tabel)
+## 🗄️ Daftar Tabel (29 Tabel)
+
+> Sumber kebenaran skema adalah migrasi Alembic (`backend/alembic/versions`). Docker Compose menjalankannya otomatis; `SIIPB.sql` untuk referensi/impor manual (lanjutkan dengan `python backend/scripts/seed_data.py`).
 
 | Kategori | Nama Tabel | Keterangan |
 | :--- | :--- | :--- |
@@ -38,12 +40,17 @@ database/
 | **Insiden & Perbaikan** | `damage_reports` | Laporan kerusakan, estimasi biaya & siklus perbaikan |
 | | `loss_reports` | Laporan kehilangan aset |
 | **Notifikasi** | `notification_templates` | Template subjek dan isi email |
+| | `notification_reads` | Penanda notifikasi sudah dibaca per pengguna internal |
+| | `scheduler_runs` | Log setiap pemeriksaan jatuh tempo (Celery Beat / manual) |
+| **Inventaris (tambahan)** | `asset_photos` | Foto barang (item_photos), maks. 5, urutan 0 = foto utama |
 | | `notification_events` | Kunci idempotency: `UNIQUE(borrowing_id, event_code)` |
 | | `notifications` | Snapshot notifikasi email yang siap dikirim |
 | | `notification_logs` | Log siklus hidup pembuatan dan antrean notifikasi |
 | | `email_deliveries` | Rekam jejak percobaan pengiriman SMTP per attempt |
 | **Konfigurasi & Audit** | `system_settings` | Konfigurasi sistem dinamis (*key-value*) |
 | | `audit_logs` | Jejak audit aktivitas pengguna & snapshot JSON |
+
+Kolom tambahan revisi `a7c3e91d2b40`: `assets.acquisition_source`, `users.phone`, `borrowings.checked_out_at/checked_out_by/cancelled_at/cancel_reason` (status `DRAF`), `borrowing_items.condition_out` (checked_out_at boleh NULL untuk draf), `return_items.asset_status_after`, `notifications.recipient_name/recipient_type/recipient_user_id`.
 
 ---
 

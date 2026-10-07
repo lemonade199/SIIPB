@@ -3,11 +3,11 @@
  * lalu mengisi store (cache di memori). Halaman tetap membaca store yang sama seperti mode mock,
  * sedangkan mutasi dikirim ke API lewat `services/repo.ts` lalu cache disegarkan.
  */
-import { atTime, diffDays, localDate, nowISO } from '@/lib/date';
+import { diffDays, localDate, nowISO } from '@/lib/date';
 import { PERMISSIONS } from '@/lib/constants';
 import { db, TABLES } from '@/lib/mock/db';
 import { defaultSettings, defaultTemplates, migrate } from '@/lib/mock/defaults';
-import { API_BASE_URL, tokenStore } from '@/services/api/client';
+import { apiBaseAbsolute, tokenStore } from '@/services/api/client';
 import {
   assetsApi,
   auditApi,
@@ -16,6 +16,8 @@ import {
   masterApi,
   notificationsApi,
   returnsApi,
+  settingsApi,
+  usersApi,
   type ApiAsset,
   type ApiAssetHistory,
   type ApiAuditLog,
@@ -23,7 +25,11 @@ import {
   type ApiBorrowing,
   type ApiNotification,
   type ApiReturn,
+  type ApiRole,
+  type ApiSchedulerRun,
+  type ApiTemplate,
   type ApiUser,
+  type ApiUserRow,
   type LoginResponse,
 } from '@/services/api/endpoints';
 import { getSession, setSession } from '@/services/session';
@@ -34,59 +40,105 @@ import type {
   BorrowStatus,
   Condition,
   DbData,
+  EmailTemplate,
   Employee,
   ID,
   Item,
   ItemMovement,
   ItemStatus,
+  LoginMethod,
   MovementType,
   Notification,
   NotificationLog,
   PermissionKey,
+  Recipient,
   Return,
   ReturnConditionKey,
   ReturnDetail,
   Role,
+  SchedulerRun,
+  Settings,
   User,
 } from '@/types';
 
-/* ================= Pemetaan izin backend → izin antarmuka ================= */
-const PERM_MAP: Record<string, PermissionKey[]> = {
+/* ================= Izin ================= */
+const UI_PERMS = new Set<string>(PERMISSIONS.map((p) => p.key));
+/** Kode lama backend (sebelum migrasi a7c3e91d2b40) → izin antarmuka. */
+const LEGACY_PERM_MAP: Record<string, PermissionKey[]> = {
   'asset.view': ['dashboard.view', 'inventory.view', 'monitoring.view', 'borrowing.view', 'notification.view'],
   'asset.create': ['inventory.manage', 'masterdata.manage', 'qr.manage'],
   'asset.update': ['inventory.manage', 'qr.manage'],
   'asset.delete': ['inventory.manage'],
   'borrowing.create': ['borrowing.view', 'borrowing.manage', 'masterdata.manage', 'monitoring.view'],
   'borrowing.return': ['borrowing.view', 'return.manage', 'monitoring.view'],
-  'report.view': ['report.view', 'report.export', 'dashboard.view'],
   'user.manage': ['users.manage'],
-  'settings.manage': ['settings.manage', 'notification.manage', 'notification.view'],
-  'audit.view': ['audit.view'],
   'audit.read': ['audit.view'],
 };
+export const ROLE_CODE: Record<string, string> = { ADMIN: 'admin', SARPRAS: 'petugas', PIMPINAN: 'pimpinan' };
 const ROLE_NAME: Record<string, string> = { ADMIN: 'Administrator', SARPRAS: 'Petugas Sarpras/IT', PIMPINAN: 'Pimpinan' };
+const uiRoleCode = (code: string) => ROLE_CODE[code] || code.toLowerCase();
+
+export function mapPermissionCodes(codes: string[]): PermissionKey[] {
+  const out = new Set<PermissionKey>();
+  for (const p of codes) {
+    if (UI_PERMS.has(p)) out.add(p as PermissionKey);
+    else (LEGACY_PERM_MAP[p] || []).forEach((k) => out.add(k));
+  }
+  return [...out];
+}
 
 export function mapPermissions(u: Pick<ApiUser, 'roles' | 'permissions'>): PermissionKey[] {
   if (u.roles.includes('ADMIN')) return PERMISSIONS.map((p) => p.key);
-  const out = new Set<PermissionKey>();
-  for (const p of u.permissions) (PERM_MAP[p] || []).forEach((k) => out.add(k));
-  if (u.roles.includes('PIMPINAN')) ['dashboard.view', 'monitoring.view', 'report.view', 'report.export', 'notification.view'].forEach((k) => out.add(k as PermissionKey));
-  return [...out];
+  return mapPermissionCodes(u.permissions);
+}
+
+export function mapRole(r: ApiRole): Role {
+  return {
+    id: r.id,
+    code: uiRoleCode(r.code),
+    name: r.name,
+    description: r.description || '',
+    permissions: r.code === 'ADMIN' ? PERMISSIONS.map((p) => p.key) : mapPermissionCodes(r.permissions),
+    system: r.system,
+  };
+}
+
+export function mapUser(u: ApiUserRow): User {
+  return {
+    id: u.id,
+    name: u.full_name,
+    username: u.username,
+    email: u.email,
+    password: '',
+    role_id: u.role_id ?? 0,
+    active: u.is_active,
+    login_method: (u.login_method as LoginMethod) || 'LOKAL',
+    phone: u.phone || '',
+    last_login: u.last_login_at,
+    created_at: u.created_at || nowISO(),
+  };
 }
 
 /* ================= Pemetaan entitas ================= */
 const ITEM_STATUSES: ItemStatus[] = ['TERSEDIA', 'DIPINJAM', 'RUSAK', 'RUSAK_BERAT', 'DALAM_PERBAIKAN', 'HILANG'];
 const CONDS: Condition[] = ['BAIK', 'RUSAK_RINGAN', 'RUSAK_BERAT'];
 
-export const photoUrl = (path: string | null) => {
+export const photoUrl = (path: string | null | undefined) => {
   if (!path) return null;
-  if (/^(https?:|data:)/.test(path)) return path;
-  return new URL(API_BASE_URL).origin + path;
+  if (/^(https?:|data:|blob:)/.test(path)) return path;
+  return new URL(apiBaseAbsolute()).origin + path;
 };
+
+/** Id foto server per URL (untuk hapus/urutkan foto). */
+export const photoIds = new Map<string, number>();
 
 export function mapAsset(a: ApiAsset): Item {
   const status = (ITEM_STATUSES as string[]).includes(a.status) ? (a.status as ItemStatus) : 'TERSEDIA';
-  const photo = photoUrl(a.photo_path);
+  const photos = (a.photos?.length ? a.photos : a.photo_path ? [{ id: 0, path: a.photo_path }] : []).map((p) => {
+    const url = photoUrl(p.path)!;
+    if (p.id) photoIds.set(url, p.id);
+    return url;
+  });
   return {
     id: a.id,
     item_code: a.inventory_code,
@@ -96,12 +148,12 @@ export function mapAsset(a: ApiAsset): Item {
     model: a.model || '',
     serial_number: a.serial_number || '',
     acquisition_year: a.purchase_date ? Number(a.purchase_date.slice(0, 4)) : '',
-    acquisition_source: '',
+    acquisition_source: a.acquisition_source || '',
     acquisition_value: a.acquisition_cost ?? '',
     location_id: a.location_id ?? 0,
     condition_status: (CONDS as string[]).includes(a.condition) ? (a.condition as Condition) : 'BAIK',
     item_status: status,
-    photos: photo ? [photo] : [],
+    photos,
     notes: a.description || '',
     active: a.is_active && a.status !== 'NONAKTIF',
     created_at: a.created_at || nowISO(),
@@ -122,10 +174,12 @@ export function mapBorrower(b: ApiBorrower): Employee {
   };
 }
 
-const BORROW_STATUS: Record<string, BorrowStatus> = { AKTIF: 'DIPINJAM', TERLAMBAT: 'TERLAMBAT', DIKEMBALIKAN: 'DIKEMBALIKAN', DIBATALKAN: 'DIBATALKAN' };
+const BORROW_STATUS: Record<string, BorrowStatus> = { DRAF: 'DRAF', AKTIF: 'DIPINJAM', TERLAMBAT: 'TERLAMBAT', DIKEMBALIKAN: 'DIKEMBALIKAN', DIBATALKAN: 'DIBATALKAN' };
 
 export function mapBorrowing(b: ApiBorrowing, returnedAt?: string | null): { borrowing: Borrowing; details: BorrowingDetail[] } {
   const created = b.created_at || b.borrowed_at || nowISO();
+  const status = BORROW_STATUS[b.status] || 'DIPINJAM';
+  const checkedOut = b.checked_out_at !== undefined ? b.checked_out_at : status === 'DRAF' ? null : b.borrowed_at || created;
   return {
     borrowing: {
       id: b.id,
@@ -135,14 +189,20 @@ export function mapBorrowing(b: ApiBorrowing, returnedAt?: string | null): { bor
       due_date: (b.due_date || created).slice(0, 10),
       purpose: b.purpose || '',
       notes: b.notes || '',
-      status: BORROW_STATUS[b.status] || 'DIPINJAM',
+      status,
       created_by: b.handled_by,
       created_at: created,
-      checked_out_at: b.borrowed_at || created,
-      checked_out_by: b.handled_by,
-      returned_at: returnedAt ?? null,
+      checked_out_at: checkedOut ?? null,
+      checked_out_by: checkedOut ? (b.checked_out_by ?? b.handled_by) : null,
+      returned_at: b.returned_at ?? returnedAt ?? null,
+      cancel_reason: b.cancel_reason || undefined,
     },
-    details: b.items.map((it) => ({ id: it.id, borrowing_id: b.id, item_id: it.asset_id, item_condition_out: 'BAIK' as Condition })),
+    details: b.items.map((it) => ({
+      id: it.id,
+      borrowing_id: b.id,
+      item_id: it.asset_id,
+      item_condition_out: ((CONDS as string[]).includes(it.condition_out || '') ? it.condition_out : 'BAIK') as Condition,
+    })),
   };
 }
 
@@ -156,64 +216,164 @@ export function mapReturn(r: ApiReturn, b: Borrowing | undefined): { ret: Return
       return_date: returnDate,
       received_by: r.received_by,
       notes: r.notes || '',
-      late_days: b ? Math.max(0, diffDays(b.due_date, returnDate)) : 0,
+      late_days: r.late_days ?? (b ? Math.max(0, diffDays(b.due_date, returnDate)) : 0),
       created_at: r.created_at || r.returned_at,
     },
     details: r.items.map((it) => {
       const sev = it.damage_report?.severity;
-      const cond: ReturnConditionKey = it.final_condition === 'BAIK' ? 'BAIK' : it.final_condition === 'HILANG' ? 'HILANG' : sev === 'BERAT' ? 'RUSAK_BERAT' : 'RUSAK';
+      const after = it.asset_status_after || '';
+      const cond: ReturnConditionKey =
+        it.final_condition === 'BAIK'
+          ? 'BAIK'
+          : it.final_condition === 'HILANG'
+            ? 'HILANG'
+            : after === 'RUSAK_BERAT' || after === 'DALAM_PERBAIKAN'
+              ? after
+              : sev === 'BERAT'
+                ? 'RUSAK_BERAT'
+                : 'RUSAK';
       const completeness = (it.completeness || '').toLowerCase();
+      const incomplete = completeness.startsWith('tidak');
       return {
         id: it.id,
         return_id: r.id,
         item_id: it.asset_id,
         condition_after: cond,
-        complete: !completeness || (completeness.includes('lengkap') && !completeness.includes('tidak')),
-        missing_note: completeness.includes('tidak') ? it.completeness || '' : '',
+        complete: !incomplete,
+        missing_note: incomplete ? (it.completeness || '').replace(/^tidak lengkap:?\s*/i, '') : '',
         damage_note: it.damage_report?.description || it.loss_report?.description || it.notes || '',
       };
     }),
   };
 }
 
+/* ---- Notifikasi: backend menyimpan satu baris per penerima; UI menampilkan satu notifikasi per event ---- */
 const NOTIF_STATUS: Record<string, Notification['status']> = { SENT: 'TERKIRIM', FAILED: 'GAGAL', QUEUED: 'MENUNGGU', PROCESSING: 'MENUNGGU', RETRYING: 'MENUNGGU' };
+const RECIPIENT: Record<string, Recipient['type']> = { PEMINJAM: 'Peminjam', PETUGAS: 'Petugas', PIMPINAN: 'Pimpinan' };
+const EVENT_TEMPLATE: Record<string, string> = {
+  LOAN_CONFIRMATION: 'tpl_checkout',
+  H_MINUS_3: 'tpl_h_min3',
+  H_MINUS_1: 'tpl_h_min1',
+  H_DAY: 'tpl_h',
+  H_PLUS_1: 'tpl_h_plus1',
+  H_PLUS_3: 'tpl_h_plus3',
+  H_PLUS_7: 'tpl_h_plus7',
+  RETURN_CONFIRMATION: 'tpl_return',
+};
+/** id notifikasi UI → id baris backend (semua penerima) untuk tandai terbaca / kirim ulang. */
+export const notificationRows = new Map<ID, ApiNotification[]>();
 
-export function mapNotification(n: ApiNotification, borrowingOfBorrower: (id: number | null) => ID): { notification: Notification; logs: NotificationLog[] } {
-  const status = NOTIF_STATUS[n.status] || 'MENUNGGU';
-  const at = n.created_at || nowISO();
-  const bid = borrowingOfBorrower(n.borrower_id);
-  return {
-    notification: {
-      id: n.id,
-      borrowing_id: bid,
-      event: (/pengembalian/i.test(n.subject) ? 'PENGEMBALIAN' : /pengingat|tenggat|batas/i.test(n.subject) ? 'H-1' : 'CHECKOUT') as Notification['event'],
-      template: '',
-      subject: n.subject,
-      body: '(Isi email disimpan di server; tampilkan melalui log pengiriman SMTP.)',
-      recipients: [{ type: 'Peminjam', name: n.recipient, email: n.recipient }],
+const guessEvent = (n: ApiNotification): Notification['event'] =>
+  (n.event as Notification['event']) || (/pengembalian/i.test(n.subject) ? 'PENGEMBALIAN' : /pengingat|batas/i.test(n.subject) ? 'H-1' : 'CHECKOUT');
+
+export function mapNotifications(rows: ApiNotification[], fallbackBorrowing: (borrowerId: number | null) => ID): { notifications: Notification[]; logs: NotificationLog[] } {
+  const groups = new Map<string, ApiNotification[]>();
+  for (const n of rows) {
+    const key = n.event_id ? `e${n.event_id}` : `n${n.id}`;
+    groups.set(key, [...(groups.get(key) || []), n]);
+  }
+  const notifications: Notification[] = [];
+  const logs: NotificationLog[] = [];
+  notificationRows.clear();
+  for (const list of groups.values()) {
+    list.sort((a, b) => a.id - b.id);
+    const head = list[0];
+    const event = guessEvent(head);
+    const borrowingId = head.borrowing_id ?? fallbackBorrowing(head.borrower_id);
+    const statuses = list.map((n) => NOTIF_STATUS[n.status] || 'MENUNGGU');
+    const status: Notification['status'] = statuses.includes('GAGAL') ? 'GAGAL' : statuses.includes('MENUNGGU') ? 'MENUNGGU' : 'TERKIRIM';
+    const readByAll = [...new Set(list.flatMap((n) => n.read_by || []))];
+    notificationRows.set(head.id, list);
+    notifications.push({
+      id: head.id,
+      borrowing_id: borrowingId,
+      event,
+      template: EVENT_TEMPLATE[head.event_code || ''] || head.template_code || '',
+      subject: head.subject,
+      body: head.body || '',
+      recipients: list.map((n) => ({
+        type: RECIPIENT[n.recipient_type || 'PEMINJAM'] || 'Peminjam',
+        name: n.recipient_name || n.recipient,
+        email: n.recipient,
+        ...(n.recipient_user_id ? { user_id: n.recipient_user_id } : {}),
+      })),
       status,
-      attempts: n.deliveries.length,
-      created_at: at,
-      sent_at: n.sent_at,
-      read_by: [],
-      trigger: 'server',
-    },
-    logs: n.deliveries.map((d, i) => ({
-      id: n.id * 100 + i,
-      notification_id: n.id,
-      borrowing_id: bid,
-      event: 'CHECKOUT',
-      recipient: n.recipient,
-      recipient_type: 'Peminjam',
-      status: d.status === 'SENT' ? 'TERKIRIM' : 'GAGAL',
-      attempt: d.attempt,
-      message: d.error || (d.status === 'SENT' ? '250 OK' : d.status),
-      at: d.attempted_at || at,
-    })),
+      attempts: Math.max(...list.map((n) => n.deliveries.length)),
+      created_at: head.created_at || nowISO(),
+      sent_at: list.every((n) => n.sent_at) ? list.map((n) => n.sent_at!).sort().pop()! : null,
+      read_by: readByAll,
+      trigger: head.trigger || 'transaksi',
+    });
+    for (const n of list) {
+      n.deliveries.forEach((d) =>
+        logs.push({
+          id: n.id * 100 + d.attempt,
+          notification_id: head.id,
+          borrowing_id: borrowingId,
+          event,
+          recipient: n.recipient,
+          recipient_type: RECIPIENT[n.recipient_type || 'PEMINJAM'] || 'Peminjam',
+          status: d.status === 'SENT' ? 'TERKIRIM' : 'GAGAL',
+          attempt: d.attempt,
+          message: d.error || (d.status === 'SENT' ? (d.provider === 'mock_smtp' ? '250 OK (SMTP simulasi)' : '250 OK') : d.status),
+          at: d.attempted_at || head.created_at || nowISO(),
+        }),
+      );
+    }
+  }
+  return { notifications, logs };
+}
+
+export function mapTemplate(t: ApiTemplate): EmailTemplate {
+  return { id: t.id, code: EVENT_TEMPLATE[t.code] || t.code, name: t.name, subject: t.subject, body: t.body, updated_at: t.updated_at || nowISO() };
+}
+export const templateServerCode = (uiCode: string) => Object.entries(EVENT_TEMPLATE).find(([, v]) => v === uiCode)?.[0] || uiCode;
+
+export function mapSchedulerRun(r: ApiSchedulerRun): SchedulerRun {
+  return {
+    id: r.id,
+    at: r.at,
+    today: r.today,
+    trigger: r.trigger === 'BEAT' ? 'Celery Beat' : 'manual',
+    checked: r.checked,
+    late_marked: r.late_marked,
+    sent: r.sent,
+    skipped: r.skipped,
+    failed: r.failed,
+    details: r.details,
   };
 }
 
-const ENTITY: Record<string, string> = { asset: 'items', borrowing: 'borrowings', return: 'returns', user: 'users', borrower: 'employees', category: 'categories', location: 'locations' };
+export function mergeSettings(base: Settings, server: Record<string, unknown>): Settings {
+  const s = server as Partial<Settings> & { rules?: Settings['rules'] };
+  const merged: Settings = {
+    ...base,
+    ...(s as Partial<Settings>),
+    smtp: { ...base.smtp, ...((s.smtp as Partial<Settings['smtp']>) || {}) },
+    scheduler: { ...base.scheduler, ...((s.scheduler as Partial<Settings['scheduler']>) || {}) },
+    security: { ...base.security, ...((s.security as Partial<Settings['security']>) || {}) },
+    backup: { ...base.backup, ...((s.backup as Partial<Settings['backup']>) || {}) },
+    parameters: (s.parameters as Settings['parameters']) || base.parameters,
+    demo_offset_days: 0,
+  };
+  if (Array.isArray(s.rules)) merged.rules = s.rules.map((r) => ({ ...r, template: EVENT_TEMPLATE[r.template] || r.template }));
+  return merged;
+}
+
+const ENTITY: Record<string, string> = {
+  asset: 'items',
+  borrowing: 'borrowings',
+  return: 'returns',
+  user: 'users',
+  role: 'roles',
+  borrower: 'employees',
+  category: 'categories',
+  location: 'locations',
+  organizational_unit: 'units',
+  notification: 'notifications',
+  notification_template: 'email_templates',
+  settings: 'settings',
+};
 
 export function mapAudit(a: ApiAuditLog): ActivityLog {
   return {
@@ -229,7 +389,18 @@ export function mapAudit(a: ApiAuditLog): ActivityLog {
   };
 }
 
-const MOVE: Record<string, MovementType> = { CHECKOUT: 'DIPINJAM', RETURN: 'DIKEMBALIKAN', RETURNED: 'DIKEMBALIKAN', CREATE: 'DICATAT', CREATED: 'DICATAT', DEACTIVATED: 'DINONAKTIFKAN', ACTIVATED: 'DIAKTIFKAN', LOCATION_CHANGE: 'PINDAH_LOKASI' };
+const MOVE: Record<string, MovementType> = {
+  CHECKOUT: 'DIPINJAM',
+  RETURNED_GOOD: 'DIKEMBALIKAN',
+  RETURNED_DAMAGED: 'DIKEMBALIKAN',
+  RETURNED_LOST: 'DIKEMBALIKAN',
+  CREATED: 'DICATAT',
+  DEACTIVATED: 'DINONAKTIFKAN',
+  ACTIVATED: 'DIAKTIFKAN',
+  LOCATION_CHANGE: 'PINDAH_LOKASI',
+  STATUS_CHANGED: 'UBAH_STATUS',
+  REPAIR_COMPLETED: 'UBAH_STATUS',
+};
 
 export function mapHistory(itemId: ID, h: ApiAssetHistory): ItemMovement {
   const st = (s: string | null) => (s && (ITEM_STATUSES as string[]).includes(s) ? (s as ItemStatus) : null);
@@ -247,26 +418,25 @@ export function mapHistory(itemId: ID, h: ApiAssetHistory): ItemMovement {
 
 /* ================= Store ================= */
 function baseData(): DbData {
-  const today = new Date().toISOString().slice(0, 10);
-  const at = (n: number, hh = '09:00') => atTime(today, hh);
+  const at = () => nowISO();
   const data = { version: 1, created_at: nowISO(), _seq: {} } as DbData;
   TABLES.forEach((t) => {
     (data as unknown as Record<string, unknown[]>)[t] = [];
   });
   data.settings = defaultSettings(at);
   data.settings.institution = process.env.NEXT_PUBLIC_INSTITUTION || data.settings.institution;
+  data.settings.backup.history = [];
   data.email_templates = defaultTemplates(at);
   return migrate(data);
 }
 
 /** Pengguna yang sedang login (dari respons login / /auth/me). */
-let me: { user: User; role: Role } | null = null;
-/** Pengaturan lokal dipertahankan antar sinkronisasi (belum ada endpoint pengaturan). */
-const SETTINGS_KEY = 'siipb.api.settings';
+let me: { user: User; role: Role; api: ApiUser } | null = null;
+export const currentApiUser = () => me?.api ?? null;
 
-function toLocalUser(u: ApiUser): { user: User; role: Role } {
+function toLocalUser(u: ApiUser): { user: User; role: Role; api: ApiUser } {
   const code = u.roles[0] || 'USER';
-  const role: Role = { id: 1, code: code.toLowerCase() === 'sarpras' ? 'petugas' : code.toLowerCase(), name: ROLE_NAME[code] || code, description: `Role backend: ${u.roles.join(', ')}`, permissions: mapPermissions(u), system: true };
+  const role: Role = { id: -1, code: uiRoleCode(code), name: ROLE_NAME[code] || code, description: '', permissions: mapPermissions(u), system: true };
   const user: User = {
     id: u.id,
     name: u.full_name || u.username,
@@ -275,12 +445,12 @@ function toLocalUser(u: ApiUser): { user: User; role: Role } {
     password: '',
     role_id: role.id,
     active: true,
-    login_method: 'LOKAL',
-    phone: '',
-    last_login: nowISO(),
+    login_method: (u.login_method as LoginMethod) || 'LOKAL',
+    phone: u.phone || '',
+    last_login: u.last_login_at || nowISO(),
     created_at: nowISO(),
   };
-  return { user, role };
+  return { user, role, api: u };
 }
 
 function jwtExp(token: string): string {
@@ -295,46 +465,53 @@ function jwtExp(token: string): string {
 /** Siapkan store kosong (sebelum login). */
 export function initApiStore() {
   db.setPersist(false);
-  const data = baseData();
-  try {
-    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
-    if (saved) data.settings = { ...data.settings, ...saved };
-  } catch {
-    /* abaikan */
-  }
-  db.replace(migrate(data));
+  db.replace(baseData());
 }
 
+const can = (p: PermissionKey) => !!me && me.role.permissions.includes(p);
 
 /** Tarik seluruh data dari API lalu ganti isi store. */
 export async function pullAll() {
-  const settings = db.ready ? db.data.settings : baseData().settings;
-  const templates = db.ready ? db.data.email_templates : [];
   const movements = db.ready ? db.data.item_movements : [];
   const safe = <T,>(p: Promise<T>, fallback: T) => p.catch(() => fallback);
+  const when = <T,>(ok: boolean, p: () => Promise<T>, fallback: T) => (ok ? safe(p(), fallback) : Promise.resolve(fallback));
 
-  const [cats, locs, units, borrowers, assets, borrowings, returns, notifs, audits] = await Promise.all([
+  const [cats, locs, units, borrowers, assets, borrowings, returns, notifs, templates, audits, settings, runs, usersFull, roles, directory] = await Promise.all([
     masterApi.categories(),
     masterApi.locations(),
     masterApi.units(),
     masterApi.borrowers(),
-    assetsApi.all(),
-    borrowingsApi.all(),
-    returnsApi.all(),
-    safe(notificationsApi.all(), []),
-    safe(auditApi.all(), []),
+    when(can('inventory.view'), () => assetsApi.all(), []),
+    when(can('borrowing.view'), () => borrowingsApi.all(), []),
+    when(can('borrowing.view'), () => returnsApi.all(), []),
+    when(can('notification.view'), () => notificationsApi.all(), []),
+    when(can('notification.view') || can('settings.manage'), () => notificationsApi.templates(), []),
+    when(can('audit.view'), () => auditApi.all(), []),
+    safe(settingsApi.get(), {} as Record<string, unknown>),
+    when(can('notification.view') || can('notification.manage'), () => settingsApi.schedulerRuns(), []),
+    when(can('users.manage'), () => usersApi.list(), []),
+    when(can('users.manage'), () => usersApi.roles(), []),
+    safe(usersApi.directory(), []),
   ]);
 
   const data = baseData();
-  data.settings = settings;
-  if (templates.length) data.email_templates = templates;
+  data.settings = mergeSettings(data.settings, settings);
+  if (templates.length) data.email_templates = templates.map(mapTemplate);
   data.item_movements = movements;
+  data.scheduler_runs = runs.map(mapSchedulerRun);
 
   const locName = new Map(locs.map((l) => [l.id, l.name]));
   data.categories = cats.map((c) => ({ id: c.id, code: c.code, name: c.name, active: c.is_active ?? true }));
-  data.locations = locs.map((l) => ({ id: l.id, code: l.code, name: l.name, building: l.parent_id ? locName.get(l.parent_id) || '' : '', active: l.is_active ?? true }));
+  data.locations = locs.map((l) => ({
+    id: l.id,
+    code: l.code,
+    name: l.name,
+    building: l.description || (l.parent_id ? locName.get(l.parent_id) || '' : ''),
+    active: l.is_active ?? true,
+  }));
   data.units = units.map((u) => ({ id: u.id, name: u.name, active: u.is_active }));
   data.employees = borrowers.map(mapBorrower);
+  photoIds.clear();
   data.items = assets.map(mapAsset);
 
   const returnedAt = new Map(returns.map((r) => [r.borrowing_id, r.returned_at]));
@@ -349,32 +526,43 @@ export async function pullAll() {
     data.returns.push(m.ret);
     data.return_details.push(...m.details);
   }
-  // notifikasi backend tidak menyertakan borrowing_id → kaitkan ke transaksi terbaru peminjam
-  const latestOfBorrower = (bid: number | null) => {
-    const list = data.borrowings.filter((b) => b.employee_id === bid).sort((a, b) => b.created_at.localeCompare(a.created_at));
-    return list[0]?.id ?? 0;
-  };
-  for (const n of notifs) {
-    const m = mapNotification(n, latestOfBorrower);
-    data.notifications.push(m.notification);
-    data.notification_logs.push(...m.logs);
-  }
+  const latestOfBorrower = (bid: number | null) =>
+    data.borrowings.filter((b) => b.employee_id === bid).sort((a, b) => b.created_at.localeCompare(a.created_at))[0]?.id ?? 0;
+  const n = mapNotifications(notifs, latestOfBorrower);
+  data.notifications = n.notifications;
+  data.notification_logs = n.logs;
   data.activity_logs = audits.map(mapAudit);
 
-  // Pengguna: diri sendiri + nama petugas yang muncul di transaksi/audit (tampilan saja)
-  const users = new Map<ID, User>();
-  const roles: Role[] = me ? [me.role] : [];
-  if (me) users.set(me.user.id, me.user);
-  const ghost = (id: ID | null | undefined, name: string | null | undefined) => {
-    if (!id || users.has(id) || !name) return;
-    users.set(id, { id, name, username: '', email: '', password: '', role_id: 0, active: true, login_method: 'LOKAL', phone: '', last_login: null, created_at: nowISO() });
-  };
-  borrowings.forEach((b) => ghost(b.handled_by, b.handler_name));
-  returns.forEach((r) => ghost(r.received_by, r.receiver_name));
-  audits.forEach((a) => ghost(a.user_id, a.user_name));
-  data.users = [...users.values()];
-  data.roles = roles;
-
+  // Pengguna & role: lengkap bila berizin users.manage; selain itu direktori nama (tampilan saja)
+  if (roles.length) {
+    data.roles = roles.map(mapRole);
+    data.users = usersFull.map(mapUser);
+  } else {
+    const roleByCode = new Map<string, Role>();
+    if (me) roleByCode.set(me.role.code, me.role);
+    data.users = directory.map((u) => {
+      const code = uiRoleCode(u.roles[0] || 'USER');
+      if (!roleByCode.has(code)) roleByCode.set(code, { id: -(roleByCode.size + 2), code, name: ROLE_NAME[u.roles[0]] || code, description: '', permissions: [], system: true });
+      return { id: u.id, name: u.full_name, username: u.username, email: '', password: '', role_id: roleByCode.get(code)!.id, active: u.is_active, login_method: 'LOKAL', phone: '', last_login: null, created_at: nowISO() };
+    });
+    data.roles = [...roleByCode.values()];
+  }
+  if (me) {
+    const self = data.users.find((u) => u.id === me!.user.id);
+    if (self) {
+      // sesi memakai izin dari token/profil terbaru
+      me.user = { ...me.user, ...self, role_id: self.role_id };
+      const role = data.roles.find((r) => r.id === self.role_id);
+      if (role) me.role = { ...role, permissions: mapPermissions(me.api) };
+      else data.roles.push(me.role);
+    } else {
+      data.users.push(me.user);
+      data.roles.push(me.role);
+    }
+    // role sendiri harus mencerminkan izin efektif dari server
+    data.roles = data.roles.map((r) => (r.id === me!.user.role_id ? { ...r, permissions: mapPermissions(me!.api) } : r));
+  }
+  data.settings.scheduler.last_run_date = data.settings.scheduler.last_run_date || (runs[0]?.today ?? null);
   db.replace(migrate(data));
 }
 
@@ -385,23 +573,26 @@ export async function loadItemHistory(itemId: ID) {
   db.touch();
 }
 
-const USER_KEY = 'siipb.api.user';
-
 function startSession(u: ApiUser, access: string) {
-  // /auth/me tidak menyertakan nama & email → lengkapi dari data login yang tersimpan
-  try {
-    const saved = JSON.parse(localStorage.getItem(USER_KEY) || 'null') as ApiUser | null;
-    if (saved && saved.id === u.id) u = { ...saved, ...u, full_name: u.full_name || saved.full_name, email: u.email || saved.email };
-    localStorage.setItem(USER_KEY, JSON.stringify(u));
-  } catch {
-    /* abaikan */
-  }
   me = toLocalUser(u);
   setSession({ user_id: u.id, token: access, exp: jwtExp(access), method: 'JWT (Flask API)', started: new Date().toISOString() });
 }
 
+/** Perbarui profil & izin dari /auth/me (mis. setelah role diubah admin). */
+export async function refreshMe() {
+  const u = await authApi.me();
+  startSession(u, tokenStore.get()?.access_token || '');
+}
+
 export async function apiLogin(username: string, password: string) {
   const res: LoginResponse = await authApi.login(username, password);
+  startSession(res.user, res.access_token);
+  await pullAll();
+  return me!.user;
+}
+
+export async function apiLoginSso(code: string) {
+  const res: LoginResponse = await authApi.exchangeSso(code);
   startSession(res.user, res.access_token);
   await pullAll();
   return me!.user;
@@ -426,11 +617,6 @@ export async function restoreApiSession(): Promise<boolean> {
 
 export async function apiLogout() {
   await authApi.logout();
-  try {
-    localStorage.removeItem(USER_KEY);
-  } catch {
-    /* abaikan */
-  }
   me = null;
   setSession(null);
   initApiStore();

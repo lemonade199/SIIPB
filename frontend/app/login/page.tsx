@@ -18,6 +18,7 @@ import { useToast } from '@/components/providers/feedback-provider';
 import { schedulerToastText } from '@/components/providers/data-provider';
 import { loginSSO } from '@/services/auth';
 import { authApi } from '@/services/api/endpoints';
+import { API_BASE_URL } from '@/services/api/client';
 import * as repo from '@/services/repo';
 import { isApiMode } from '@/lib/config';
 import { role, user as userById } from '@/services/lookup';
@@ -32,6 +33,9 @@ const FEATURES: [IconName, string, string][] = [
   ['shield', 'Aman & dapat ditelusuri', 'RBAC, JWT, SSO OIDC, audit log, dan backup.'],
 ];
 
+/** Mode api: daftar akun awal hanya ditampilkan bila NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS=true (jangan di production). */
+const SHOW_DEMO = !isApiMode || process.env.NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS === 'true';
+
 export default function LoginPage() {
   useTitle('Masuk');
   const router = useRouter();
@@ -44,6 +48,10 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const settings = db.data.settings;
   const oidc = useMemo(() => ({ state: uid(), nonce: uid() }), []);
+  const [pub, setPub] = useState<{ institution: string; oidc_enabled: boolean } | null>(null);
+  const institution = pub?.institution || settings.institution;
+  const oidcEnabled = pub ? pub.oidc_enabled : settings.security.oidc_enabled;
+
 
   // Sudah login → langsung ke halaman awal.
   useEffect(() => {
@@ -56,6 +64,31 @@ export default function LoginPage() {
     if (res && (res.sent || res.late_marked)) setTimeout(() => toast(schedulerToastText(res, settings.scheduler.time), 'warn'), 500);
     router.replace(homeFor((p) => can(p, u)));
   };
+
+  // Mode api: info publik (nama instansi, SSO aktif) + selesaikan login SSO (#sso_code dari backend).
+  useEffect(() => {
+    if (!isApiMode) return;
+    fetch(`${API_BASE_URL}/settings/public`)
+      .then((r) => r.json())
+      .then((j) => j?.data && setPub(j.data))
+      .catch(() => undefined);
+    const hash = new URLSearchParams(window.location.hash.slice(1));
+    const code = hash.get('sso_code');
+    const ssoErr = hash.get('sso_error');
+    if (!code && !ssoErr) return;
+    window.history.replaceState(null, '', window.location.pathname);
+    if (ssoErr) {
+      queueMicrotask(() => setError(`Login SSO gagal: ${ssoErr}`));
+      return;
+    }
+    queueMicrotask(() => setBusy(true));
+    repo.loginSso(code!).then((r) => {
+      setBusy(false);
+      if (!r.ok) return setError(r.error);
+      afterLogin(r.user, 'SSO');
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- hanya sekali saat halaman dibuka
+  }, []);
 
   const submit = async (username: string, password: string) => {
     const errs: Record<string, string> = {};
@@ -72,7 +105,7 @@ export default function LoginPage() {
   };
 
   const onSSO = () => {
-    if (!settings.security.oidc_enabled) return toast('SSO/OIDC belum diaktifkan oleh administrator.', 'warn');
+    if (!oidcEnabled) return toast('SSO/OIDC belum diaktifkan oleh administrator.', 'warn');
     if (isApiMode) {
       // Alur OAuth 2.0 / OIDC ditangani backend (Authlib): state & nonce divalidasi di server.
       window.location.href = authApi.ssoUrl();
@@ -93,7 +126,7 @@ export default function LoginPage() {
               SIIPB
             </div>
             <div className="brand-sub" style={{ fontSize: 13 }}>
-              {settings.institution}
+              {institution}
             </div>
           </div>
         </div>
@@ -160,12 +193,13 @@ export default function LoginPage() {
           <Button icon="key" block onClick={onSSO}>
             Masuk dengan SSO Organisasi
           </Button>
+          {SHOW_DEMO && (
           <div className="card" style={{ padding: '14px 16px' }}>
             <div className="label" style={{ marginBottom: 8 }}>
-              {isApiMode ? 'Akun seed backend (scripts/seed_data.py)' : 'Akun demo'}
+              {isApiMode ? 'Akun awal (scripts/seed_data.py) — ganti kata sandi setelah login' : 'Akun demo'}
             </div>
             <div className="demo-acc">
-              {DEMO_ACCOUNTS.filter((a) => !isApiMode || a.username !== 'pimpinan').map((a) => (
+              {DEMO_ACCOUNTS.map((a) => (
                 <button
                   key={a.username}
                   type="button"
@@ -182,6 +216,7 @@ export default function LoginPage() {
               ))}
             </div>
           </div>
+          )}
           <Alert type="info">
             Peminjam <b>tidak perlu login</b>. Informasi peminjaman, pengingat, dan pemberitahuan keterlambatan dikirim otomatis ke email peminjam.
           </Alert>

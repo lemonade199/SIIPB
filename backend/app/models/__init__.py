@@ -8,18 +8,19 @@ from app.models.auth import ExternalIdentity, RefreshToken
 from app.models.borrower import Borrower
 from app.models.category import Category
 from app.models.location import Location
-from app.models.asset import Asset, AssetHistory
+from app.models.asset import Asset, AssetHistory, AssetPhoto
 from app.models.borrowing import Borrowing, BorrowingItem
 from app.models.asset_return import Return, ReturnItem
 from app.models.damage_report import DamageReport
 from app.models.loss_report import LossReport
 from app.models.notification_template import NotificationTemplate
 from app.models.notification_event import NotificationEvent
-from app.models.notification import Notification
+from app.models.notification import Notification, NotificationRead
 from app.models.notification_log import NotificationLog
 from app.models.email_delivery import EmailDelivery
 from app.models.audit_log import AuditLog
 from app.models.system_setting import SystemSetting
+from app.models.scheduler_run import SchedulerRun
 from app.models.enums import (
     AssetCondition,
     AssetStatus,
@@ -30,6 +31,7 @@ from app.models.enums import (
     NotificationEventCode,
     NotificationEventStatus,
     NotificationStatus,
+    RecipientType,
     RepairStatus,
     ReturnCondition,
     SettingValueType,
@@ -63,4 +65,8 @@ __all__ = [
     "EmailDelivery",
     "AuditLog",
     "SystemSetting",
+    "AssetPhoto",
+    "NotificationRead",
+    "SchedulerRun",
+    "RecipientType",
 ]

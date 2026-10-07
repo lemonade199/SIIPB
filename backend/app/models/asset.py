@@ -12,6 +12,7 @@ from sqlalchemy import (
     Date,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     String,
     Text,
@@ -69,6 +70,7 @@ class Asset(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
     photo_path: Mapped[str | None] = mapped_column(String(500))
     purchase_date: Mapped[date | None] = mapped_column(Date)
     acquisition_cost: Mapped[Decimal | None] = mapped_column(Numeric(15, 2))
+    acquisition_source: Mapped[str | None] = mapped_column(String(150))
     status: Mapped[str] = mapped_column(
         String(30),
         default=AssetStatus.TERSEDIA.value,
@@ -92,6 +94,9 @@ class Asset(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
         back_populates="asset", order_by="AssetHistory.created_at"
     )
     borrowing_items: Mapped[list[BorrowingItem]] = relationship(back_populates="asset")
+    photos: Mapped[list[AssetPhoto]] = relationship(
+        back_populates="asset", order_by="AssetPhoto.sort_order", cascade="all, delete-orphan"
+    )
 
     @property
     def is_borrowable(self) -> bool:
@@ -139,3 +144,18 @@ class AssetHistory(IdMixin, CreatedAtMixin, Base):
     changer: Mapped[User | None] = relationship()
     old_location: Mapped[Location | None] = relationship(foreign_keys=[old_location_id])
     new_location: Mapped[Location | None] = relationship(foreign_keys=[new_location_id])
+
+
+class AssetPhoto(IdMixin, CreatedAtMixin, Base):
+    """item_photos (dokumen Plan): banyak foto per barang; sort_order 0 = foto utama."""
+
+    __tablename__ = "asset_photos"
+    __table_args__ = table_args()
+
+    asset_id: Mapped[int] = mapped_column(
+        BigIntU, ForeignKey("assets.id", ondelete="CASCADE"), index=True
+    )
+    path: Mapped[str] = mapped_column(String(500))
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+
+    asset: Mapped[Asset] = relationship(back_populates="photos")

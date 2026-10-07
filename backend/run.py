@@ -33,4 +33,6 @@ if __name__ == "__main__":
     print(f"   * Swagger Documentation    : http://{local_ip}:{port}/api/docs")
     print(f"   * Health Check             : http://{local_ip}:{port}/api/health")
     print(f"=======================================================\n")
-    app.run(host=host, port=port, debug=True)
+    from app.config import Config
+
+    app.run(host=host, port=port, debug=Config.DEBUG and Config.APP_ENV != "production")

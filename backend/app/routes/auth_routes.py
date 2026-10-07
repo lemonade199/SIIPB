@@ -1,4 +1,6 @@
 """Authentication API endpoints."""
+from datetime import datetime
+
 from flask import Blueprint, g, request
 
 from app.database import SessionLocal
@@ -92,7 +94,7 @@ def refresh():
 @auth_bp.get("/me")
 @jwt_required
 def get_me():
-    """Get current authenticated user profile and permissions.
+    """Profil pengguna yang sedang login beserta role & permission.
     ---
     tags:
       - Authentication
@@ -102,15 +104,120 @@ def get_me():
       200:
         description: Informasi profil pengguna
     """
-    return success_response(
-        data={
-            "id": g.current_user["id"],
-            "username": g.current_user["username"],
-            "roles": g.current_user["roles"],
-            "permissions": list(g.current_user["permissions"]),
-        },
-        message="Profil pengguna berhasil dimuat",
-    )
+    from app.models import User
+    from app.services.auth_service import user_profile
+
+    with SessionLocal() as session:
+        user = session.get(User, g.current_user["id"])
+        return success_response(data=user_profile(user), message="Profil pengguna berhasil dimuat")
+
+
+@auth_bp.put("/me")
+@jwt_required
+def update_me():
+    """Ubah profil sendiri (nama, email, telepon).
+    ---
+    tags:
+      - Authentication
+    security:
+      - Bearer: []
+    responses:
+      200:
+        description: Profil diperbarui
+    """
+    from marshmallow import Schema, ValidationError, fields, validate
+    from sqlalchemy import select
+
+    from app.models import User
+    from app.services.audit_service import record_audit
+    from app.services.auth_service import user_profile
+
+    class ProfileSchema(Schema):
+        full_name = fields.String(validate=validate.Length(min=2, max=150))
+        email = fields.Email()
+        phone = fields.String(allow_none=True, validate=validate.Length(max=30))
+
+    try:
+        data = ProfileSchema().load(request.get_json(silent=True) or {})
+    except ValidationError as err:
+        return error_response("Validasi profil gagal", error_code="VALIDATION_ERROR", errors=err.messages)
+    with SessionLocal() as session:
+        user = session.get(User, g.current_user["id"])
+        if "email" in data and data["email"] != user.email:
+            if session.scalars(select(User).where(User.email == data["email"], User.id != user.id)).first():
+                return error_response("Email sudah dipakai pengguna lain", error_code="VALIDATION_ERROR",
+                                      errors={"email": ["Email sudah dipakai."]})
+        old = {k: getattr(user, k) for k in data}
+        for k, v in data.items():
+            setattr(user, k, v)
+        record_audit(session, "UPDATE_PROFILE", "auth", "user", user.id, user.id, old_data=old, new_data=data)
+        session.commit()
+        return success_response(data=user_profile(user), message="Profil diperbarui")
+
+
+@auth_bp.post("/change-password")
+@jwt_required
+def change_password_route():
+    """Ganti kata sandi sendiri (minimal 8 karakter, huruf & angka). Semua sesi lain dicabut.
+    ---
+    tags:
+      - Authentication
+    security:
+      - Bearer: []
+    parameters:
+      - in: body
+        name: body
+        schema:
+          type: object
+          required: [current_password, new_password]
+          properties:
+            current_password: {type: string}
+            new_password: {type: string}
+    responses:
+      200:
+        description: Kata sandi diganti
+      400:
+        description: Kata sandi lama salah / kebijakan tidak terpenuhi
+    """
+    from app.services.auth_service import change_password
+
+    data = request.get_json(silent=True) or {}
+    with SessionLocal() as session:
+        try:
+            change_password(session, g.current_user["id"], data.get("current_password") or "", data.get("new_password") or "")
+        except ValueError as e:
+            return error_response(str(e), error_code="VALIDATION_ERROR", errors={"new_password": [str(e)]})
+    return success_response(message="Kata sandi berhasil diganti. Silakan login ulang di perangkat lain.")
+
+
+@auth_bp.post("/sso/exchange")
+def sso_exchange():
+    """Tukar kode sekali pakai hasil login SSO (berlaku 60 detik) dengan token JWT.
+    ---
+    tags:
+      - Authentication
+    parameters:
+      - in: body
+        name: body
+        schema:
+          type: object
+          required: [code]
+          properties:
+            code: {type: string}
+    responses:
+      200:
+        description: Token diterbitkan
+      401:
+        description: Kode tidak valid
+    """
+    from app.services.auth_service import exchange_sso_code
+
+    code = (request.get_json(silent=True) or {}).get("code") or ""
+    with SessionLocal() as session:
+        try:
+            return success_response(data=exchange_sso_code(session, code), message="Login SSO berhasil")
+        except ValueError as e:
+            return error_response(str(e), error_code="AUTH_FAILED", status_code=401)
 
 
 @auth_bp.post("/logout")
@@ -160,28 +267,26 @@ def google_login():
 def google_callback():
     """Google OAuth 2.0 / OIDC callback endpoint."""
     from app.extensions import oauth
-    from app.services.auth_service import authenticate_oauth_identity
-
     if not hasattr(oauth, "google"):
         return error_response("Google OAuth belum dikonfigurasi", status_code=501)
 
+    from urllib.parse import quote
+
+    from flask import redirect
+
+    from app.config import Config
+    from app.services.auth_service import issue_sso_code, resolve_oauth_user
+
+    target = Config.FRONTEND_URL.rstrip("/") + "/login"
     try:
-        token = oauth.google.authorize_access_token()
-        userinfo = token.get("userinfo")
-        if not userinfo:
-            userinfo = oauth.google.userinfo()
-
-        provider_subject = str(userinfo["sub"])
-        email = userinfo.get("email")
-
+        token = oauth.google.authorize_access_token()  # memvalidasi state & nonce (Authlib)
+        userinfo = token.get("userinfo") or oauth.google.userinfo()
+        if userinfo.get("email") and userinfo.get("email_verified") is False:
+            raise ValueError("Email akun SSO belum terverifikasi")
         with SessionLocal() as session:
-            res = authenticate_oauth_identity(
-                session=session,
-                provider="google",
-                provider_subject=provider_subject,
-                email=email,
-            )
-            return success_response(data=res, message="Login Google OAuth berhasil")
-    except Exception as e:
-        return error_response(f"Autentikasi Google gagal: {str(e)}", status_code=400)
-
+            user = resolve_oauth_user(session, "google", str(userinfo["sub"]), userinfo.get("email"))
+            user.last_login_at = datetime.now()
+            code = issue_sso_code(session, user)
+        return redirect(f"{target}#sso_code={quote(code)}")
+    except Exception as e:  # noqa: BLE001
+        return redirect(f"{target}#sso_error={quote(str(e)[:200])}")

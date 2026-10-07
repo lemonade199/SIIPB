@@ -30,6 +30,9 @@ class ReturnItemInputSchema(Schema):
     )
     completeness = fields.String(allow_none=True, required=False)
     notes = fields.String(allow_none=True, required=False)
+    asset_status = fields.String(
+        allow_none=True, required=False, validate=validate.OneOf(["RUSAK", "RUSAK_BERAT", "DALAM_PERBAIKAN"])
+    )
     damage = fields.Nested(DamageInputSchema, required=False)
     loss = fields.Nested(LossInputSchema, required=False)
 
@@ -37,6 +40,9 @@ class ReturnItemInputSchema(Schema):
 class ReturnCreateSchema(Schema):
     borrowing_id = fields.Integer(required=True)
     notes = fields.String(allow_none=True, required=False)
+    returned_date = fields.Date(allow_none=True, required=False)
+    # False -> jangan kirim email konfirmasi pengembalian untuk transaksi ini
+    send_confirmation = fields.Boolean(required=False, load_default=True)
     items = fields.List(
         fields.Nested(ReturnItemInputSchema),
         required=True,

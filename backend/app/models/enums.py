@@ -27,6 +27,7 @@ class AssetCondition(StrEnum):
 
 
 class BorrowingStatus(StrEnum):
+    DRAF = "DRAF"
     AKTIF = "AKTIF"
     TERLAMBAT = "TERLAMBAT"
     DIKEMBALIKAN = "DIKEMBALIKAN"
@@ -84,6 +85,12 @@ class NotificationStatus(StrEnum):
     SENT = "SENT"
     FAILED = "FAILED"
     RETRYING = "RETRYING"
+
+
+class RecipientType(StrEnum):
+    PEMINJAM = "PEMINJAM"
+    PETUGAS = "PETUGAS"
+    PIMPINAN = "PIMPINAN"
 
 
 class EmailDeliveryStatus(StrEnum):

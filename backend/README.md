@@ -119,3 +119,20 @@ Aplikasi akan langsung dapat diakses pada port 80:
 - API: `http://localhost/api/v1`
 - Swagger UI: `http://localhost/api/docs`
 - Static Uploads: `http://localhost/uploads/`
+
+---
+
+## 🔄 Pembaruan (fitur dokumen Plan)
+
+- **Migrasi baru** `a7c3e91d2b40`: draf peminjaman & checkout, `asset_photos` (item_photos), sumber perolehan, penerima notifikasi
+  (peminjam/petugas/pimpinan) & `notification_reads`, `scheduler_runs`, permission RBAC diseragamkan dengan antarmuka, template
+  email berbahasa Indonesia. Jalankan `alembic upgrade head` lalu `python scripts/seed_data.py` (idempoten).
+- **Endpoint baru**: `/users`, `/roles`, `/permissions`, `/items` (alias `/assets`), `/borrowings/{id}/checkout|cancel`,
+  `/notifications/{id}/read`, `/dashboard/overdue`, `/dashboard/statistics`, `/reports/{jenis}?format=pdf|xlsx`, `/settings`,
+  `/scheduler/run`, `/backups`, `/auth/change-password`, `/auth/sso/exchange` — lihat `docs/api_specification.md` dan `/api/docs`.
+- **Perbaikan**: serialisasi `purchase_date` (500), `/notifications/templates` (500), nama event scheduler (crash),
+  izin audit (`audit.read` → `audit.view`), event pengembalian ganda pada pengembalian parsial, seed menyimpan kata sandi tanpa hash
+  (kini scrypt; format lama di-hash ulang otomatis saat login).
+- **Tes**: `pytest` memakai database terpisah `siipb_test` (dibuat ulang otomatis). Atur `TEST_DATABASE_URL` bila perlu.
+- **Pengiriman email**: `NOTIFICATION_DISPATCH=sync` (bawaan non-production) mengirim langsung tanpa worker; production memakai Celery.
+  Tanpa `SMTP_USERNAME/SMTP_PASSWORD` (env atau Pengaturan → SMTP) email disimulasikan dan tetap tercatat di log.
