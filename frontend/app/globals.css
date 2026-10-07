@@ -205,6 +205,8 @@
   .card-foot { border-top: 1px solid var(--border); padding: 12px 20px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
   .stat { padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; }
   .stat-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--muted-foreground); font-weight: 500; font-size: 13px; }
+  .stat-top > :first-child { min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .stat-sub { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .stat-ico { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; }
   .stat-val { font-size: 28px; font-weight: 650; letter-spacing: -.02em; line-height: 1; }
   a.card.stat { color: inherit; text-decoration: none; transition: border-color .15s; }
@@ -235,12 +237,16 @@
   .table-wrap { overflow-x: auto; }
   table.table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
   .table th { text-align: left; font-size: 11.5px; font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: .04em; padding: 10px 14px; background: #f3f6f9; border-bottom: 1px solid var(--border); white-space: nowrap; }
-  .table td { padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .table td { padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; white-space: nowrap; }
+  /* Teks panjang di tabel: satu baris + "…" (teks lengkap muncul saat kursor diarahkan) */
+  .table td > div, .table td > a, .table td > span:not(.badge) { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .table td > a, .table td > span:not(.badge) { display: inline-block; vertical-align: middle; }
+  .table td.wrap { white-space: normal; }
   .table tr:last-child td { border-bottom: 0; }
   .table tbody tr:hover td { background: #f7f9fb; }
   .table tr.clickable { cursor: pointer; }
   .cell-title { font-weight: 600; color: var(--fg); }
-  .cell-sub { font-size: 12px; color: var(--muted-foreground); }
+  .cell-sub { font-size: 12px; color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pager { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 20px; border-top: 1px solid var(--border); font-size: 13px; color: var(--muted-foreground); }
   .empty { padding: 40px 20px; text-align: center; color: var(--muted-foreground); }
   .empty svg { color: var(--subtle); margin-bottom: 8px; }
@@ -279,6 +285,8 @@
   .avatar.dark { background: var(--sidebar-active); color: #fff; }
   .list { list-style: none; margin: 0; padding: 0; }
   .list > li { padding: 11px 0; border-bottom: 1px solid var(--border); display: flex; gap: 12px; align-items: center; }
+  .list > li > div { min-width: 0; }
+  .list .cell-title, .list .cell-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .list > li:last-child { border-bottom: 0; }
   .timeline { list-style: none; margin: 0; padding: 0 0 0 4px; }
   .timeline li { position: relative; padding: 0 0 16px 22px; }

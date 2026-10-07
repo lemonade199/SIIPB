@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { FeedbackProvider } from '@/components/providers/feedback-provider';
 import { DataProvider } from '@/components/providers/data-provider';
+import { TruncateTitle } from '@/components/layout/truncate-title';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -19,6 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <FeedbackProvider>
           <DataProvider>{children}</DataProvider>
+          <TruncateTitle />
         </FeedbackProvider>
       </body>
     </html>

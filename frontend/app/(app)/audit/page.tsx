@@ -38,14 +38,18 @@ const ENTITY_LINK: Record<string, string> = { items: '/inventaris/', borrowings:
 function Val({ v }: { v: AuditValue }) {
   if (v === null || v === undefined) return <span className="muted">—</span>;
   if (typeof v !== 'object') return <>{String(v)}</>;
+  const entries = Object.entries(v).map(([k, x]) => [k, typeof x === 'object' ? JSON.stringify(x) : String(x)] as const);
+  const MAX = 3; // tampilkan maksimal 3 baris agar baris tabel tidak terlalu tinggi
+  const full = entries.map(([k, x]) => `${k}: ${x}`).join('\n');
   return (
-    <>
-      {Object.entries(v).map(([k, x]) => (
-        <div key={k}>
-          <span className="muted">{k}:</span> {typeof x === 'object' ? JSON.stringify(x) : String(x)}
+    <div title={full}>
+      {entries.slice(0, MAX).map(([k, x]) => (
+        <div key={k} className="truncate">
+          <span className="muted">{k}:</span> {x}
         </div>
       ))}
-    </>
+      {entries.length > MAX && <div className="subtle">+{entries.length - MAX} lainnya</div>}
+    </div>
   );
 }
 
