@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     Asset,
+    AssetCondition,
     AssetHistory,
     AssetStatus,
     Borrowing,
@@ -13,9 +14,7 @@ from app.models import (
     BorrowingStatus,
     DamageReport,
     LossReport,
-    NotificationEvent,
     NotificationEventCode,
-    NotificationEventStatus,
     RepairStatus,
     Return,
     ReturnCondition,
@@ -50,17 +49,27 @@ def process_return(
     received_by: int,
     items_data: list[dict[str, Any]],
     notes: str | None = None,
-) -> Return:
+    returned_on: Any | None = None,
+    send_confirmation: bool = True,
+) -> tuple[Return, list[int]]:
     """Process return of borrowed items (supports partial or complete returns)."""
     # 1. Validate Borrowing exists and is open
     borrowing = session.get(Borrowing, borrowing_id)
     if not borrowing:
         raise ValueError("Transaksi peminjaman tidak ditemukan")
 
+    borrowing = session.get(Borrowing, borrowing_id, with_for_update=True)
     if borrowing.status not in (BorrowingStatus.AKTIF.value, BorrowingStatus.TERLAMBAT.value):
         raise ValueError(f"Transaksi ini tidak dalam status aktif/terlambat (Status: {borrowing.status})")
 
     now = datetime.now()
+    if returned_on is not None:
+        if returned_on > now.date():
+            raise ValueError("Tanggal pengembalian tidak boleh di masa depan")
+        if returned_on < borrowing.start_date:
+            raise ValueError("Tanggal pengembalian tidak boleh sebelum tanggal peminjaman")
+        if returned_on != now.date():
+            now = datetime.combine(returned_on, now.time())
 
     # 2. Create Return Header
     return_header = Return(
@@ -114,28 +123,41 @@ def process_return(
         old_status = asset.status
 
         # 4. Handle Status Transitions based on final_condition
+        old_condition = asset.condition
         if final_condition == ReturnCondition.BAIK.value:
             asset.status = AssetStatus.TERSEDIA.value
+            asset.condition = AssetCondition.BAIK.value
             new_status = AssetStatus.TERSEDIA.value
             event_type = "RETURNED_GOOD"
             reason = f"Dikembalikan dalam kondisi baik (TX: {borrowing.transaction_number})"
 
         elif final_condition == ReturnCondition.RUSAK.value:
-            asset.status = AssetStatus.RUSAK.value
-            new_status = AssetStatus.RUSAK.value
+            dmg_data = item_input.get("damage") or {}
+            severity = (dmg_data.get("severity") or "SEDANG").upper()
+            # status aset: eksplisit (RUSAK / RUSAK_BERAT / DALAM_PERBAIKAN) atau dari tingkat kerusakan
+            new_status = (item_input.get("asset_status") or "").upper() or (
+                AssetStatus.RUSAK_BERAT.value if severity == "BERAT" else AssetStatus.RUSAK.value
+            )
+            if new_status not in (AssetStatus.RUSAK.value, AssetStatus.RUSAK_BERAT.value, AssetStatus.DALAM_PERBAIKAN.value):
+                raise ValueError(f"Status aset '{new_status}' tidak valid untuk barang rusak")
+            asset.status = new_status
+            asset.condition = (
+                AssetCondition.RUSAK_BERAT.value if new_status == AssetStatus.RUSAK_BERAT.value or severity == "BERAT"
+                else AssetCondition.RUSAK_RINGAN.value
+            )
             event_type = "RETURNED_DAMAGED"
             reason = f"Dikembalikan dalam kondisi rusak (TX: {borrowing.transaction_number})"
 
             # Create Damage Report
-            dmg_data = item_input.get("damage") or {}
             damage_report = DamageReport(
                 return_item_id=ret_item.id,
                 reported_by=received_by,
-                severity=dmg_data.get("severity", "SEDANG").upper(),
+                severity=severity,
                 description=dmg_data.get("description", "Kerusakan saat peminjaman"),
                 evidence_path=dmg_data.get("evidence_path"),
                 action_taken=dmg_data.get("action_taken"),
-                repair_status=RepairStatus.DILAPORKAN.value,
+                repair_status=(RepairStatus.DALAM_PERBAIKAN.value if new_status == AssetStatus.DALAM_PERBAIKAN.value
+                               else RepairStatus.DILAPORKAN.value),
                 repair_cost=dmg_data.get("repair_cost"),
                 reported_at=now,
             )
@@ -162,6 +184,8 @@ def process_return(
         else:
             raise ValueError(f"Kondisi pengembalian '{final_condition}' tidak valid")
 
+        ret_item.asset_status_after = new_status
+
         # 5. Append to Asset History
         history = AssetHistory(
             asset_id=asset.id,
@@ -169,6 +193,8 @@ def process_return(
             event_type=event_type,
             old_status=old_status,
             new_status=new_status,
+            old_condition=old_condition,
+            new_condition=asset.condition,
             reason=reason,
         )
         session.add(history)
@@ -183,15 +209,6 @@ def process_return(
 
     if returned_count >= total_borrowing_items:
         borrowing.status = BorrowingStatus.DIKEMBALIKAN.value
-
-    # 7. Create Idempotent Notification Event for Return Confirmation
-    notif_event = NotificationEvent(
-        borrowing_id=borrowing.id,
-        event_code=NotificationEventCode.RETURN_CONFIRMATION.value,
-        scheduled_at=now,
-        status=NotificationEventStatus.PENDING.value,
-    )
-    session.add(notif_event)
 
     # 8. Record Audit Log
     record_audit(
@@ -209,5 +226,21 @@ def process_return(
         },
     )
 
+    # 7. Konfirmasi pengembalian ke peminjam (idempoten) bila seluruh barang sudah kembali
+    notif_ids: list[int] = []
+    session.flush()
+    session.refresh(return_header)
+    if borrowing.status == BorrowingStatus.DIKEMBALIKAN.value:
+        from app.services.notification_service import create_event_notifications
+        from app.services.settings_service import get_settings
+
+        settings = get_settings(session)
+        if send_confirmation and settings.get("return_notify", True):
+            notifs, _ = create_event_notifications(
+                session, borrowing, NotificationEventCode.RETURN_CONFIRMATION.value, ["peminjam"], settings,
+                today=now.date(), return_=return_header,
+            )
+            notif_ids = [n.id for n in notifs]
+
     session.commit()
-    return return_header
+    return return_header, notif_ids

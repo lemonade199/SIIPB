@@ -56,24 +56,30 @@ def update_damage_repair_status(
 
     # If repaired (SELESAI), restore asset to TERSEDIA and condition BAIK
     asset = report.return_item.asset
-    if report.repair_status == RepairStatus.SELESAI.value:
+    damaged = {AssetStatus.RUSAK.value, AssetStatus.RUSAK_BERAT.value, AssetStatus.DALAM_PERBAIKAN.value}
+    old_asset_status = asset.status
+    target = {
+        RepairStatus.SELESAI.value: AssetStatus.TERSEDIA.value,
+        RepairStatus.DALAM_PERBAIKAN.value: AssetStatus.DALAM_PERBAIKAN.value,
+        RepairStatus.TIDAK_DAPAT_DIPERBAIKI.value: AssetStatus.RUSAK_BERAT.value,
+    }.get(report.repair_status)
+    if report.repair_status in (RepairStatus.SELESAI.value, RepairStatus.TIDAK_DAPAT_DIPERBAIKI.value):
         report.resolved_at = now
-        asset.status = AssetStatus.TERSEDIA.value
-        asset.condition = "BAIK"
-
-        history = AssetHistory(
+    # status aset hanya diubah bila aset masih dalam status kerusakan (tidak sedang dipinjam ulang)
+    if target and old_asset_status in damaged and target != old_asset_status:
+        asset.status = target
+        if target == AssetStatus.TERSEDIA.value:
+            asset.condition = "BAIK"
+        elif target == AssetStatus.RUSAK_BERAT.value:
+            asset.condition = "RUSAK_BERAT"
+        session.add(AssetHistory(
             asset_id=asset.id,
             changed_by=user_id,
-            event_type="REPAIR_COMPLETED",
-            old_status=AssetStatus.RUSAK.value,
-            new_status=AssetStatus.TERSEDIA.value,
-            reason=f"Perbaikan selesai untuk laporan #{report.id}",
-        )
-        session.add(history)
-
-    elif report.repair_status == RepairStatus.TIDAK_DAPAT_DIPERBAIKI.value:
-        report.resolved_at = now
-        asset.status = AssetStatus.RUSAK_BERAT.value
+            event_type="REPAIR_COMPLETED" if target == AssetStatus.TERSEDIA.value else "STATUS_CHANGED",
+            old_status=old_asset_status,
+            new_status=target,
+            reason=f"Laporan kerusakan #{report.id}: {report.repair_status}",
+        ))
 
     record_audit(
         session=session,

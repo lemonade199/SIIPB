@@ -35,6 +35,10 @@ class Config:
     CELERY_BROKER_URL: str = os.getenv("CELERY_BROKER_URL", REDIS_URL)
     CELERY_RESULT_BACKEND: str = os.getenv("CELERY_RESULT_BACKEND", REDIS_URL)
     CELERY_TIMEZONE: str = os.getenv("CELERY_TIMEZONE", "Asia/Jakarta")
+    # "celery" (production: worker mengirim email) atau "sync" (pengembangan/tes: kirim langsung).
+    NOTIFICATION_DISPATCH: str = os.getenv(
+        "NOTIFICATION_DISPATCH", "celery" if os.getenv("APP_ENV", "development") == "production" else "sync"
+    ).lower()
 
     # JWT
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", SECRET_KEY)
@@ -62,7 +66,14 @@ class Config:
     S3_SECRET_KEY: str = os.getenv("S3_SECRET_KEY", "minioadmin")
     S3_BUCKET: str = os.getenv("S3_BUCKET", "siipb-uploads")
     S3_SECURE: bool = os.getenv("S3_SECURE", "false").lower() in ("true", "1", "yes")
-    UPLOAD_FOLDER: str = str(backend_dir / "uploads")
+    UPLOAD_FOLDER: str = os.getenv("UPLOAD_FOLDER", str(backend_dir / "uploads"))
+    MAX_UPLOAD_MB: int = int(os.getenv("MAX_UPLOAD_MB", "5"))
+    BACKUP_FOLDER: str = os.getenv("BACKUP_FOLDER", str(backend_dir / "backups"))
+
+    # CORS: daftar origin dipisah koma; "*" hanya untuk pengembangan.
+    CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "*")
+    # URL frontend untuk redirect setelah login SSO.
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
     # Pagination Defaults
     DEFAULT_PAGE: int = 1

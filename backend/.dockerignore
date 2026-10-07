@@ -25,3 +25,4 @@ htmlcov
 uploads
 *.log
 .env
+backups

@@ -2,7 +2,7 @@
 from flask import Blueprint, g, request
 
 from app.database import SessionLocal
-from app.middleware.auth_middleware import jwt_required, permission_required
+from app.middleware.auth_middleware import permission_required
 from app.models.enums import RepairStatus
 from app.schemas.return_schema import ReturnCreateSchema
 from app.services.damage_loss_service import (
@@ -29,6 +29,7 @@ def serialize_return(r) -> dict:
             "inventory_code": it.asset.inventory_code if it.asset else None,
             "final_condition": it.final_condition,
             "completeness": it.completeness,
+            "asset_status_after": it.asset_status_after,
             "notes": it.notes,
             "damage_report": {
                 "id": dmg.id,
@@ -51,6 +52,7 @@ def serialize_return(r) -> dict:
         "received_by": r.received_by,
         "receiver_name": r.receiver.full_name if r.receiver else None,
         "returned_at": r.returned_at.isoformat() if r.returned_at else None,
+        "late_days": max(0, (r.returned_at.date() - r.borrowing.due_date).days) if r.returned_at and r.borrowing else 0,
         "notes": r.notes,
         "items": items_list,
         "created_at": r.created_at.isoformat() if r.created_at else None,
@@ -60,7 +62,7 @@ def serialize_return(r) -> dict:
 
 # ---- Return Transactions ----
 @return_bp.get("/returns")
-@jwt_required
+@permission_required("borrowing.view")
 def list_returns():
     """List return transactions.
     ---
@@ -98,7 +100,7 @@ def list_returns():
 
 
 @return_bp.get("/returns/<int:return_id>")
-@jwt_required
+@permission_required("borrowing.view")
 def get_return_detail(return_id: int):
     """Get single return detail.
     ---
@@ -120,7 +122,7 @@ def get_return_detail(return_id: int):
 
 
 @return_bp.post("/returns")
-@permission_required("borrowing.return")
+@permission_required("return.manage")
 def create_return_transaction():
     """Process return of borrowed items (supports partial or complete returns).
     ---
@@ -141,6 +143,10 @@ def create_return_transaction():
               type: integer
             notes:
               type: string
+            returned_date:
+              type: string
+              format: date
+              description: Tanggal barang diterima (bawaan hari ini; tidak boleh di masa depan)
             items:
               type: array
               items:
@@ -157,6 +163,10 @@ def create_return_transaction():
                   final_condition:
                     type: string
                     enum: [BAIK, RUSAK, HILANG]
+                  asset_status:
+                    type: string
+                    enum: [RUSAK, RUSAK_BERAT, DALAM_PERBAIKAN]
+                    description: Status aset setelah kembali rusak (opsional)
                   completeness:
                     type: string
                   notes:
@@ -171,33 +181,41 @@ def create_return_transaction():
       400:
         description: Validasi gagal atau item tidak cocok
     """
-    data = request.get_json(silent=True) or {}
-    schema = ReturnCreateSchema()
-    errors = schema.validate(data)
-    if errors:
-        return error_response("Validasi input pengembalian gagal", error_code="VALIDATION_ERROR", errors=errors)
+    from marshmallow import ValidationError
+
+    from app.services.notification_service import dispatch
+
+    try:
+        data = ReturnCreateSchema().load(request.get_json(silent=True) or {})
+    except ValidationError as err:
+        return error_response("Validasi input pengembalian gagal", error_code="VALIDATION_ERROR", errors=err.messages)
 
     with SessionLocal() as session:
         try:
-            ret = process_return(
+            ret, notif_ids = process_return(
                 session=session,
                 borrowing_id=data["borrowing_id"],
                 received_by=g.current_user["id"],
                 items_data=data["items"],
                 notes=data.get("notes"),
-            )
-            return success_response(
-                data=serialize_return(ret),
-                message="Pengembalian barang berhasil dicatat",
-                status_code=201,
+                returned_on=data.get("returned_date"),
+                send_confirmation=data.get("send_confirmation", True),
             )
         except ValueError as e:
+            session.rollback()
             return error_response(str(e), error_code="RETURN_FAILED", status_code=400)
+        dispatch(notif_ids, session=session)
+        session.refresh(ret)
+        return success_response(
+            data=serialize_return(ret),
+            message="Pengembalian barang berhasil dicatat",
+            status_code=201,
+        )
 
 
 # ---- Damage Reports ----
 @return_bp.get("/damage-reports")
-@jwt_required
+@permission_required("borrowing.view")
 def list_damage_reports():
     """List damage incident reports.
     ---
@@ -265,7 +283,7 @@ def list_damage_reports():
 
 
 @return_bp.put("/damage-reports/<int:report_id>/repair-status")
-@permission_required("damage.update")
+@permission_required("return.manage")
 def update_repair_status(report_id: int):
     """Update repair lifecycle status for a damage report.
     ---
@@ -320,7 +338,7 @@ def update_repair_status(report_id: int):
 
 # ---- Loss Reports ----
 @return_bp.get("/loss-reports")
-@jwt_required
+@permission_required("borrowing.view")
 def list_loss_reports():
     """List loss incident reports.
     ---

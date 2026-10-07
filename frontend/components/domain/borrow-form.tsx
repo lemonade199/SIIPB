@@ -17,7 +17,7 @@ import { Field, Select, TextareaField, TextField, toOptions } from '@/components
 import { Icon } from '@/components/ui/icon';
 import { Alert, Avatar, Empty, KV, PageHead, Thumb } from '@/components/ui/misc';
 import { useToast } from '@/components/providers/feedback-provider';
-import { checkout, genCode, updateDraft, type BorrowingSaveResult } from '@/services/borrowing';
+import { genCode } from '@/services/borrowing';
 import * as repo from '@/services/repo';
 import { CAPABILITIES, isApiMode } from '@/lib/config';
 import { activeBorrowings, borrowableItems, detailsOf, emp, isBorrowable, item as getItem, itemByCode, loc, unit, conditionLabel } from '@/services/lookup';
@@ -106,18 +106,18 @@ export function BorrowForm({ id }: { id?: ID }) {
   const submit = async (doCheckout: boolean) => {
     if (saving) return;
     const payload = { employee_id: employeeId, item_ids: itemIds, ...form };
-    let r: BorrowingSaveResult;
+    setSaving(true);
+    let r: Awaited<ReturnType<typeof repo.createBorrowing>>;
     if (id) {
-      r = updateDraft(id, payload);
+      r = await repo.updateDraft(id, payload);
       if (r.ok && doCheckout) {
-        const c = checkout(r.borrowing.id);
+        const c = await repo.checkout(r.borrowing.id);
         r = c.ok ? { ok: true, borrowing: c.borrowing, notification: c.notification } : { ok: false, errors: { item_ids: c.error } };
       }
     } else {
-      setSaving(true);
       r = await repo.createBorrowing(payload, doCheckout);
-      setSaving(false);
     }
+    setSaving(false);
     if (!r.ok) {
       setErrors(r.errors);
       return;
@@ -322,7 +322,7 @@ export function BorrowForm({ id }: { id?: ID }) {
               <KV
                 one
                 items={[
-                  ['Kode transaksi', <span key="c" className="mono">{editing ? editing.code : isApiMode ? 'Dibuat server (TX-…)' : genCode('borrowings', 'PJM', borrow || today())}</span>],
+                  ['Kode transaksi', <span key="c" className="mono">{editing ? editing.code : isApiMode ? 'Dibuat otomatis saat disimpan (PJM-…)' : genCode('borrowings', 'PJM', borrow || today())}</span>],
                   ['Petugas', user.name],
                   ['Peminjam', e ? e.name : <span key="p" className="muted">Belum dipilih</span>],
                   ['Jumlah barang', `${itemIds.length} barang`],

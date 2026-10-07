@@ -11,7 +11,7 @@ audit_bp = Blueprint("audit_logs", __name__, url_prefix="/api/v1/audit-logs")
 
 
 @audit_bp.get("")
-@permission_required("audit.read")
+@permission_required("audit.view")
 def list_audit_logs():
     """List system audit log trail.
     ---
@@ -30,6 +30,20 @@ def list_audit_logs():
         name: user_id
         type: integer
       - in: query
+        name: entity_type
+        type: string
+      - in: query
+        name: entity_id
+        type: integer
+      - in: query
+        name: from
+        type: string
+        format: date
+      - in: query
+        name: to
+        type: string
+        format: date
+      - in: query
         name: page
         type: integer
         default: 1
@@ -41,11 +55,23 @@ def list_audit_logs():
       200:
         description: Riwayat audit trail berhasil diambil
     """
+    from datetime import date, datetime, time
+
+    from sqlalchemy import func
+
     module = request.args.get("module")
     action = request.args.get("action")
     user_id = request.args.get("user_id", type=int)
-    page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", 20, type=int)
+    entity_type = request.args.get("entity_type")
+    entity_id = request.args.get("entity_id", type=int)
+    page = max(1, request.args.get("page", 1, type=int))
+    per_page = min(200, max(1, request.args.get("per_page", 20, type=int)))
+
+    def _d(name):
+        try:
+            return date.fromisoformat(request.args[name]) if request.args.get(name) else None
+        except ValueError:
+            return None
 
     with SessionLocal() as session:
         query = select(AuditLog)
@@ -55,8 +81,16 @@ def list_audit_logs():
             query = query.where(AuditLog.action == action)
         if user_id:
             query = query.where(AuditLog.user_id == user_id)
+        if entity_type:
+            query = query.where(AuditLog.entity_type == entity_type)
+        if entity_id:
+            query = query.where(AuditLog.entity_id == entity_id)
+        if _d("from"):
+            query = query.where(AuditLog.created_at >= datetime.combine(_d("from"), time.min))
+        if _d("to"):
+            query = query.where(AuditLog.created_at <= datetime.combine(_d("to"), time.max))
 
-        total = len(session.scalars(query).all())
+        total = session.scalar(select(func.count()).select_from(query.subquery())) or 0
         items = list(
             session.scalars(
                 query.order_by(AuditLog.id.desc())

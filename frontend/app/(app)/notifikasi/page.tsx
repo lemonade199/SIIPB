@@ -18,7 +18,7 @@ import { Alert, Empty, PageHead, Pager, SearchInput, Tabs } from '@/components/u
 import { EmailPreview } from '@/components/domain/email-preview';
 import { useToast } from '@/components/providers/feedback-provider';
 import { emp } from '@/services/lookup';
-import { runScheduler } from '@/services/scheduler';
+import * as repo from '@/services/repo';
 import type { ID } from '@/types';
 
 type Tab = 'riwayat' | 'log' | 'jadwal';
@@ -42,8 +42,10 @@ export default function NotifikasiPage() {
   const s = db.data.settings;
   const failed = db.where('notifications', (n) => n.status === 'GAGAL').length;
 
-  const onRun = () => {
-    const r = runScheduler({ trigger: 'manual', user_id: user.id });
+  const onRun = async () => {
+    const res = await repo.runScheduler();
+    if (!res.ok) return toast(res.error, 'err');
+    const r = res.result;
     setF((p) => ({ ...p, tab: 'jadwal', page: 1 }));
     toast(`Pemeriksaan selesai: ${r.checked} diperiksa, ${r.late_marked} menjadi TERLAMBAT, ${r.sent} terkirim, ${r.skipped} dilewati.`);
   };

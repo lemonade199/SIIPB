@@ -1,64 +1,44 @@
-# Arsitektur Monorepo & Integrasi SIIPB
-
-Dokumen ini menjelaskan arsitektur sistem SIIPB dalam pola monorepo terpadu.
-
----
-
-## 🏛️ Diagram Arsitektur Sistem
+# Arsitektur SIIPB (dokumen Plan §9, §14, §23)
 
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│                       KLIEN / PENGGUNA                      │
-│      Petugas Sarpras, Admin, Pimpinan (Desktop / Mobile)    │
-└──────────────────────────────┬──────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                  FRONTEND LAYER (frontend/)                 │
-│      Single Page Application (Vite / React / Vue / etc.)    │
-│      Port: http://localhost:5173                            │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ HTTP / JSON REST API
-                               │ CORS Enabled
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                   BACKEND LAYER (backend/)                  │
-│      Flask 3.0 REST API Factory                             │
-│      Port: http://localhost:5000/api                        │
-│                                                             │
-│      ├── api/         (Controllers & Route Blueprints)      │
-│      ├── services/    (Transaction & Business Logic)        │
-│      ├── models/      (SQLAlchemy 2.x Declarative Models)   │
-│      └── alembic/     (Database Migration Engine)           │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ PyMySQL / utf8mb4
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                  DATABASE LAYER (database/)                 │
-│      MariaDB 13 (InnoDB Engine)                             │
-│                                                             │
-│      ├── 26 Tables with CHECK Constraints                   │
-│      ├── Master Data & RBAC (Users, Roles, Permissions)     │
-│      ├── Peminjam Tanpa Akun (Borrowers)                    │
-│      ├── Transaksi (Borrowings, Returns) - ON DELETE RESTRICT│
-│      ├── Insiden (Damage Reports, Loss Reports)             │
-│      ├── Idempotent Notifikasi (UNIQUE(borrowing, event))   │
-│      └── Audit Trail & System Settings (JSON Validated)     │
-└─────────────────────────────────────────────────────────────┘
+ Pengguna internal (Admin / Petugas Sarpras-IT / Pimpinan)          Peminjam (tanpa akun)
+                │ HTTPS                                                   ▲ email
+                ▼                                                         │
+ ┌──────────────────────── Nginx ────────────────────────┐                │
+ │  /            → frontend:3000 (Next.js standalone)     │                │
+ │  /api/, /api/docs → backend:5000 (Flask + Gunicorn)    │                │
+ │  /uploads/    → volume uploads (foto barang)           │                │
+ │  rate limit login, header keamanan, TLS (nginx.https)  │                │
+ └───────────────┬────────────────────────┬───────────────┘                │
+                 ▼                        ▼                                │
+        Next.js + React + TS      Flask REST API ──── SQLAlchemy ──► MariaDB 11 (29 tabel, Alembic)
+        (UI, RBAC rute & tombol)   JWT · RBAC · Marshmallow   │
+                                   │                          └──► Redis ◄── Celery Beat (jatuh tempo /15 mnt, backup 01.00)
+                                   └── dispatch email ──────────────┘   │
+                                                                        ▼
+                                                                Celery Worker ──► SMTP (retry, log)
 ```
 
----
+## Alur utama
 
-## 🔄 Alur Integrasi Tim Frontend & Backend
+1. **Peminjaman** (Plan §7.1, §20): petugas memilih peminjam & barang → `POST /borrowings` (DRAF atau langsung checkout).
+   Checkout mengunci baris aset (`SELECT … FOR UPDATE`, urut id), memvalidasi `TERSEDIA`, mengubah status menjadi `DIPINJAM`,
+   mencatat `asset_history` & `audit_logs`, lalu membuat event `LOAN_CONFIRMATION` → email ke peminjam.
+2. **Pengembalian** (§7.2): `POST /returns` mencatat kondisi & kelengkapan per barang; status aset menjadi TERSEDIA / RUSAK /
+   RUSAK_BERAT / DALAM_PERBAIKAN / HILANG, laporan kerusakan/kehilangan dibuat, transaksi `DIKEMBALIKAN` bila semua barang kembali,
+   konfirmasi email (dapat dimatikan per transaksi atau global).
+3. **Keterlambatan** (§7.3, §21): Celery Beat → `run_due_check` → AKTIF lewat batas menjadi TERLAMBAT → aturan H-3…H+7
+   (penerima dapat dikonfigurasi) → `notification_events` (UNIQUE borrowing+event, anti-duplikat) → `notifications` per penerima
+   → worker SMTP → `email_deliveries` + `notification_logs`.
 
-1. **Backend Developer:**
-   - Mengembangkan model & business logic di `backend/app/models/` dan `backend/app/services/`.
-   - Mengelola perubahan skema melalui Alembic: `alembic revision --autogenerate` dan `alembic upgrade head`.
-   - Menghasilkan endpoint REST di `backend/app/api/` sesuai spesifikasi di `docs/api_specification.md`.
+## Keputusan teknis
 
-2. **Frontend Developer:**
-   - Membangun antarmuka di `frontend/`.
-   - Menjalankan `python backend/scripts/seed_data.py` untuk mendapatkan dataset realistis di database lokal.
-   - Menjalankan server backend `python backend/run.py`.
-   - Menghubungkan HTTP client (Axios, Fetch, TanStack Query) ke `http://localhost:5000/api`.
-   - Menikmati integrasi tanpa kendala CORS karena backend sudah mengizinkan origin lokal secara bawaan.
+| Aspek | Keputusan |
+|---|---|
+| Sumber kebenaran skema | Alembic (`backend/alembic/versions`); `database/SIIPB.sql` hanya referensi |
+| RBAC | Kode permission backend = kode antarmuka; izin dibaca dari DB setiap permintaan |
+| Rahasia | `.env` / secret manager; kata sandi SMTP dari UI disimpan terenkripsi (Fernet, kunci dari `SECRET_KEY`) |
+| Pengiriman email | `NOTIFICATION_DISPATCH=celery` (production) atau `sync` (pengembangan/tes) |
+| Frontend | Mode `api` (production) dan `mock` (demo tanpa server) memakai komponen yang sama; mutasi melalui `services/repo.ts` |
+| Berkas | Foto barang di volume `/app/uploads` (ekstensi + magic bytes diperiksa, nama UUID, batas ukuran) |
+| Backup | `mariadb-dump` gzip harian + manual; pemulihan hanya via skrip server |

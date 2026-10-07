@@ -1,8 +1,8 @@
 /**
- * Endpoint Flask REST API SIIPB yang tersedia di `backend/app/routes` (prefix /api/v1).
- * Bentuk DTO mengikuti serializer backend (snake_case) — diverifikasi terhadap backend yang berjalan.
+ * Endpoint Flask REST API SIIPB (`backend/app/routes`, prefix /api/v1).
+ * Bentuk DTO mengikuti serializer backend (snake_case). Dokumentasi lengkap: /api/docs (Swagger).
  */
-import { api, request, tokenStore, type ApiEnvelope } from '@/services/api/client';
+import { api, download, request, tokenStore, type ApiEnvelope } from '@/services/api/client';
 
 /* ================= DTO ================= */
 export interface ApiUser {
@@ -10,8 +10,12 @@ export interface ApiUser {
   username: string;
   email?: string;
   full_name?: string;
+  phone?: string | null;
+  unit_id?: number | null;
   roles: string[];
   permissions: string[];
+  login_method?: string;
+  last_login_at?: string | null;
 }
 export interface LoginResponse {
   access_token: string;
@@ -19,6 +23,37 @@ export interface LoginResponse {
   token_type: 'Bearer';
   expires_in: number;
   user: ApiUser;
+}
+export interface ApiUserRow {
+  id: number;
+  username: string;
+  email: string;
+  full_name: string;
+  phone: string | null;
+  unit_id: number | null;
+  is_active: boolean;
+  roles: { id: number; code: string; name: string }[];
+  role_id: number | null;
+  login_method: string;
+  last_login_at: string | null;
+  created_at: string | null;
+}
+export interface ApiDirectoryUser {
+  id: number;
+  full_name: string;
+  username: string;
+  is_active: boolean;
+  roles: string[];
+}
+export interface ApiRole {
+  id: number;
+  code: string;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  system: boolean;
+  permissions: string[];
+  user_count: number;
 }
 export interface ApiCategory {
   id: number;
@@ -32,6 +67,8 @@ export interface ApiLocation {
   code: string;
   name: string;
   parent_id: number | null;
+  parent_name?: string | null;
+  description?: string | null;
   is_active?: boolean;
 }
 export interface ApiUnit {
@@ -61,8 +98,10 @@ export interface ApiAsset {
   serial_number: string | null;
   description: string | null;
   photo_path: string | null;
+  photos?: { id: number; path: string }[];
   purchase_date: string | null;
   acquisition_cost: number | null;
+  acquisition_source?: string | null;
   status: string;
   condition: string;
   category_id: number;
@@ -76,7 +115,7 @@ export interface ApiAsset {
   updated_at: string | null;
 }
 export interface ApiAssetInput {
-  inventory_code?: string;
+  inventory_code?: string | null;
   category_id?: number;
   location_id?: number | null;
   name?: string;
@@ -86,7 +125,9 @@ export interface ApiAssetInput {
   description?: string | null;
   purchase_date?: string | null;
   acquisition_cost?: number | null;
+  acquisition_source?: string | null;
   condition?: string;
+  status?: string;
   is_active?: boolean;
   reason?: string | null;
 }
@@ -101,6 +142,7 @@ export interface ApiAssetHistory {
   new_location_id: number | null;
   reason: string | null;
   changed_by: number | null;
+  changed_by_name?: string | null;
   created_at: string;
 }
 export interface ApiBorrowing {
@@ -116,7 +158,12 @@ export interface ApiBorrowing {
   status: string;
   purpose: string | null;
   notes: string | null;
-  items: { id: number; asset_id: number; asset_name: string | null; inventory_code: string | null; checked_out_at: string | null }[];
+  checked_out_at?: string | null;
+  checked_out_by?: number | null;
+  checked_out_name?: string | null;
+  cancel_reason?: string | null;
+  returned_at?: string | null;
+  items: { id: number; asset_id: number; asset_name: string | null; inventory_code: string | null; condition_out?: string | null; checked_out_at: string | null }[];
   created_at: string | null;
 }
 export interface ApiBorrowingCreate {
@@ -126,6 +173,7 @@ export interface ApiBorrowingCreate {
   purpose?: string;
   notes?: string;
   asset_ids: number[];
+  checkout?: boolean;
 }
 export interface ApiReturnItem {
   id: number;
@@ -134,6 +182,7 @@ export interface ApiReturnItem {
   asset_name: string | null;
   inventory_code: string | null;
   final_condition: 'BAIK' | 'RUSAK' | 'HILANG';
+  asset_status_after?: string | null;
   completeness: string | null;
   notes: string | null;
   damage_report: { id: number; severity: string; description: string; repair_cost: number | null; repair_status: string } | null;
@@ -146,6 +195,7 @@ export interface ApiReturn {
   received_by: number;
   receiver_name: string | null;
   returned_at: string;
+  late_days?: number;
   notes: string | null;
   created_at: string;
   items: ApiReturnItem[];
@@ -153,10 +203,13 @@ export interface ApiReturn {
 export interface ApiReturnCreate {
   borrowing_id: number;
   notes?: string;
+  returned_date?: string;
+  send_confirmation?: boolean;
   items: {
     borrowing_item_id: number;
     asset_id: number;
     final_condition: 'BAIK' | 'RUSAK' | 'HILANG';
+    asset_status?: 'RUSAK' | 'RUSAK_BERAT' | 'DALAM_PERBAIKAN';
     completeness?: string;
     notes?: string;
     damage?: { severity: 'RINGAN' | 'SEDANG' | 'BERAT'; description: string; repair_cost?: number };
@@ -166,14 +219,36 @@ export interface ApiReturnCreate {
 export interface ApiNotification {
   id: number;
   event_id: number | null;
+  event_code?: string | null;
+  event?: string | null;
+  borrowing_id?: number | null;
+  transaction_number?: string | null;
+  trigger?: string;
   borrower_id: number | null;
+  template_code?: string | null;
   channel: string;
   recipient: string;
+  recipient_name?: string | null;
+  recipient_type?: 'PEMINJAM' | 'PETUGAS' | 'PIMPINAN';
+  recipient_user_id?: number | null;
   subject: string;
+  body?: string | null;
   status: string;
   sent_at: string | null;
   created_at: string | null;
-  deliveries: { attempt: number; status: string; error: string | null; attempted_at: string | null }[];
+  read_by?: number[];
+  deliveries: { attempt: number; status: string; provider?: string; error: string | null; attempted_at: string | null }[];
+  logs?: { status: string; message: string; created_at: string | null }[];
+}
+export interface ApiTemplate {
+  id: number;
+  code: string;
+  event: string | null;
+  name: string;
+  subject: string;
+  body: string;
+  is_active: boolean;
+  updated_at: string | null;
 }
 export interface ApiAuditLog {
   id: number;
@@ -186,6 +261,24 @@ export interface ApiAuditLog {
   ip_address: string | null;
   user_id: number | null;
   user_name: string | null;
+  created_at: string;
+}
+export interface ApiSchedulerRun {
+  id: number;
+  at: string;
+  today: string;
+  trigger: string;
+  triggered_by: number | null;
+  checked: number;
+  late_marked: number;
+  sent: number;
+  skipped: number;
+  failed: number;
+  details: { code: string; action: string }[];
+}
+export interface ApiBackup {
+  file: string;
+  size_kb: number;
   created_at: string;
 }
 export interface Paging {
@@ -205,6 +298,8 @@ export async function fetchAll<T>(path: string, query: object = {}, perPage = 10
   return out;
 }
 
+const API_BASE = () => (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api/v1').replace(/\/+$/, '');
+
 /* ================= Auth ================= */
 export const authApi = {
   async login(username: string, password: string) {
@@ -212,7 +307,14 @@ export const authApi = {
     tokenStore.set({ access_token: res.data.access_token, refresh_token: res.data.refresh_token });
     return res.data;
   },
+  async exchangeSso(code: string) {
+    const res = await request<LoginResponse>('/auth/sso/exchange', { method: 'POST', body: { code }, anonymous: true });
+    tokenStore.set({ access_token: res.data.access_token, refresh_token: res.data.refresh_token });
+    return res.data;
+  },
   me: () => api.get<ApiUser>('/auth/me').then((r) => r.data),
+  updateMe: (body: { full_name?: string; email?: string; phone?: string | null }) => api.put<ApiUser>('/auth/me', body).then((r) => r.data),
+  changePassword: (current_password: string, new_password: string) => api.post<null>('/auth/change-password', { current_password, new_password }),
   async logout() {
     const t = tokenStore.get();
     try {
@@ -224,7 +326,19 @@ export const authApi = {
     }
   },
   /** URL login SSO (OAuth/OIDC) yang ditangani backend. */
-  ssoUrl: () => `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api/v1'}/auth/google`,
+  ssoUrl: () => `${API_BASE()}/auth/google`,
+};
+
+/* ================= Pengguna & role ================= */
+export const usersApi = {
+  list: () => api.get<ApiUserRow[]>('/users').then((r) => r.data),
+  directory: () => api.get<ApiDirectoryUser[]>('/users/directory').then((r) => r.data),
+  create: (body: Record<string, unknown>) => api.post<ApiUserRow>('/users', body).then((r) => r.data),
+  update: (id: number, body: Record<string, unknown>) => api.put<ApiUserRow>(`/users/${id}`, body).then((r) => r.data),
+  remove: (id: number) => api.del<null>(`/users/${id}`),
+  roles: () => api.get<ApiRole[]>('/roles').then((r) => r.data),
+  createRole: (body: Record<string, unknown>) => api.post<ApiRole>('/roles', body).then((r) => r.data),
+  updateRole: (id: number, body: Record<string, unknown>) => api.put<ApiRole>(`/roles/${id}`, body).then((r) => r.data),
 };
 
 /* ================= Inventaris ================= */
@@ -234,14 +348,17 @@ export const assetsApi = {
   get: (id: number) => api.get<ApiAsset>(`/assets/${id}`).then((r) => r.data),
   create: (body: ApiAssetInput) => api.post<ApiAsset>('/assets', body).then((r) => r.data),
   update: (id: number, body: ApiAssetInput) => api.put<ApiAsset>(`/assets/${id}`, body).then((r) => r.data),
-  /** Backend: menonaktifkan aset (tidak menghapus riwayat). */
+  setStatus: (id: number, status: string, reason?: string) => api.post<ApiAsset>(`/assets/${id}/status`, { status, reason }).then((r) => r.data),
   deactivate: (id: number) => api.del<null>(`/assets/${id}`),
   history: (id: number) => api.get<ApiAssetHistory[]>(`/assets/${id}/history`).then((r) => r.data),
-  uploadPhoto: (id: number, file: File) => {
+  uploadPhotos: (id: number, files: File[], primary = false) => {
     const fd = new FormData();
-    fd.append('file', file);
-    return api.upload<{ photo_path: string } | ApiAsset>(`/assets/${id}/upload-photo`, fd).then((r) => r.data);
+    files.forEach((f) => fd.append('files', f));
+    if (primary) fd.append('primary', 'true');
+    return api.upload<ApiAsset>(`/assets/${id}/photos`, fd).then((r) => r.data);
   },
+  deletePhoto: (id: number, photoId: number) => api.del<ApiAsset>(`/assets/${id}/photos/${photoId}`).then((r) => r.data),
+  orderPhotos: (id: number, photo_ids: number[]) => api.put<ApiAsset>(`/assets/${id}/photos/order`, { photo_ids }).then((r) => r.data),
 };
 
 /* ================= Transaksi ================= */
@@ -250,6 +367,9 @@ export const borrowingsApi = {
   all: () => fetchAll<ApiBorrowing>('/borrowings'),
   get: (id: number) => api.get<ApiBorrowing>(`/borrowings/${id}`).then((r) => r.data),
   create: (body: ApiBorrowingCreate) => api.post<ApiBorrowing>('/borrowings', body).then((r) => r.data),
+  update: (id: number, body: ApiBorrowingCreate) => api.put<ApiBorrowing>(`/borrowings/${id}`, body).then((r) => r.data),
+  checkout: (id: number) => api.post<ApiBorrowing>(`/borrowings/${id}/checkout`).then((r) => r.data),
+  cancel: (id: number, reason: string) => api.post<ApiBorrowing>(`/borrowings/${id}/cancel`, { reason }).then((r) => r.data),
 };
 
 export const returnsApi = {
@@ -263,29 +383,49 @@ export const returnsApi = {
 };
 
 /* ================= Master data ================= */
+export type MasterPath = 'organizational-units' | 'categories' | 'locations' | 'borrowers';
 export const masterApi = {
-  units: () => api.get<ApiUnit[]>('/organizational-units').then((r) => r.data),
-  createUnit: (body: { code: string; name: string; parent_id?: number | null }) => api.post<ApiUnit>('/organizational-units', body).then((r) => r.data),
-  categories: () => api.get<ApiCategory[]>('/categories').then((r) => r.data),
-  createCategory: (body: { code: string; name: string; description?: string | null }) => api.post<ApiCategory>('/categories', body).then((r) => r.data),
-  locations: () => api.get<ApiLocation[]>('/locations').then((r) => r.data),
-  createLocation: (body: { code: string; name: string; parent_id?: number | null; description?: string | null }) =>
-    api.post<ApiLocation>('/locations', body).then((r) => r.data),
-  borrowers: () => fetchAll<ApiBorrower>('/borrowers'),
-  createBorrower: (body: Partial<ApiBorrower>) => api.post<ApiBorrower>('/borrowers', body).then((r) => r.data),
-  updateBorrower: (id: number, body: Partial<ApiBorrower>) => api.put<ApiBorrower>(`/borrowers/${id}`, body).then((r) => r.data),
-  deleteBorrower: (id: number) => api.del<null>(`/borrowers/${id}`),
+  units: () => api.get<ApiUnit[]>('/organizational-units', { all: 1 }).then((r) => r.data),
+  categories: () => api.get<ApiCategory[]>('/categories', { all: 1 }).then((r) => r.data),
+  locations: () => api.get<ApiLocation[]>('/locations', { all: 1 }).then((r) => r.data),
+  borrowers: () => fetchAll<ApiBorrower>('/borrowers', { all: 1 }),
+  create: (path: MasterPath, body: Record<string, unknown>) => api.post<{ id: number }>(`/${path}`, body).then((r) => r.data),
+  update: (path: MasterPath, id: number, body: Record<string, unknown>) => api.put<{ id: number }>(`/${path}/${id}`, body).then((r) => r.data),
+  remove: (path: MasterPath, id: number) => api.del<null>(`/${path}/${id}`),
 };
 
-/* ================= Notifikasi, dashboard, audit ================= */
+/* ================= Notifikasi ================= */
 export const notificationsApi = {
   all: () => fetchAll<ApiNotification>('/notifications'),
-  templates: () => api.get<unknown[]>('/notifications/templates').then((r) => r.data),
-  resend: (id: number) => api.post<unknown>(`/notifications/${id}/resend`).then((r) => r.data),
+  templates: () => api.get<ApiTemplate[]>('/notifications/templates').then((r) => r.data),
+  updateTemplate: (id: number, body: Partial<Pick<ApiTemplate, 'name' | 'subject' | 'body' | 'is_active'>>) =>
+    api.put<ApiTemplate>(`/notifications/templates/${id}`, body).then((r) => r.data),
+  resend: (id: number) => api.post<ApiNotification>(`/notifications/${id}/resend`).then((r) => r.data),
+  read: (id: number) => api.post<unknown>(`/notifications/${id}/read`),
+  readAll: () => api.post<{ marked: number }>('/notifications/read-all'),
 };
+
+/* ================= Dashboard, laporan, audit ================= */
 export const dashboardApi = {
   summary: () => api.get<Record<string, unknown>>('/dashboard/summary').then((r) => r.data),
+  overdue: () => api.get<unknown[]>('/dashboard/overdue').then((r) => r.data),
+  statistics: (months = 12) => api.get<Record<string, unknown>>('/dashboard/statistics', { months }).then((r) => r.data),
+};
+export const reportsApi = {
+  download: (type: string, format: 'xlsx' | 'pdf', filters: Record<string, string | undefined>) => download(`/reports/${type}`, { ...filters, format }),
 };
 export const auditApi = {
-  all: () => fetchAll<ApiAuditLog>('/audit-logs'),
+  all: () => fetchAll<ApiAuditLog>('/audit-logs', {}, 200),
+};
+
+/* ================= Pengaturan, scheduler, backup ================= */
+export const settingsApi = {
+  get: () => api.get<Record<string, unknown>>('/settings').then((r) => r.data),
+  update: (body: Record<string, unknown>) => api.put<Record<string, unknown>>('/settings', body).then((r) => r.data),
+  testSmtp: () => api.post<{ ok: boolean; mode: string }>('/settings/smtp/test'),
+  runScheduler: (date?: string) => api.post<ApiSchedulerRun>('/scheduler/run', date ? { date } : {}),
+  schedulerRuns: () => api.get<ApiSchedulerRun[]>('/scheduler/runs').then((r) => r.data),
+  backups: () => api.get<ApiBackup[]>('/backups').then((r) => r.data),
+  backupNow: () => api.post<{ file: string; size_kb: number; status: string }>('/backups'),
+  downloadBackup: (name: string) => download(`/backups/${encodeURIComponent(name)}`),
 };

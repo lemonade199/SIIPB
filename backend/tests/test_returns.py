@@ -1,119 +1,77 @@
-"""Tests for Return processing and incident reporting."""
+"""Pengembalian: kondisi akhir, kerusakan/kehilangan, status barang, konfirmasi email."""
 from datetime import date, timedelta
-import uuid
 
 
-def test_return_condition_baik(client, auth_headers):
-    # 1. Create asset & borrow
-    unique_code = f"AST-RET-{uuid.uuid4().hex[:6].upper()}"
-    asset_res = client.post(
-        "/api/v1/assets",
-        json={"inventory_code": unique_code, "category_id": 1, "name": "Monitor Dell 24 inch", "status": "TERSEDIA"},
-        headers=auth_headers,
-    )
-    asset_id = asset_res.get_json()["data"]["id"]
-
-    today = date.today()
-    borrow_res = client.post(
-        "/api/v1/borrowings",
-        json={
-            "borrower_id": 1,
-            "start_date": today.isoformat(),
-            "due_date": (today + timedelta(days=3)).isoformat(),
-            "asset_ids": [asset_id],
-        },
-        headers=auth_headers,
-    )
-    b_data = borrow_res.get_json()["data"]
-    borrowing_id = b_data["id"]
-    borrowing_item_id = b_data["items"][0]["id"]
-
-    # 2. Process return with condition BAIK
-    return_payload = {
-        "borrowing_id": borrowing_id,
-        "items": [
-            {
-                "borrowing_item_id": borrowing_item_id,
-                "asset_id": asset_id,
-                "final_condition": "BAIK",
-                "completeness": "Lengkap",
-                "notes": "Barang kembali mulus",
-            }
-        ],
-    }
-    ret_res = client.post("/api/v1/returns", json=return_payload, headers=auth_headers)
-    assert ret_res.status_code == 201
-
-    # 3. Verify asset status restored to TERSEDIA
-    asset_check = client.get(f"/api/v1/assets/{asset_id}", headers=auth_headers)
-    assert asset_check.get_json()["data"]["status"] == "TERSEDIA"
-
-    # 4. Verify borrowing status is DIKEMBALIKAN
-    borrowing_check = client.get(f"/api/v1/borrowings/{borrowing_id}", headers=auth_headers)
-    assert borrowing_check.get_json()["data"]["status"] == "DIKEMBALIKAN"
+def _items(b, cond, **extra):
+    return [{"borrowing_item_id": it["id"], "asset_id": it["asset_id"], "final_condition": cond, "completeness": "Lengkap", **extra}
+            for it in b["items"]]
 
 
-def test_return_condition_rusak_and_repair_lifecycle(client, auth_headers):
-    # 1. Create asset & borrow
-    unique_code = f"AST-DMG-{uuid.uuid4().hex[:6].upper()}"
-    asset_res = client.post(
-        "/api/v1/assets",
-        json={"inventory_code": unique_code, "category_id": 1, "name": "Laptop HP Pavilion", "status": "TERSEDIA"},
-        headers=auth_headers,
-    )
-    asset_id = asset_res.get_json()["data"]["id"]
+def test_return_good(client, auth_headers, make_borrowing):
+    b = make_borrowing()
+    res = client.post("/api/v1/returns", json={"borrowing_id": b["id"], "items": _items(b, "BAIK")}, headers=auth_headers)
+    assert res.status_code == 201, res.get_json()
+    r = res.get_json()["data"]
+    assert r["late_days"] == 0
+    detail = client.get(f"/api/v1/borrowings/{b['id']}", headers=auth_headers).get_json()["data"]
+    assert detail["status"] == "DIKEMBALIKAN" and detail["returned_at"]
+    asset = client.get(f"/api/v1/assets/{b['items'][0]['asset_id']}", headers=auth_headers).get_json()["data"]
+    assert asset["status"] == "TERSEDIA"
+    notifs = client.get(f"/api/v1/notifications?borrowing_id={b['id']}&event=PENGEMBALIAN", headers=auth_headers).get_json()["data"]
+    assert len(notifs) == 1 and notifs[0]["status"] == "SENT"
+    # tidak bisa dikembalikan dua kali
+    again = client.post("/api/v1/returns", json={"borrowing_id": b["id"], "items": _items(b, "BAIK")}, headers=auth_headers)
+    assert again.status_code == 400
 
-    today = date.today()
-    borrow_res = client.post(
-        "/api/v1/borrowings",
-        json={
-            "borrower_id": 1,
-            "start_date": today.isoformat(),
-            "due_date": (today + timedelta(days=2)).isoformat(),
-            "asset_ids": [asset_id],
-        },
-        headers=auth_headers,
-    )
-    b_data = borrow_res.get_json()["data"]
-    borrowing_id = b_data["id"]
-    borrowing_item_id = b_data["items"][0]["id"]
 
-    # 2. Process return with condition RUSAK
-    return_payload = {
-        "borrowing_id": borrowing_id,
-        "items": [
-            {
-                "borrowing_item_id": borrowing_item_id,
-                "asset_id": asset_id,
-                "final_condition": "RUSAK",
-                "damage": {
-                    "severity": "SEDANG",
-                    "description": "Engsel laptop retak saat pemakaian",
-                    "repair_cost": 250000,
-                },
-            }
-        ],
-    }
-    ret_res = client.post("/api/v1/returns", json=return_payload, headers=auth_headers)
-    assert ret_res.status_code == 201
-    ret_data = ret_res.get_json()["data"]
-    damage_report = ret_data["items"][0]["damage_report"]
-    assert damage_report is not None
-    assert damage_report["repair_status"] == "DILAPORKAN"
-    damage_report_id = damage_report["id"]
+def test_return_damaged_heavy_and_repair(client, auth_headers, make_borrowing):
+    b = make_borrowing()
+    res = client.post("/api/v1/returns", json={"borrowing_id": b["id"], "items": _items(
+        b, "RUSAK", damage={"severity": "BERAT", "description": "Layar pecah"})}, headers=auth_headers)
+    assert res.status_code == 201
+    item = res.get_json()["data"]["items"][0]
+    assert item["asset_status_after"] == "RUSAK_BERAT" and item["damage_report"]["severity"] == "BERAT"
+    asset = client.get(f"/api/v1/assets/{item['asset_id']}", headers=auth_headers).get_json()["data"]
+    assert asset["status"] == "RUSAK_BERAT" and asset["condition"] == "RUSAK_BERAT"
+    # barang rusak berat tidak bisa dipinjam
+    bad = client.post("/api/v1/borrowings", json={"borrower_id": 1, "start_date": date.today().isoformat(),
+                                                  "due_date": date.today().isoformat(), "asset_ids": [item["asset_id"]]}, headers=auth_headers)
+    assert bad.status_code == 400
+    rep = client.put(f"/api/v1/damage-reports/{item['damage_report']['id']}/repair-status",
+                     json={"repair_status": "SELESAI", "action_taken": "Ganti layar"}, headers=auth_headers)
+    assert rep.status_code == 200
+    assert client.get(f"/api/v1/assets/{item['asset_id']}", headers=auth_headers).get_json()["data"]["status"] == "TERSEDIA"
 
-    # 3. Check asset status is RUSAK
-    asset_check = client.get(f"/api/v1/assets/{asset_id}", headers=auth_headers)
-    assert asset_check.get_json()["data"]["status"] == "RUSAK"
 
-    # 4. Progress repair status to SELESAI
-    repair_update_res = client.put(
-        f"/api/v1/damage-reports/{damage_report_id}/repair-status",
-        json={"repair_status": "SELESAI", "action_taken": "Engsel diganti baru"},
-        headers=auth_headers,
-    )
-    assert repair_update_res.status_code == 200
+def test_return_in_repair_and_lost(client, auth_headers, make_borrowing):
+    b = make_borrowing(n_items=2)
+    i1, i2 = b["items"]
+    res = client.post("/api/v1/returns", json={"borrowing_id": b["id"], "items": [
+        {"borrowing_item_id": i1["id"], "asset_id": i1["asset_id"], "final_condition": "RUSAK", "asset_status": "DALAM_PERBAIKAN",
+         "completeness": "Tidak lengkap: charger", "damage": {"severity": "SEDANG", "description": "Engsel longgar"}},
+        {"borrowing_item_id": i2["id"], "asset_id": i2["asset_id"], "final_condition": "HILANG", "loss": {"description": "Hilang di lokasi kegiatan"}},
+    ]}, headers=auth_headers)
+    assert res.status_code == 201, res.get_json()
+    assets = {a: client.get(f"/api/v1/assets/{a}", headers=auth_headers).get_json()["data"]["status"] for a in (i1["asset_id"], i2["asset_id"])}
+    assert assets == {i1["asset_id"]: "DALAM_PERBAIKAN", i2["asset_id"]: "HILANG"}
+    losses = client.get("/api/v1/loss-reports", headers=auth_headers).get_json()["data"]
+    assert any(l["inventory_code"] == i2["inventory_code"] for l in losses)
 
-    # 5. Asset status should automatically revert to TERSEDIA
-    asset_restored = client.get(f"/api/v1/assets/{asset_id}", headers=auth_headers)
-    assert asset_restored.get_json()["data"]["status"] == "TERSEDIA"
+
+def test_damage_requires_description(client, auth_headers, make_borrowing):
+    b = make_borrowing()
+    res = client.post("/api/v1/returns", json={"borrowing_id": b["id"], "items": _items(b, "RUSAK", damage={"severity": "RINGAN", "description": ""})},
+                      headers=auth_headers)
+    assert res.status_code == 400
+
+
+def test_late_return_with_date(client, auth_headers, make_borrowing):
+    b = make_borrowing(start=date.today() - timedelta(days=10), due=date.today() - timedelta(days=5))
+    ret_date = (date.today() - timedelta(days=1)).isoformat()
+    res = client.post("/api/v1/returns", json={"borrowing_id": b["id"], "returned_date": ret_date, "items": _items(b, "BAIK")}, headers=auth_headers)
+    assert res.status_code == 201
+    assert res.get_json()["data"]["returned_at"].startswith(ret_date) and res.get_json()["data"]["late_days"] == 4
+    future = make_borrowing()
+    res = client.post("/api/v1/returns", json={"borrowing_id": future["id"], "returned_date": (date.today() + timedelta(days=1)).isoformat(),
+                                                "items": _items(future, "BAIK")}, headers=auth_headers)
+    assert res.status_code == 400

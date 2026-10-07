@@ -18,13 +18,14 @@ npm run dev                      # http://localhost:3000 (mode mock, bawaan)
 Salin `.env.example` menjadi `.env` lalu atur nilainya. Variabel `NEXT_PUBLIC_*` dibaca saat build, jadi jalankan ulang `npm run dev` / `npm run build` setelah mengubahnya.
 
 Akun demo (mode mock): `admin / admin123`, `petugas / petugas123`, `pimpinan / pimpinan123`.
-Akun mode api: akun hasil `backend/scripts/seed_data.py` (`admin / admin123`, `petugas / petugas123`).
+Akun mode api: akun hasil `backend/scripts/seed_data.py` (`admin / admin123`, `petugas / petugas123`, `pimpinan / pimpinan123`; di Docker diatur lewat `SEED_*_PASSWORD`). Daftar akun di halaman login mode api hanya tampil bila `NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS=true`.
 
 ### Perintah lain
 
 ```bash
 npm run build && npm start   # production
 npm run build:api            # build mode api
+docker build -t siipb-frontend --build-arg NEXT_PUBLIC_API_BASE_URL=/api/v1 .   # image standalone
 npm run lint                 # ESLint
 npm run typecheck            # TypeScript
 npm test                     # Vitest (unit, aturan bisnis, mapper API, komponen)
@@ -62,32 +63,30 @@ frontend/
 - Semua **mutasi** lewat `services/repo.ts`:
   - mode mock → layanan lokal di `services/*` (aturan bisnis lengkap di browser);
   - mode api → endpoint Flask (`services/api/endpoints.ts`), lalu cache disegarkan dari server (`services/api/sync.ts`).
-- `lib/config.ts` (`CAPABILITIES`) menyembunyikan fitur yang belum punya endpoint backend, sehingga UI tidak menjanjikan data yang tidak tersimpan.
+- `lib/config.ts` (`CAPABILITIES`): seluruh fitur dokumen Plan tersedia di kedua mode; hanya *mode demo geser tanggal* dan backup JSON lokal yang khusus mode mock.
+- Mode api menyegarkan cache tiap 60 detik dan saat tab kembali aktif. `NEXT_PUBLIC_API_BASE_URL` boleh relatif (`/api/v1`) bila frontend & API di balik Nginx yang sama.
 
-### Cakupan mode api (diverifikasi terhadap backend yang berjalan)
+### Cakupan mode api (diuji Playwright terhadap backend yang berjalan, langsung & lewat Nginx)
 
-| Fitur | Endpoint | Status |
-|---|---|---|
-| Login, sesi, logout, refresh token | `/auth/login`, `/auth/me`, `/auth/logout`, `/auth/refresh` | ✅ |
-| Inventaris: daftar, tambah, ubah, aktif/nonaktif, foto utama, riwayat | `/assets`, `/assets/{id}`, `/assets/{id}/history`, `/assets/{id}/upload-photo` | ✅ |
-| Master: peminjam (tambah/ubah/nonaktif/hapus); kategori, lokasi, unit (tambah) | `/borrowers`, `/categories`, `/locations`, `/organizational-units` | ✅ |
-| Peminjaman (checkout langsung) & pengembalian (rusak/hilang → laporan kerusakan/kehilangan) | `/borrowings`, `/returns` | ✅ |
-| Notifikasi (riwayat, kirim ulang), audit log | `/notifications`, `/audit-logs` | ✅ |
-| Dashboard, monitoring, laporan, QR | dihitung di frontend dari data API | ✅ |
-| Pengguna/role, pengaturan, template, draf peminjaman, ubah status manual, jalankan scheduler | belum ada endpoint | ⏸️ disembunyikan / disimpan lokal |
-
-### Temuan di backend (tidak diubah — di luar lingkup frontend)
-
-1. `POST/PUT /assets` dengan `purchase_date` → error 500 (`serialize_asset` memanggil `.isoformat()` pada string). Data tetap tersimpan, tetapi respons gagal. Karena itu tahun perolehan tidak dikirim pada mode api.
-2. `GET /notifications/templates` → error 500 (`NotificationTemplate` tidak punya atribut `channel`).
-3. Endpoint di dokumen bagian 11 berbeda dengan implementasi: `/items` ↔ `/assets`; belum ada `/users`, `/borrowings/{id}/checkout`, `/notifications/{id}/read`, `/dashboard/overdue`, `/dashboard/statistics`.
-4. Respons notifikasi belum menyertakan `borrowing_id`, jadi notifikasi dikaitkan ke transaksi terbaru peminjam.
+| Fitur | Endpoint |
+|---|---|
+| Login JWT, refresh, logout, profil, ganti kata sandi, SSO OIDC | `/auth/*` |
+| Pengguna, role & matriks permission | `/users`, `/roles`, `/permissions` |
+| Inventaris: tambah/ubah, tahun & sumber perolehan, ≤5 foto, status manual, aktif/nonaktif, riwayat | `/items` (`/assets`) |
+| Master data: tambah/ubah/nonaktif/hapus (peminjam, kategori, lokasi, unit kerja) + parameter status/kondisi | `/borrowers`, `/categories`, `/locations`, `/organizational-units`, `/settings` |
+| Peminjaman: draf, ubah draf, checkout, batal | `/borrowings`, `/borrowings/{id}/checkout|cancel` |
+| Pengembalian: kondisi, kelengkapan, rusak/perbaikan/hilang, tanggal kembali, konfirmasi email | `/returns` |
+| Notifikasi: riwayat per penerima, log pengiriman, tandai terbaca, kirim ulang, template | `/notifications/*` |
+| Scheduler manual & riwayat | `/scheduler/run`, `/scheduler/runs` |
+| Laporan PDF (WeasyPrint) & Excel (openpyxl) | `/reports/{jenis}?format=pdf|xlsx` |
+| Pengaturan (umum, SMTP + kata sandi terenkripsi, penjadwal, aturan H-3…H+7, keamanan), backup | `/settings`, `/backups` |
+| Audit log | `/audit-logs` |
 
 ## Catatan fitur
 
 - **Parameter status & kondisi** (Master Data → Status & Kondisi): label & keterangan dapat diubah, kode tetap karena terikat aturan bisnis.
 - **Monitoring** mencakup tab *Rusak / hilang* (RUSAK, RUSAK_BERAT, DALAM_PERBAIKAN, HILANG).
-- **Foto barang**: hingga 5 foto per barang (`item_photos`), foto pertama = foto utama. Mode api: 1 foto (`photo_path`).
-- **Laporan**: unduh **Excel .xlsx** (ExcelJS: header, autofilter, format Rupiah) dan **PDF** (jsPDF: A4 lanskap, kop, nomor halaman, tanda tangan), plus cetak.
+- **Foto barang**: hingga 5 foto per barang (`asset_photos`), foto pertama = foto utama.
+- **Laporan**: unduh **PDF** dan **Excel .xlsx** — mode api dibuat server (WeasyPrint/openpyxl, tercatat di audit log); mode mock dibuat di browser (jsPDF/ExcelJS); plus cetak.
 - **QR** dibuat lokal (`qrcode`, SVG) — tetap berfungsi offline; pemindaian lewat keyboard scanner atau kamera (BarcodeDetector).
 - RBAC dua lapis di antarmuka: menu/tombol per permission dan penolakan rute (403) di `lib/navigation.ts`.

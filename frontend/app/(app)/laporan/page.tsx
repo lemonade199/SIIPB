@@ -19,6 +19,8 @@ import { Empty, PageHead } from '@/components/ui/misc';
 import { useToast } from '@/components/providers/feedback-provider';
 import { cat, loc, unit, userName } from '@/services/lookup';
 import { buildReport, logReport, type ReportColumn } from '@/services/report';
+import * as repo from '@/services/repo';
+import { isApiMode } from '@/lib/config';
 import type { ReportFilters, ReportType } from '@/types';
 
 function defaultFrom() {
@@ -86,7 +88,10 @@ export default function LaporanPage() {
   const doPdf = async () => {
     setBusy('pdf');
     try {
-      await exportPdf(`laporan-${f.type}-${today()}.pdf`, { ...exportMeta, signature: 'Pimpinan' }, rep.columns, rep.rows);
+      if (isApiMode) {
+        const r = await repo.exportReport(f, 'pdf');
+        if (!r.ok) throw new Error(r.error);
+      } else await exportPdf(`laporan-${f.type}-${today()}.pdf`, { ...exportMeta, signature: 'Pimpinan' }, rep.columns, rep.rows);
       logReport(f, 'PDF', rep.rows.length);
       toast('Laporan PDF diunduh.');
     } catch (e) {
@@ -98,7 +103,10 @@ export default function LaporanPage() {
   const doXlsx = async () => {
     setBusy('xlsx');
     try {
-      await exportXlsx(`laporan-${f.type}-${today()}.xlsx`, exportMeta, rep.columns, rep.rows);
+      if (isApiMode) {
+        const r = await repo.exportReport(f, 'xlsx');
+        if (!r.ok) throw new Error(r.error);
+      } else await exportXlsx(`laporan-${f.type}-${today()}.xlsx`, exportMeta, rep.columns, rep.rows);
       logReport(f, 'Excel', rep.rows.length);
       toast('Laporan Excel (.xlsx) diunduh.');
     } catch (e) {
@@ -242,7 +250,11 @@ export default function LaporanPage() {
                 <Button icon="printer" block onClick={doPrint}>
                   Cetak
                 </Button>
-                <p className="small muted">PDF (A4 lanskap, dengan kop & kolom tanda tangan) dan Excel (.xlsx, dengan filter & format Rupiah) dibuat langsung di browser. Saat endpoint laporan backend tersedia, berkas dapat dibuat oleh WeasyPrint/openpyxl.</p>
+                <p className="small muted">
+                  {isApiMode
+                    ? 'PDF (A4 lanskap, kop & tanda tangan) dibuat server dengan WeasyPrint dan Excel (.xlsx, filter & format Rupiah) dengan openpyxl; setiap unduhan tercatat di audit log.'
+                    : 'PDF (A4 lanskap, dengan kop & kolom tanda tangan) dan Excel (.xlsx, dengan filter & format Rupiah) dibuat langsung di browser (mode demo).'}
+                </p>
               </div>
             ) : (
               <p className="small muted">Peran Anda hanya dapat melihat laporan.</p>

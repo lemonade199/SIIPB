@@ -1,7 +1,11 @@
-"""Borrowing and Checkout Service with Database Transaction and Row Locking."""
-from datetime import datetime
+"""Peminjaman oleh petugas: draf -> checkout (penyerahan) dengan row locking, ubah & batalkan draf."""
+from __future__ import annotations
+
+from datetime import date, datetime
 from typing import Any
-from sqlalchemy import select
+
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -12,26 +16,31 @@ from app.models import (
     Borrowing,
     BorrowingItem,
     BorrowingStatus,
-    NotificationEvent,
     NotificationEventCode,
-    NotificationEventStatus,
 )
 from app.services.audit_service import record_audit
 
 
-def generate_transaction_number() -> str:
-    """Generate unique borrowing transaction number, e.g. TX-20261006123456-ABCD."""
-    import uuid
-    now = datetime.now()
-    timestamp_str = now.strftime("%Y%m%d%H%M%S")
-    suffix = uuid.uuid4().hex[:4].upper()
-    return f"TX-{timestamp_str}-{suffix}"
+class BorrowingError(ValueError):
+    def __init__(self, message: str, errors: dict[str, str] | None = None):
+        super().__init__(message)
+        self.errors = errors or {}
+
+
+def next_transaction_number(session: Session, ref: date) -> str:
+    prefix = f"PJM-{ref.year}-"
+    last = session.scalar(
+        select(func.max(Borrowing.transaction_number)).where(Borrowing.transaction_number.like(f"{prefix}%"))
+    )
+    n = int(last[len(prefix):]) + 1 if last and last[len(prefix):].isdigit() else 1
+    return f"{prefix}{n:04d}"
 
 
 def get_borrowings(
     session: Session,
     status: str | None = None,
     borrower_id: int | None = None,
+    search: str | None = None,
     page: int = 1,
     per_page: int = 20,
 ) -> tuple[list[Borrowing], int]:
@@ -40,15 +49,14 @@ def get_borrowings(
         query = query.where(Borrowing.status == status.upper())
     if borrower_id:
         query = query.where(Borrowing.borrower_id == borrower_id)
-
-    total = len(session.scalars(query).all())
-    items = list(
-        session.scalars(
-            query.order_by(Borrowing.id.desc())
-            .offset((page - 1) * per_page)
-            .limit(per_page)
-        ).all()
-    )
+    if search:
+        query = query.join(Borrower).where(
+            Borrowing.transaction_number.ilike(f"%{search}%") | Borrower.name.ilike(f"%{search}%")
+        )
+    total = session.scalar(select(func.count()).select_from(query.subquery())) or 0
+    items = list(session.scalars(
+        query.order_by(Borrowing.id.desc()).offset((page - 1) * per_page).limit(per_page)
+    ).all())
     return items, total
 
 
@@ -56,107 +64,197 @@ def get_borrowing_by_id(session: Session, borrowing_id: int) -> Borrowing | None
     return session.get(Borrowing, borrowing_id)
 
 
-def checkout_borrowing(
-    session: Session,
-    borrower_id: int,
-    handled_by: int,
-    start_date: Any,
-    due_date: Any,
-    asset_ids: list[int],
-    purpose: str | None = None,
-    notes: str | None = None,
-) -> Borrowing:
-    """Execute checkout in a strict database transaction with row-level locking (SELECT FOR UPDATE).
-
-    Guarantees that two concurrent checkout requests on the same asset will not succeed simultaneously.
-    """
-    # 1. Validate Borrower exists and is active
-    borrower = session.get(Borrower, borrower_id)
+def _validate_header(session: Session, data: dict[str, Any]) -> Borrower:
+    borrower = session.get(Borrower, data["borrower_id"])
     if not borrower or not borrower.is_active or borrower.deleted_at is not None:
-        raise ValueError("Peminjam tidak ditemukan atau tidak aktif")
+        raise BorrowingError("Peminjam tidak ditemukan atau tidak aktif", {"borrower_id": "Pilih peminjam dari master data."})
+    if not borrower.email:
+        raise BorrowingError("Peminjam belum memiliki email untuk notifikasi",
+                             {"borrower_id": "Peminjam belum memiliki email untuk notifikasi."})
+    return borrower
 
-    now = datetime.now()
-    tx_number = generate_transaction_number()
 
-    # 2. Create Borrowing Header
-    borrowing = Borrowing(
-        transaction_number=tx_number,
-        borrower_id=borrower_id,
-        handled_by=handled_by,
-        borrowed_at=now,
-        start_date=start_date,
-        due_date=due_date,
-        purpose=purpose,
-        notes=notes,
-        status=BorrowingStatus.AKTIF.value,
-    )
-    session.add(borrowing)
-    session.flush()
-
-    checked_out_assets: list[Asset] = []
-
-    # 3. Lock each asset row with FOR UPDATE and validate availability
-    for asset_id in asset_ids:
-        # Strict Row Locking: SELECT ... FOR UPDATE
-        asset = session.get(Asset, asset_id, with_for_update=True)
+def _lock_available_assets(session: Session, asset_ids: list[int]) -> list[Asset]:
+    """SELECT ... FOR UPDATE tiap aset (urut id untuk mencegah deadlock) dan validasi ketersediaan."""
+    assets: list[Asset] = []
+    bad: list[str] = []
+    for asset_id in sorted(set(asset_ids)):
+        asset = session.get(Asset, asset_id, with_for_update=True, populate_existing=True)
         if not asset or asset.deleted_at is not None:
-            raise ValueError(f"Aset dengan ID {asset_id} tidak ditemukan")
-
-        # Check non-borrowable status (TERSEDIA is the only borrowable status)
+            raise BorrowingError(f"Aset dengan ID {asset_id} tidak ditemukan", {"asset_ids": f"Aset {asset_id} tidak ditemukan."})
         if asset.status != AssetStatus.TERSEDIA.value or not asset.is_active:
-            raise ValueError(
-                f"Aset '{asset.name}' ({asset.inventory_code}) tidak tersedia untuk dipinjam (Status saat ini: {asset.status})"
-            )
+            bad.append(f"{asset.inventory_code} ({asset.status})")
+        assets.append(asset)
+    if bad:
+        msg = "Barang tidak tersedia: " + ", ".join(bad)
+        raise BorrowingError(msg, {"asset_ids": msg})
+    return assets
 
-        # 4. Create Borrowing Item
-        item = BorrowingItem(
-            borrowing_id=borrowing.id,
-            asset_id=asset.id,
-            checked_out_at=now,
-        )
-        session.add(item)
 
-        # 5. Transition Asset status: TERSEDIA -> DIPINJAM
-        old_status = asset.status
+def _set_items(session: Session, borrowing: Borrowing, asset_ids: list[int]) -> None:
+    for it in list(borrowing.items):
+        session.delete(it)
+    session.flush()
+    for asset_id in dict.fromkeys(asset_ids):
+        asset = session.get(Asset, asset_id)
+        if not asset or asset.deleted_at is not None:
+            raise BorrowingError(f"Aset dengan ID {asset_id} tidak ditemukan", {"asset_ids": f"Aset {asset_id} tidak ditemukan."})
+        session.add(BorrowingItem(borrowing_id=borrowing.id, asset_id=asset_id, condition_out=asset.condition))
+    session.flush()
+    session.refresh(borrowing)
+
+
+def _checkout(session: Session, borrowing: Borrowing, user_id: int, today: date | None = None) -> list[int]:
+    """Serahkan barang: kunci aset, TERSEDIA -> DIPINJAM, riwayat, audit, notifikasi konfirmasi.
+
+    Mengembalikan id notifikasi yang perlu dikirim (setelah commit).
+    """
+    from app.services.notification_service import create_event_notifications
+    from app.services.settings_service import get_settings
+
+    today = today or date.today()
+    assets = _lock_available_assets(session, [it.asset_id for it in borrowing.items])
+    now = datetime.now()
+    for asset in assets:
+        old = asset.status
         asset.status = AssetStatus.DIPINJAM.value
+        session.add(AssetHistory(
+            asset_id=asset.id, changed_by=user_id, event_type="CHECKOUT",
+            old_status=old, new_status=AssetStatus.DIPINJAM.value,
+            reason=f"Checkout {borrowing.transaction_number} — {borrowing.borrower.name}",
+        ))
+    by_asset = {a.id: a for a in assets}
+    for it in borrowing.items:
+        it.checked_out_at = now
+        it.condition_out = by_asset[it.asset_id].condition
+    borrowing.status = BorrowingStatus.TERLAMBAT.value if borrowing.due_date < today else BorrowingStatus.AKTIF.value
+    borrowing.checked_out_at = now
+    borrowing.checked_out_by = user_id
+    borrowing.borrowed_at = now
+    session.flush()
+    session.refresh(borrowing)
 
-        # 6. Append to Asset History
-        history = AssetHistory(
-            asset_id=asset.id,
-            changed_by=handled_by,
-            event_type="CHECKOUT",
-            old_status=old_status,
-            new_status=AssetStatus.DIPINJAM.value,
-            reason=f"Dipinjam pada transaksi {tx_number} oleh {borrower.name}",
-        )
-        session.add(history)
-        checked_out_assets.append(asset)
+    record_audit(session, "CHECKOUT", "borrowing", "borrowing", borrowing.id, user_id,
+                 old_data={"status": BorrowingStatus.DRAF.value},
+                 new_data={"status": borrowing.status, "transaction_number": borrowing.transaction_number,
+                           "asset_ids": [a.id for a in assets]})
 
-    # 7. Create Idempotent Notification Event for loan confirmation
-    notif_event = NotificationEvent(
-        borrowing_id=borrowing.id,
-        event_code=NotificationEventCode.LOAN_CONFIRMATION.value,
-        scheduled_at=now,
-        status=NotificationEventStatus.PENDING.value,
+    settings = get_settings(session)
+    if not settings.get("checkout_notify", True):
+        return []
+    notifs, _ = create_event_notifications(
+        session, borrowing, NotificationEventCode.LOAN_CONFIRMATION.value, ["peminjam"], settings, today=today
     )
-    session.add(notif_event)
+    return [n.id for n in notifs]
 
-    # 8. Record Audit Log
-    record_audit(
-        session=session,
-        action="CHECKOUT_CREATED",
-        module="borrowing",
-        entity_type="borrowing",
-        entity_id=borrowing.id,
-        user_id=handled_by,
-        new_data={
-            "transaction_number": tx_number,
-            "borrower_id": borrower_id,
-            "borrower_name": borrower.name,
-            "asset_ids": asset_ids,
-            "due_date": str(due_date),
-        },
-    )
 
+def create_borrowing(
+    session: Session,
+    data: dict[str, Any],
+    user_id: int,
+    checkout: bool = True,
+) -> tuple[Borrowing, list[int]]:
+    """Buat transaksi (DRAF), lalu checkout langsung bila ``checkout=True``.
+
+    Seluruhnya dalam satu transaksi DB: bila ada barang yang tidak tersedia, tidak ada yang tersimpan.
+    """
+    for attempt in range(5):
+        try:
+            borrower = _validate_header(session, data)
+            asset_ids = list(data["asset_ids"])
+            if not checkout:
+                # draf: validasi ketersediaan tanpa mengunci
+                bad = [a for a in (session.get(Asset, i) for i in asset_ids)
+                       if not a or a.deleted_at is not None or a.status != AssetStatus.TERSEDIA.value or not a.is_active]
+                if bad:
+                    msg = "Barang tidak tersedia: " + ", ".join(f"{a.inventory_code} ({a.status})" if a else "?" for a in bad)
+                    raise BorrowingError(msg, {"asset_ids": msg})
+            now = datetime.now()
+            b = Borrowing(
+                transaction_number=next_transaction_number(session, data["start_date"]),
+                borrower_id=borrower.id,
+                handled_by=user_id,
+                borrowed_at=now,
+                start_date=data["start_date"],
+                due_date=data["due_date"],
+                purpose=(data.get("purpose") or "").strip() or None,
+                notes=(data.get("notes") or "").strip() or None,
+                status=BorrowingStatus.DRAF.value,
+            )
+            session.add(b)
+            session.flush()
+            _set_items(session, b, asset_ids)
+            record_audit(session, "CREATE", "borrowing", "borrowing", b.id, user_id, new_data={
+                "transaction_number": b.transaction_number, "borrower_id": borrower.id,
+                "borrower_name": borrower.name, "asset_ids": asset_ids, "due_date": str(b.due_date),
+                "status": BorrowingStatus.DRAF.value,
+            })
+            notif_ids = _checkout(session, b, user_id) if checkout else []
+            session.commit()
+            return b, notif_ids
+        except IntegrityError as exc:
+            session.rollback()
+            if "transaction_number" not in str(exc.orig) or attempt == 4:
+                raise BorrowingError("Gagal menyimpan transaksi (konflik data). Coba lagi.") from exc
+        except Exception:
+            session.rollback()
+            raise
+    raise BorrowingError("Gagal membuat nomor transaksi unik")
+
+
+def checkout_borrowing(session: Session, borrowing_id: int, user_id: int) -> tuple[Borrowing, list[int]]:
+    b = session.get(Borrowing, borrowing_id, with_for_update=True)
+    if not b:
+        raise BorrowingError("Transaksi peminjaman tidak ditemukan")
+    if b.status != BorrowingStatus.DRAF.value:
+        raise BorrowingError("Hanya transaksi berstatus DRAF yang dapat di-checkout.")
+    try:
+        ids = _checkout(session, b, user_id)
+        session.commit()
+        return b, ids
+    except Exception:
+        session.rollback()
+        raise
+
+
+def update_draft(session: Session, borrowing_id: int, data: dict[str, Any], user_id: int) -> Borrowing:
+    b = session.get(Borrowing, borrowing_id)
+    if not b:
+        raise BorrowingError("Transaksi peminjaman tidak ditemukan")
+    if b.status != BorrowingStatus.DRAF.value:
+        raise BorrowingError("Hanya draf yang dapat diubah.")
+    try:
+        borrower = _validate_header(session, data)
+        old = {"borrower_id": b.borrower_id, "due_date": str(b.due_date), "purpose": b.purpose,
+               "asset_ids": [it.asset_id for it in b.items]}
+        b.borrower_id = borrower.id
+        b.start_date = data["start_date"]
+        b.due_date = data["due_date"]
+        b.purpose = (data.get("purpose") or "").strip() or None
+        b.notes = (data.get("notes") or "").strip() or None
+        _set_items(session, b, list(data["asset_ids"]))
+        record_audit(session, "UPDATE", "borrowing", "borrowing", b.id, user_id, old_data=old, new_data={
+            "borrower_id": borrower.id, "due_date": str(b.due_date), "purpose": b.purpose,
+            "asset_ids": list(data["asset_ids"]),
+        })
+        session.commit()
+        return b
+    except Exception:
+        session.rollback()
+        raise
+
+
+def cancel_borrowing(session: Session, borrowing_id: int, reason: str, user_id: int) -> Borrowing:
+    b = session.get(Borrowing, borrowing_id)
+    if not b:
+        raise BorrowingError("Transaksi peminjaman tidak ditemukan")
+    if b.status != BorrowingStatus.DRAF.value:
+        raise BorrowingError("Hanya draf yang dapat dibatalkan.")
+    b.status = BorrowingStatus.DIBATALKAN.value
+    b.cancelled_at = datetime.now()
+    b.cancel_reason = reason or None
+    record_audit(session, "CANCEL", "borrowing", "borrowing", b.id, user_id,
+                 old_data={"status": BorrowingStatus.DRAF.value},
+                 new_data={"status": BorrowingStatus.DIBATALKAN.value, "reason": reason})
     session.commit()
-    return borrowing
+    return b

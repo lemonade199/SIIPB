@@ -1,5 +1,6 @@
 """Security utilities: password hashing, SHA-256 token hashing, and JWT handling."""
 import hashlib
+import hmac
 import secrets
 from datetime import datetime, timezone, timedelta
 from typing import Any
@@ -10,20 +11,42 @@ from app.config import Config
 
 
 def hash_password(password: str) -> str:
-    """Generate a secure password hash using PBKDF2/SHA-256."""
+    """Hash kata sandi (scrypt, werkzeug)."""
     return generate_password_hash(password, method="scrypt")
 
 
 def verify_password(plain_password: str, password_hash: str | None) -> bool:
-    """Verify password against stored hash, supporting both werkzeug hashes and existing seed format."""
-    if not password_hash:
+    """Verifikasi kata sandi terhadap hash werkzeug (scrypt/pbkdf2).
+
+    Kompatibilitas: data awal lama menyimpan ``pbkdf2:sha256:<plain>`` (bukan hash). Format itu masih
+    diterima satu kali lalu langsung di-hash ulang saat login (lihat :func:`needs_rehash`).
+    """
+    if not password_hash or not plain_password:
         return False
-    if password_hash == f"pbkdf2:sha256:{plain_password}" or password_hash == plain_password:
-        return True
+    if is_legacy_plain_hash(password_hash):
+        return hmac.compare_digest(password_hash, f"pbkdf2:sha256:{plain_password}")
     try:
         return check_password_hash(password_hash, plain_password)
     except Exception:
         return False
+
+
+def is_legacy_plain_hash(password_hash: str) -> bool:
+    # hash werkzeug asli berformat "method$salt$hash"
+    return password_hash.startswith("pbkdf2:sha256:") and "$" not in password_hash
+
+
+def needs_rehash(password_hash: str | None) -> bool:
+    return bool(password_hash) and (is_legacy_plain_hash(password_hash) or not password_hash.startswith("scrypt:"))
+
+
+def validate_password_strength(password: str) -> str | None:
+    """Kebijakan minimum: 8 karakter, mengandung huruf dan angka."""
+    if len(password or "") < 8:
+        return "Kata sandi minimal 8 karakter."
+    if not any(c.isalpha() for c in password) or not any(c.isdigit() for c in password):
+        return "Kata sandi harus mengandung huruf dan angka."
+    return None
 
 
 def hash_token(raw_token: str) -> str:

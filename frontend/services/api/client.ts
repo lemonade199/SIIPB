@@ -4,12 +4,13 @@
  * - Envelope respons backend: { success, message, data, meta?, error_code?, errors? }
  * - Access token dikirim sebagai `Authorization: Bearer …`
  * - Bila access token kedaluwarsa (401), refresh token dipakai sekali untuk memperbarui.
- *
- * Mockup saat ini berjalan pada adapter localStorage (`lib/mock`). Modul ini menjadi titik
- * integrasi ketika endpoint backend untuk tiap modul sudah lengkap.
  */
 
 export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api/v1').replace(/\/+$/, '');
+
+/** URL absolut API. `NEXT_PUBLIC_API_BASE_URL=/api/v1` (di balik Nginx yang sama) didukung. */
+export const apiBaseAbsolute = () =>
+  API_BASE_URL.startsWith('/') ? (typeof window !== 'undefined' ? window.location.origin : 'http://localhost') + API_BASE_URL : API_BASE_URL;
 
 const TOKEN_KEY = 'siipb.api.tokens';
 
@@ -65,7 +66,7 @@ export interface RequestOptions extends Omit<RequestInit, 'body'> {
 }
 
 function buildUrl(path: string, query?: Query) {
-  const url = new URL(API_BASE_URL + (path.startsWith('/') ? path : `/${path}`));
+  const url = new URL(apiBaseAbsolute() + (path.startsWith('/') ? path : `/${path}`));
   Object.entries((query || {}) as Record<string, unknown>).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, String(v));
   });
@@ -138,3 +139,29 @@ export const api = {
   del: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
   upload: <T>(path: string, form: FormData) => request<T>(path, { method: 'POST', body: form }),
 };
+
+/** Unduh berkas biner (laporan PDF/Excel, backup) dengan header Authorization. */
+export async function download(path: string, query?: Query, retry = true): Promise<{ blob: Blob; filename: string }> {
+  const tokens = tokenStore.get();
+  const h = new Headers();
+  if (tokens?.access_token) h.set('Authorization', `Bearer ${tokens.access_token}`);
+  let res: Response;
+  try {
+    res = await fetch(buildUrl(path, query), { headers: h });
+  } catch {
+    throw new ApiError('Tidak dapat terhubung ke server SIIPB.', 0, 'NETWORK_ERROR');
+  }
+  if (res.status === 401 && retry && (await refreshTokens())) return download(path, query, false);
+  if (!res.ok) {
+    let msg = `Unduhan gagal (HTTP ${res.status}).`;
+    try {
+      msg = ((await res.json()) as ApiEnvelope<unknown>).message || msg;
+    } catch {
+      /* bukan JSON */
+    }
+    throw new ApiError(msg, res.status);
+  }
+  const cd = res.headers.get('Content-Disposition') || '';
+  const filename = /filename="?([^";]+)"?/i.exec(cd)?.[1] || path.split('/').pop() || 'unduhan';
+  return { blob: await res.blob(), filename };
+}

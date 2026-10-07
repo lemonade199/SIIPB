@@ -9,61 +9,42 @@ export const DATA_SOURCE: DataSource = process.env.NEXT_PUBLIC_DATA_SOURCE === '
 export const isApiMode = DATA_SOURCE === 'api';
 
 /**
- * Fitur yang tersedia per sumber data. Di mode `api`, fitur yang belum memiliki endpoint
- * di backend disembunyikan/dinonaktifkan agar UI tidak menjanjikan hal yang tidak tersimpan.
+ * Fitur yang tersedia per sumber data. Seluruh fitur dokumen Plan kini memiliki endpoint backend,
+ * sehingga perbedaannya hanya pada fitur khusus demo (geser tanggal sistem) dan backup JSON lokal.
  */
 export interface Capabilities {
-  /** Draf peminjaman (backend langsung checkout saat transaksi dibuat). */
   drafts: boolean;
-  /** Ubah status barang manual (AssetUpdateSchema belum menerima `status`). */
   manualItemStatus: boolean;
-  /** Field sumber perolehan (tidak ada kolom di tabel assets). */
   acquisitionSource: boolean;
-  /**
-   * Tahun perolehan (`purchase_date`). Di backend saat ini POST/PUT /assets dengan purchase_date
-   * menyebabkan error 500 saat serialisasi (bug serialize_asset), jadi dinonaktifkan di mode api.
-   */
   acquisitionYear: boolean;
-  /** Banyak foto per barang (backend: satu `photo_path`). */
   multiPhoto: boolean;
-  /** Tanggal pengembalian dapat dipilih (backend memakai waktu server). */
   returnDate: boolean;
-  /** Jalankan scheduler manual & mode demo (backend: Celery Beat). */
+  /** Jalankan pemeriksaan jatuh tempo secara manual. */
   scheduler: boolean;
-  /** Kelola pengguna & role (belum ada endpoint /users, /roles). */
+  /** Mode demo: geser tanggal sistem (hanya mode mock; di server tanggal = jam server). */
+  demoClock: boolean;
   userAdmin: boolean;
-  /** Ganti kata sandi sendiri. */
   changePassword: boolean;
-  /** Pengaturan disimpan ke server (saat ini hanya tersimpan di browser). */
   serverSettings: boolean;
-  /** Master data: ubah / nonaktifkan / hapus per jenis. */
+  /** Backup/restore berkas JSON di browser (mode mock). Mode api: mysqldump di server. */
+  localBackup: boolean;
   masterEdit: Record<'peminjam' | 'kategori' | 'lokasi' | 'unit', boolean>;
 }
 
-export const CAPABILITIES: Capabilities = isApiMode
-  ? {
-      drafts: false,
-      manualItemStatus: false,
-      acquisitionSource: false,
-      acquisitionYear: false,
-      multiPhoto: false,
-      returnDate: false,
-      scheduler: false,
-      userAdmin: false,
-      changePassword: false,
-      serverSettings: false,
-      masterEdit: { peminjam: true, kategori: false, lokasi: false, unit: false },
-    }
-  : {
-      drafts: true,
-      manualItemStatus: true,
-      acquisitionSource: true,
-      acquisitionYear: true,
-      multiPhoto: true,
-      returnDate: true,
-      scheduler: true,
-      userAdmin: true,
-      changePassword: true,
-      serverSettings: true,
-      masterEdit: { peminjam: true, kategori: true, lokasi: true, unit: true },
-    };
+const ALL_MASTER = { peminjam: true, kategori: true, lokasi: true, unit: true };
+
+export const CAPABILITIES: Capabilities = {
+  drafts: true,
+  manualItemStatus: true,
+  acquisitionSource: true,
+  acquisitionYear: true,
+  multiPhoto: true,
+  returnDate: true,
+  scheduler: true,
+  demoClock: !isApiMode,
+  userAdmin: true,
+  changePassword: true,
+  serverSettings: true,
+  localBackup: !isApiMode,
+  masterEdit: ALL_MASTER,
+};

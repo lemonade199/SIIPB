@@ -11,10 +11,16 @@ import app.tasks  # registers all celery tasks
 
 # Celery Beat schedule definition
 celery.conf.beat_schedule = {
-    # Check due dates and overdue loans daily at 08:00 AM WIB
+    # Pemeriksaan jatuh tempo: dicek tiap 15 menit, dijalankan sekali sehari setelah jam di Pengaturan
+    # (bawaan 08.00 WIB) sehingga jam & zona waktu dapat diubah tanpa restart.
     "daily-borrowing-due-dates-check": {
         "task": "app.tasks.scheduler_tasks.check_borrowing_due_dates_task",
-        "schedule": crontab(hour=8, minute=0),
+        "schedule": crontab(minute="*/15"),
+    },
+    # Backup database harian 01.00 (zona waktu CELERY_TIMEZONE)
+    "daily-database-backup": {
+        "task": "app.tasks.backup_tasks.scheduled_backup_task",
+        "schedule": crontab(hour=1, minute=0),
     },
     # Process queued notifications every 5 minutes
     "process-queued-notifications": {

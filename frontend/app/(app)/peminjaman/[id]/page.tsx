@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
-import { isApiMode } from '@/lib/config';
 import { db } from '@/lib/mock/db';
 import { addDays, fmtDate, fmtDateTime, today } from '@/lib/date';
 import { EVENT_LABEL } from '@/lib/constants';
@@ -18,7 +17,7 @@ import { BorrowBadge, DueText } from '@/components/domain/borrow-status';
 import { EmailPreview } from '@/components/domain/email-preview';
 import { NotFoundView } from '@/components/layout/app-shell';
 import { useConfirm, useToast } from '@/components/providers/feedback-provider';
-import { cancelBorrowing, checkout } from '@/services/borrowing';
+import * as repo from '@/services/repo';
 import { borrowView, detailsOf, emp, isActive, item as getItem, itemsOf, returnOf, unit, user as getUser, userName, conditionLabel } from '@/services/lookup';
 import type { ID } from '@/types';
 
@@ -51,14 +50,15 @@ export default function BorrowDetailPage() {
       confirmText: 'Checkout',
     });
     if (!ok) return;
-    const r = checkout(b.id);
+    const r = await repo.checkout(b.id);
     if (!r.ok) return toast(r.error, 'err');
-    toast(`${b.code} diserahkan. Email dikirim ke peminjam.`);
+    toast(r.notification?.status === 'GAGAL' ? `${b.code} diserahkan, tetapi email gagal dikirim.` : `${b.code} diserahkan. Email dikirim ke peminjam.`, r.notification?.status === 'GAGAL' ? 'warn' : undefined);
   };
   const onCancel = async () => {
     const reason = await confirm({ title: 'Batalkan draf?', message: 'Draf dibatalkan dan tetap tersimpan sebagai riwayat.', input: 'Alasan pembatalan', confirmText: 'Batalkan draf', danger: true });
     if (!reason) return;
-    cancelBorrowing(b.id, String(reason).trim());
+    const r = await repo.cancelBorrowing(b.id, String(reason).trim());
+    if (!r.ok) return toast(r.error, 'err');
     toast('Draf dibatalkan.');
   };
 
@@ -296,9 +296,7 @@ export default function BorrowDetailPage() {
                         <span className="small" style={{ flex: 1 }}>
                           {fmtDate(date)}
                         </span>
-                        {isApiMode ? (
-                          <span className="small muted">{passed ? 'diproses server' : 'terjadwal'}</span>
-                        ) : sent ? (
+                        {sent ? (
                           <Badge status={sent.status} />
                         ) : passed ? (
                           <Badge status="DILEWATI">TIDAK DIKIRIM</Badge>
