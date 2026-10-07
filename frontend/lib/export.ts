@@ -43,7 +43,7 @@ export async function exportXlsx(filename: string, meta: ExportMeta, columns: Ex
   for (const line of meta.subtitle || []) {
     ws.mergeCells(`A${r}:${lastCol}${r}`);
     ws.getCell(`A${r}`).value = line;
-    ws.getCell(`A${r}`).font = { size: 10, color: { argb: 'FF5B6475' } };
+    ws.getCell(`A${r}`).font = { size: 10, color: { argb: 'FF567C8D' } };
     r++;
   }
   r++;
@@ -52,9 +52,9 @@ export async function exportXlsx(filename: string, meta: ExportMeta, columns: Ex
     const cell = headerRow.getCell(i + 1);
     cell.value = c.label;
     cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2F4156' } };
     cell.alignment = { vertical: 'middle', wrapText: true };
-    cell.border = { bottom: { style: 'thin', color: { argb: 'FFCDD3DC' } } };
+    cell.border = { bottom: { style: 'thin', color: { argb: 'FFC8D9E6' } } };
   });
   headerRow.height = 20;
   const headerIndex = r;
@@ -111,8 +111,8 @@ export async function exportPdf(filename: string, meta: ExportMeta & { signature
     head: [['No', ...columns.map((c) => c.label)]],
     body: rows.map((row, i) => [String(i + 1), ...columns.map((c) => (c.money ? money(row[c.key]) : cellText(row[c.key])))]),
     styles: { fontSize: 7.5, cellPadding: 1.6, overflow: 'linebreak', valign: 'top' },
-    headStyles: { fillColor: [29, 78, 216], textColor: 255, fontStyle: 'bold' },
-    alternateRowStyles: { fillColor: [246, 247, 249] },
+    headStyles: { fillColor: [47, 65, 86], textColor: 255, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [245, 239, 235] },
     margin: { left: 14, right: 14 },
     didDrawPage: () => {
       const n = doc.getNumberOfPages();

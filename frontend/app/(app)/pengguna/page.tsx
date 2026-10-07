@@ -310,7 +310,7 @@ function GroupRows({
   return (
     <>
       <tr>
-        <td colSpan={roles.length + 1} style={{ background: '#f9fafb', fontWeight: 600, fontSize: 12, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--muted-foreground)' }}>
+        <td colSpan={roles.length + 1} style={{ background: '#f7f9fb', fontWeight: 600, fontSize: 12, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--muted-foreground)' }}>
           {group}
         </td>
       </tr>

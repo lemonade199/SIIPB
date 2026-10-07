@@ -128,7 +128,7 @@ export default function LoginPage() {
         </div>
         <div style={{ display: 'grid', gap: 12 }}>
           <h1>Sistem Informasi Inventaris Barang, Peminjaman, dan Pengembalian Barang</h1>
-          <p style={{ color: '#aebbd0', fontSize: 15, maxWidth: 480 }}>
+          <p style={{ color: '#c8d9e6', fontSize: 15, maxWidth: 480 }}>
             Ruang kerja petugas Sarpras/IT untuk mendata inventaris, mencatat transaksi, memantau keterlambatan, dan menyusun laporan.
           </p>
         </div>
@@ -145,7 +145,7 @@ export default function LoginPage() {
             </li>
           ))}
         </ul>
-        <span style={{ marginTop: 'auto', fontSize: 12, color: '#8191a8' }}>{isApiMode ? 'Terhubung ke Flask REST API' : 'Mode demo · data tersimpan di browser ini'}</span>
+        <span style={{ marginTop: 'auto', fontSize: 12, color: '#9fb3c4' }}>{isApiMode ? 'Terhubung ke Flask REST API' : 'Mode demo · data tersimpan di browser ini'}</span>
       </div>
 
       <div className="login-main">

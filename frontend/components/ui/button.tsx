@@ -20,8 +20,8 @@ export const buttonVariants = cva(
         secondary: 'bg-secondary text-secondary-foreground hover:bg-muted',
         ghost: 'bg-transparent text-foreground hover:bg-accent',
         destructive: 'bg-destructive text-white hover:bg-destructive/90',
-        danger: 'border-[#efc1c1] bg-card text-danger hover:bg-danger-bg',
-        success: 'bg-ok text-white hover:bg-[#116a33]',
+        danger: 'border-[#ebc6c6] bg-card text-danger hover:bg-danger-bg',
+        success: 'bg-ok text-white hover:bg-[#2f5f47]',
         link: 'h-auto! px-0! text-primary underline-offset-4 hover:underline',
       },
       size: {

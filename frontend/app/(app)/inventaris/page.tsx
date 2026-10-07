@@ -125,7 +125,7 @@ export default function InventarisPage() {
             </label>
           </div>
           {selected.size > 0 && (
-            <div className="toolbar" style={{ background: '#f5f8fe' }}>
+            <div className="toolbar" style={{ background: '#f3f7fa' }}>
               <span>
                 <b>{selected.size}</b> barang dipilih
               </span>
