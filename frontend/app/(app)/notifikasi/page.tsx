@@ -20,6 +20,7 @@ import { useToast } from '@/components/providers/feedback-provider';
 import { emp } from '@/services/lookup';
 import * as repo from '@/services/repo';
 import type { ID } from '@/types';
+import { TableWrap } from '@/components/ui/table-wrap';
 
 type Tab = 'riwayat' | 'log' | 'jadwal';
 interface Filter {
@@ -145,7 +146,7 @@ function Riwayat({ f, onPage, onOpen }: { f: Filter; onPage: (n: number) => void
   const p = paginate(rows, f.page, 12);
   return (
     <>
-      <div className="table-wrap">
+      <TableWrap>
         <table className="table">
           <thead>
             <tr>
@@ -181,20 +182,20 @@ function Riwayat({ f, onPage, onOpen }: { f: Filter; onPage: (n: number) => void
                     </td>
                     <td className="small">
                       {n.recipients.map((r) => (
-                        <div key={r.email}>
+                        <div key={r.email} className="nowrap">
                           {r.name} <Tag>{r.type}</Tag>
                         </div>
                       ))}
                     </td>
-                    <td className="small" style={{ maxWidth: 300 }}>
-                      {n.subject}
+                    <td className="small" style={{ minWidth: 190, maxWidth: 340 }}>
+                      <div className="clamp-2">{n.subject}</div>
                     </td>
                     <td>
                       <Badge status={n.status} />
                       {n.attempts > 1 && <div className="cell-sub">{n.attempts}× percobaan</div>}
                     </td>
                     <td className="right nowrap">
-                      <Button size="sm" icon="eye" onClick={() => onOpen(n.id)}>
+                      <Button size="sm" icon="eye" title="Lihat" onClick={() => onOpen(n.id)}>
                         Lihat
                       </Button>
                     </td>
@@ -210,7 +211,7 @@ function Riwayat({ f, onPage, onOpen }: { f: Filter; onPage: (n: number) => void
             )}
           </tbody>
         </table>
-      </div>
+      </TableWrap>
       <Pager page={p} label="notifikasi" onPage={onPage} />
     </>
   );
@@ -227,7 +228,7 @@ function Log({ f, onPage, onOpen }: { f: Filter; onPage: (n: number) => void; on
   const p = paginate(rows, f.page, 15);
   return (
     <>
-      <div className="table-wrap">
+      <TableWrap>
         <table className="table">
           <thead>
             <tr>
@@ -272,7 +273,7 @@ function Log({ f, onPage, onOpen }: { f: Filter; onPage: (n: number) => void; on
             )}
           </tbody>
         </table>
-      </div>
+      </TableWrap>
       <Pager page={p} label="log" onPage={onPage} />
     </>
   );
@@ -282,7 +283,7 @@ function Runs() {
   const rows = db.all('scheduler_runs').slice().reverse();
   if (!rows.length) return <Empty icon="clock">Scheduler belum pernah berjalan.</Empty>;
   return (
-    <div className="table-wrap">
+    <TableWrap>
       <table className="table">
         <thead>
           <tr>
@@ -323,6 +324,6 @@ function Runs() {
           ))}
         </tbody>
       </table>
-    </div>
+    </TableWrap>
   );
 }

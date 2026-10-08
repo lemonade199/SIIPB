@@ -26,6 +26,7 @@ import { CAPABILITIES, isApiMode } from '@/lib/config';
 import { statusDesc, statusLabel } from '@/services/lookup';
 import { activeBorrowingOfItem, cat, emp, isBorrowable, item as getItem, loc, userName, conditionLabel } from '@/services/lookup';
 import type { ItemStatus } from '@/types';
+import { TableWrap } from '@/components/ui/table-wrap';
 
 export default function ItemDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -182,7 +183,7 @@ export default function ItemDetailPage() {
 
           <Card title="Riwayat peminjaman" flush>
             {history.length ? (
-              <div className="table-wrap">
+              <TableWrap>
                 <table className="table">
                   <thead>
                     <tr>
@@ -211,7 +212,7 @@ export default function ItemDetailPage() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </TableWrap>
             ) : (
               <Empty icon="history">Belum pernah dipinjam.</Empty>
             )}

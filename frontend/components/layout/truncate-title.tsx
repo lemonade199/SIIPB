@@ -11,7 +11,7 @@ export function TruncateTitle() {
     const onOver = (e: MouseEvent) => {
       const el = e.target as HTMLElement | null;
       if (!el || !(el instanceof HTMLElement) || el.hasAttribute('title')) return;
-      if (el.scrollWidth > el.clientWidth + 1) {
+      if (el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1) {
         const text = el.innerText.trim();
         if (text) el.setAttribute('title', text);
       }

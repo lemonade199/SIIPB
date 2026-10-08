@@ -11,6 +11,7 @@ import { Modal } from '@/components/ui/dialog';
 import { Icon } from '@/components/ui/icon';
 import { useToast } from '@/components/providers/feedback-provider';
 import type { ID } from '@/types';
+import { TableWrap } from '@/components/ui/table-wrap';
 
 /** Pratinjau email yang diterima peminjam / petugas / pimpinan + log pengiriman SMTP. */
 export function EmailPreview({ id, onClose }: { id: ID | null; onClose: () => void }) {
@@ -65,7 +66,7 @@ export function EmailPreview({ id, onClose }: { id: ID | null; onClose: () => vo
       <div className="label" style={{ margin: '16px 0 8px' }}>
         Log pengiriman (notification_logs)
       </div>
-      <div className="table-wrap">
+      <TableWrap>
         <table className="table">
           <thead>
             <tr>
@@ -92,7 +93,7 @@ export function EmailPreview({ id, onClose }: { id: ID | null; onClose: () => vo
             ))}
           </tbody>
         </table>
-      </div>
+      </TableWrap>
     </Modal>
   );
 }

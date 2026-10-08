@@ -61,6 +61,8 @@ export function buttonClass({ variant = 'outline', size = 'md', iconOnly, block,
 
 export function Button({ variant, size, icon, iconOnly, block, href, asChild, className, children, title, type, onClick, ...rest }: ButtonProps) {
   const cls = buttonClass({ variant, size, iconOnly, block, className });
+  // Nama tombol jadi tooltip (dipakai saat tombol tampil sebagai ikon saja di layar kecil)
+  if (title === undefined && typeof children === 'string' && icon) title = children;
   const content = (
     <>
       {icon && <Icon name={icon} size={size === 'sm' ? 15 : 17} />}

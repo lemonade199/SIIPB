@@ -20,6 +20,7 @@ import { useConfirm, useToast } from '@/components/providers/feedback-provider';
 import * as repo from '@/services/repo';
 import { borrowView, detailsOf, emp, isActive, item as getItem, itemsOf, returnOf, unit, user as getUser, userName, conditionLabel } from '@/services/lookup';
 import type { ID } from '@/types';
+import { TableWrap } from '@/components/ui/table-wrap';
 
 export default function BorrowDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -157,14 +158,14 @@ export default function BorrowDetailPage() {
           </Card>
 
           <Card title={`Barang (${details.length})`} flush>
-            <div className="table-wrap">
+            <TableWrap>
               <table className="table">
                 <thead>
                   <tr>
                     <th>Barang</th>
-                    <th>Kondisi diserahkan</th>
+                    <th>Kondisi awal</th>
                     <th>Kondisi kembali</th>
-                    <th>Status barang kini</th>
+                    <th>Status kini</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -204,7 +205,7 @@ export default function BorrowDetailPage() {
                   })}
                 </tbody>
               </table>
-            </div>
+            </TableWrap>
           </Card>
 
           <div className="print-only" style={{ marginTop: 40 }}>

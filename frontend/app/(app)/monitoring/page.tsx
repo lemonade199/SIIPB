@@ -24,6 +24,7 @@ import { activeBorrowings, borrowView, cat, conditionLabel, emp, itemsOf, loc, u
 import { lastSchedulerRun } from '@/services/scheduler';
 import * as repo from '@/services/repo';
 import type { Borrowing, ItemStatus } from '@/types';
+import { TableWrap } from '@/components/ui/table-wrap';
 
 type Tab = 'aktif' | 'jatuh_tempo' | 'terlambat' | 'rusak_hilang';
 const BROKEN: ItemStatus[] = ['RUSAK', 'RUSAK_BERAT', 'DALAM_PERBAIKAN', 'HILANG'];
@@ -183,18 +184,16 @@ export default function MonitoringPage() {
             ]}
           />
         </div>
-        <div className="table-wrap">
+        <TableWrap>
           <table className="table">
             <thead>
               <tr>
                 <th>Transaksi</th>
                 <th>Peminjam</th>
                 <th>Barang</th>
-                <th>Pinjam</th>
-                <th>Batas</th>
-                <th>Sisa / terlambat</th>
+                <th>Pinjam / batas</th>
                 <th>Status</th>
-                <th>Notifikasi terakhir</th>
+                <th>Notifikasi</th>
                 <th />
               </tr>
             </thead>
@@ -213,23 +212,25 @@ export default function MonitoringPage() {
                       <td>
                         <div className="cell-title">{e?.name}</div>
                         <div className="cell-sub">
-                          {unit(e?.unit_id)?.name} · {e?.phone}
+                          {unit(e?.unit_id)?.name} · <span className="nowrap">{e?.phone}</span>
                         </div>
                       </td>
-                      <td className="small">
+                      <td className="small text-col">
                         {itemsOf(b).map((i) => (
-                          <div key={i.id}>
+                          <div key={i.id} className="clamp-2">
                             {i.item_name} <span className="mono muted">{i.item_code}</span>
                           </div>
                         ))}
                       </td>
-                      <td className="nowrap">{fmtDate(b.borrow_date)}</td>
-                      <td className="nowrap">{fmtDate(b.due_date)}</td>
-                      <td className="nowrap small">
-                        <DueText b={b} />
+                      <td className="nowrap">
+                        {fmtDate(b.borrow_date)}
+                        <div className="cell-sub">batas {fmtDate(b.due_date)}</div>
                       </td>
-                      <td>
+                      <td className="nowrap">
                         <BorrowBadge b={b} />
+                        <div className="cell-sub">
+                          <DueText b={b} />
+                        </div>
                       </td>
                       <td>
                         {n ? (
@@ -245,7 +246,7 @@ export default function MonitoringPage() {
                       </td>
                       <td className="right nowrap">
                         {can('return.manage') ? (
-                          <Button size="sm" icon="in" href={`/pengembalian/baru?pinjam=${b.id}`}>
+                          <Button size="sm" icon="in" title="Kembalikan" href={`/pengembalian/baru?pinjam=${b.id}`}>
                             Kembalikan
                           </Button>
                         ) : (
@@ -259,14 +260,14 @@ export default function MonitoringPage() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={9}>
+                  <td colSpan={7}>
                     <Empty icon="checkCircle">{f.tab === 'terlambat' ? 'Tidak ada transaksi terlambat.' : 'Tidak ada transaksi pada kategori ini.'}</Empty>
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
-        </div>
+        </TableWrap>
         <Pager page={p} label="transaksi" onPage={(n) => set('page', n)} />
           </>
         )}
@@ -294,7 +295,7 @@ function BrokenItems({ q, category, onQ, onCategory }: { q: string; category: st
         <Select aria-label="Kategori barang" value={category} onChange={(e) => onCategory(e.target.value)} options={toOptions(db.all('categories'), 'Semua kategori')} />
         <span className="small muted">Barang dengan status ini tidak dapat dipinjam sampai statusnya dipulihkan.</span>
       </div>
-      <div className="table-wrap">
+      <TableWrap>
         <table className="table">
           <thead>
             <tr>
@@ -347,7 +348,7 @@ function BrokenItems({ q, category, onQ, onCategory }: { q: string; category: st
             )}
           </tbody>
         </table>
-      </div>
+      </TableWrap>
     </>
   );
 }

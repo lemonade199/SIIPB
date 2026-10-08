@@ -13,6 +13,7 @@ import { Select } from '@/components/ui/form';
 import { Empty, PageHead, Pager, SearchInput } from '@/components/ui/misc';
 import { userName } from '@/services/lookup';
 import type { ActivityLog, AuditValue } from '@/types';
+import { TableWrap } from '@/components/ui/table-wrap';
 
 const GROUPS: Record<string, string> = {
   auth: 'Login / logout',
@@ -147,7 +148,7 @@ export default function AuditPage() {
           <Input type="date" aria-label="Dari tanggal" value={f.from} onChange={(e) => set('from', e.target.value)} />
           <Input type="date" aria-label="Sampai tanggal" value={f.to} onChange={(e) => set('to', e.target.value)} />
         </div>
-        <div className="table-wrap">
+        <TableWrap>
           <table className="table">
             <thead>
               <tr>
@@ -188,7 +189,7 @@ export default function AuditPage() {
               )}
             </tbody>
           </table>
-        </div>
+        </TableWrap>
         <Pager page={p} label="catatan" onPage={(n) => set('page', n)} />
       </section>
     </>

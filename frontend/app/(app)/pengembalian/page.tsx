@@ -14,6 +14,7 @@ import { Card } from '@/components/ui/card';
 import { Empty, PageHead, Pager, SearchInput } from '@/components/ui/misc';
 import { BorrowBadge, DueText, LateText } from '@/components/domain/borrow-status';
 import { activeBorrowings, emp, itemsOf, returnDetails, userName } from '@/services/lookup';
+import { TableWrap } from '@/components/ui/table-wrap';
 
 export default function PengembalianPage() {
   useTitle('Pengembalian');
@@ -51,7 +52,7 @@ export default function PengembalianPage() {
       <div className="stack">
         <Card title={`Menunggu pengembalian (${active.length})`} flush>
           {active.length ? (
-            <div className="table-wrap">
+            <TableWrap>
               <table className="table">
                 <thead>
                   <tr>
@@ -96,7 +97,7 @@ export default function PengembalianPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableWrap>
           ) : (
             <Empty icon="checkCircle">Tidak ada transaksi aktif.</Empty>
           )}
@@ -112,7 +113,7 @@ export default function PengembalianPage() {
           <div className="toolbar" style={{ marginTop: 12, borderTop: '1px solid var(--border)' }}>
             <SearchInput value={f.q} onChange={(v) => set('q', v)} placeholder="Cari kode, peminjam, barang…" label="Cari pengembalian" />
           </div>
-          <div className="table-wrap">
+          <TableWrap>
             <table className="table">
               <thead>
                 <tr>
@@ -168,7 +169,7 @@ export default function PengembalianPage() {
                 )}
               </tbody>
             </table>
-          </div>
+          </TableWrap>
           <Pager page={p} label="pengembalian" onPage={(n) => set('page', n)} />
         </section>
       </div>
