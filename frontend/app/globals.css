@@ -238,18 +238,22 @@
   /* Tabel bisa digeser ke samping: scrollbar terlihat, bayangan di tepi, dan tombol panah */
   .table-scroll { position: relative; }
   .table-wrap { overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--teal) var(--sky-soft); }
-  .table-wrap::-webkit-scrollbar { height: 10px; }
+  .table-wrap::-webkit-scrollbar, .tscroll-top::-webkit-scrollbar { height: 10px; }
+  .tscroll-bar { display: flex; align-items: center; gap: 12px; padding: 6px 12px; border-bottom: 1px solid var(--border); background: var(--sky-soft); }
+  .tscroll-hint { font-size: 12px; color: var(--teal-dark); white-space: nowrap; }
+  .tscroll-mini { width: 24px; height: 24px; flex-shrink: 0; border-radius: 6px; display: grid; place-items: center; border: 1px solid var(--sky); background: #fff; color: var(--navy); cursor: pointer; }
+  .tscroll-mini:hover:not(:disabled) { background: var(--teal); color: #fff; border-color: var(--teal); }
+  .tscroll-mini:disabled { opacity: .4; cursor: default; }
+  .tscroll-top { flex: 1; min-height: 12px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; scrollbar-color: var(--teal) #fff; }
+  .tscroll-top::-webkit-scrollbar-track { background: #fff; border-radius: 999px; }
+  .tscroll-top::-webkit-scrollbar-thumb { background: var(--teal); border-radius: 999px; }
   .table-wrap::-webkit-scrollbar-track { background: var(--sky-soft); }
   .table-wrap::-webkit-scrollbar-thumb { background: var(--teal); border-radius: 999px; border: 2px solid var(--sky-soft); }
   .table-wrap::-webkit-scrollbar-thumb:hover { background: var(--navy); }
-  .table-scroll::before, .table-scroll::after { content: ""; position: absolute; top: 0; bottom: 10px; width: 28px; pointer-events: none; opacity: 0; transition: opacity .15s; z-index: 2; }
+  .table-scroll::before, .table-scroll::after { content: ""; position: absolute; top: 40px; bottom: 10px; width: 28px; pointer-events: none; opacity: 0; transition: opacity .15s; z-index: 2; }
   .table-scroll::before { left: 0; background: linear-gradient(to right, rgba(47, 65, 86, .14), transparent); }
   .table-scroll::after { right: 0; background: linear-gradient(to left, rgba(47, 65, 86, .14), transparent); }
   .table-scroll.can-left::before, .table-scroll.can-right::after { opacity: 1; }
-  .tscroll-btn { position: absolute; top: 6px; z-index: 3; width: 28px; height: 28px; border-radius: 999px; display: grid; place-items: center; background: var(--navy); color: #fff; border: 2px solid #fff; box-shadow: var(--shadow-lg); cursor: pointer; }
-  .tscroll-btn:hover { background: var(--teal); }
-  .tscroll-btn.left { left: 6px; }
-  .tscroll-btn.right { right: 6px; }
   table.table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
   .table th { text-align: left; font-size: 11.5px; font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: .04em; padding: 10px 12px; background: #f3f6f9; border-bottom: 1px solid var(--border); white-space: nowrap; }
   .table td { padding: 11px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
@@ -257,8 +261,13 @@
      - kode, tanggal, telepon, status, tombol aksi tidak dipotong ke baris baru
      - teks panjang boleh turun ke bawah, tapi maksimal 2 baris (lengkapnya muncul saat kursor diarahkan) */
   .table td .mono, .table td.mono, .table td .badge, .table td .nowrap { white-space: nowrap; }
-  .table td:last-child:has([data-slot="button"]) { white-space: nowrap; width: 1%; padding-right: 18px; }
-  .table th:last-child { padding-right: 18px; }
+  /* Kolom aksi: judul "Aksi" dan tombolnya rata tengah, diberi jarak dari tepi kanan */
+  .table td:last-child:has([data-slot="button"]) { white-space: nowrap; width: 1%; padding-left: 28px; padding-right: 36px; text-align: center; }
+  .table th:last-child { padding-right: 36px; }
+  .table:has(td:last-child [data-slot="button"]) th:last-child { text-align: center; padding-left: 28px; }
+  /* Tabel yang kolomnya banyak (6+) diberi lebar lega; kalau layar tidak cukup, tabel digeser ke samping */
+  .table-wrap > .table:has(thead th:nth-child(6)) { min-width: 1180px; }
+  .table-wrap > .table:has(thead th:nth-child(6)) td { padding-top: 13px; padding-bottom: 13px; }
   .table td .cell-title, .table td .cell-sub, .table td .clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .table td .cell-title { min-width: 120px; }
   .table td:not(.nowrap):has(> .cell-sub), .table td.text-col { min-width: 160px; }
