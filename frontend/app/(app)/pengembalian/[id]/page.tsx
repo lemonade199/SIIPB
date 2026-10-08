@@ -12,6 +12,7 @@ import { KV, PageHead } from '@/components/ui/misc';
 import { LateText } from '@/components/domain/borrow-status';
 import { NotFoundView } from '@/components/layout/app-shell';
 import { emp, item as getItem, returnDetails, unit, userName } from '@/services/lookup';
+import { TableWrap } from '@/components/ui/table-wrap';
 
 export default function ReturnDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -55,7 +56,7 @@ export default function ReturnDetailPage() {
       <div className="split">
         <div className="stack">
           <Card title="Hasil pemeriksaan" flush>
-            <div className="table-wrap">
+            <TableWrap>
               <table className="table">
                 <thead>
                   <tr>
@@ -100,7 +101,7 @@ export default function ReturnDetailPage() {
                   })}
                 </tbody>
               </table>
-            </div>
+            </TableWrap>
           </Card>
           <div className="print-only" style={{ marginTop: 40 }}>
             <table style={{ width: '100%', textAlign: 'center' }}>

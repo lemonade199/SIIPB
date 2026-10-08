@@ -16,6 +16,7 @@ import { Select, toOptions } from '@/components/ui/form';
 import { Alert, Empty, PageHead, Pager, SearchInput, Thumb } from '@/components/ui/misc';
 import { cat, loc, conditionLabel } from '@/services/lookup';
 import type { Condition, ID, ItemStatus } from '@/types';
+import { TableWrap } from '@/components/ui/table-wrap';
 
 interface Filter {
   q: string;
@@ -137,7 +138,7 @@ export default function InventarisPage() {
               </Button>
             </div>
           )}
-          <div className="table-wrap">
+          <TableWrap>
             <table className="table">
               <thead>
                 <tr>
@@ -201,7 +202,7 @@ export default function InventarisPage() {
                 )}
               </tbody>
             </table>
-          </div>
+          </TableWrap>
           <Pager page={p} label="barang" onPage={(n) => set('page', n)} />
         </section>
       </div>

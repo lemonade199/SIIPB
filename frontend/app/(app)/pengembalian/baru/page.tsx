@@ -24,6 +24,7 @@ import { type ReturnItemInput } from '@/services/return';
 import * as repo from '@/services/repo';
 import { CAPABILITIES } from '@/lib/config';
 import type { Borrowing, ID, ReturnConditionKey } from '@/types';
+import { TableWrap } from '@/components/ui/table-wrap';
 
 export default function ReturnFormPage() {
   useTitle('Catat pengembalian');
@@ -104,7 +105,7 @@ function Picker() {
         {!all.length ? (
           <Empty icon="checkCircle">Tidak ada transaksi aktif yang menunggu pengembalian.</Empty>
         ) : list.length ? (
-          <div className="table-wrap">
+          <TableWrap>
             <table className="table">
               <thead>
                 <tr>
@@ -145,7 +146,7 @@ function Picker() {
                 })}
               </tbody>
             </table>
-          </div>
+          </TableWrap>
         ) : (
           <Empty icon="search">Tidak ada transaksi aktif yang cocok.</Empty>
         )}

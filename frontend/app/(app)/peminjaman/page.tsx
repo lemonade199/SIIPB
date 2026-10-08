@@ -16,6 +16,7 @@ import { Empty, PageHead, Pager, SearchInput, Tabs } from '@/components/ui/misc'
 import { BorrowBadge, DueText } from '@/components/domain/borrow-status';
 import { borrowView, emp, isActive, itemsOf, unit, userName } from '@/services/lookup';
 import type { Borrowing } from '@/types';
+import { TableWrap } from '@/components/ui/table-wrap';
 
 type TabKey = 'semua' | 'DRAF' | 'aktif' | 'JATUH TEMPO' | 'TERLAMBAT' | 'DIKEMBALIKAN' | 'DIBATALKAN';
 const TABS: [TabKey, string][] = [
@@ -99,7 +100,7 @@ export default function PeminjamanPage() {
           </label>
           <Input type="date" id="pj-to" value={f.to} onChange={(e) => set('to', e.target.value)} />
         </div>
-        <div className="table-wrap">
+        <TableWrap>
           <table className="table">
             <thead>
               <tr>
@@ -108,7 +109,6 @@ export default function PeminjamanPage() {
                 <th>Barang</th>
                 <th>Pinjam</th>
                 <th>Batas kembali</th>
-                <th>Sisa waktu</th>
                 <th>Status</th>
                 <th>Petugas</th>
               </tr>
@@ -135,11 +135,11 @@ export default function PeminjamanPage() {
                       </td>
                       <td className="nowrap">{fmtDate(b.borrow_date)}</td>
                       <td className="nowrap">{fmtDate(b.due_date)}</td>
-                      <td className="nowrap small">
-                        <DueText b={b} />
-                      </td>
-                      <td>
+                      <td className="nowrap">
                         <BorrowBadge b={b} />
+                        <div className="cell-sub">
+                          <DueText b={b} />
+                        </div>
                       </td>
                       <td className="small">{userName(b.checked_out_by || b.created_by)}</td>
                     </tr>
@@ -147,14 +147,14 @@ export default function PeminjamanPage() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={8}>
+                  <td colSpan={7}>
                     <Empty icon="out">Tidak ada transaksi.</Empty>
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
-        </div>
+        </TableWrap>
         <Pager page={p} label="transaksi" onPage={(n) => set('page', n)} />
       </section>
     </>

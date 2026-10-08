@@ -19,6 +19,7 @@ import { role } from '@/services/lookup';
 import { type UserInput } from '@/services/users';
 import * as repo from '@/services/repo';
 import type { FieldErrors, LoginMethod, Role, User } from '@/types';
+import { TableWrap } from '@/components/ui/table-wrap';
 
 type Tab = 'users' | 'roles';
 
@@ -106,7 +107,7 @@ export default function PenggunaPage() {
           ]}
         />
         {tab === 'users' ? (
-          <div className="table-wrap">
+          <TableWrap>
             <table className="table">
               <thead>
                 <tr>
@@ -165,7 +166,7 @@ export default function PenggunaPage() {
                 })}
               </tbody>
             </table>
-          </div>
+          </TableWrap>
         ) : (
           <>
             <div style={{ padding: '14px 20px' }}>
@@ -181,7 +182,7 @@ export default function PenggunaPage() {
                 </div>
               ))}
             </div>
-            <div className="table-wrap">
+            <TableWrap>
               <table className="table matrix">
                 <thead>
                   <tr>
@@ -197,7 +198,7 @@ export default function PenggunaPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableWrap>
           </>
         )}
       </section>

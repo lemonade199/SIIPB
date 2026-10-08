@@ -22,6 +22,7 @@ import { MASTER, type MasterForm, type MasterKey } from '@/services/master';
 import * as repo from '@/services/repo';
 import { CAPABILITIES } from '@/lib/config';
 import type { Category, Employee, FieldErrors, ID, Location, Unit } from '@/types';
+import { TableWrap } from '@/components/ui/table-wrap';
 
 type AnyRow = Employee | Category | Location | Unit;
 
@@ -50,16 +51,21 @@ const VIEWS: Record<MasterKey, ViewDef> = {
       return [
         <span key="n" className="mono">{e.nip}</span>,
         <div key="m">
-          <b>{e.name}</b>
+          <div className="cell-title">{e.name}</div>
           <div className="cell-sub">{e.position}</div>
         </div>,
         unit(e.unit_id)?.name,
-        e.email,
-        e.phone,
+        <span key="e" className="nowrap">{e.email}</span>,
+        <span key="p" className="nowrap">{e.phone}</span>,
         act.length ? (
-          <span key="a">
-            {act.length} transaksi {late > 0 && <Badge status="TERLAMBAT">{late} terlambat</Badge>}
-          </span>
+          <div key="a" className="nowrap">
+            {act.length} transaksi
+            {late > 0 && (
+              <div>
+                <Badge status="TERLAMBAT">{late} terlambat</Badge>
+              </div>
+            )}
+          </div>
         ) : (
           <span key="a" className="muted">—</span>
         ),
@@ -241,7 +247,7 @@ function MasterTableView({ tabKey: key }: { tabKey: MasterKey }) {
             <Checkbox checked={f.inactive} onCheckedChange={(c) => setF((p) => ({ ...p, inactive: c === true }))} /> Tampilkan nonaktif
           </label>
         </div>
-        <div className="table-wrap">
+        <TableWrap>
           <table className="table">
             <thead>
               <tr>
@@ -294,7 +300,7 @@ function MasterTableView({ tabKey: key }: { tabKey: MasterKey }) {
               )}
             </tbody>
           </table>
-        </div>
+        </TableWrap>
       </section>
 
       <Modal
@@ -361,7 +367,7 @@ function ParameterView() {
           </Alert>
         </div>
         <div className="px-5 pb-2 text-[15px] font-semibold">Status barang</div>
-        <div className="table-wrap">
+        <TableWrap>
           <table className="table">
             <thead>
               <tr>
@@ -390,9 +396,9 @@ function ParameterView() {
               ))}
             </tbody>
           </table>
-        </div>
+        </TableWrap>
         <div className="px-5 pt-5 pb-2 text-[15px] font-semibold">Kondisi barang</div>
-        <div className="table-wrap">
+        <TableWrap>
           <table className="table">
             <thead>
               <tr>
@@ -419,7 +425,7 @@ function ParameterView() {
               ))}
             </tbody>
           </table>
-        </div>
+        </TableWrap>
       </section>
       <Modal
         open={!!edit}

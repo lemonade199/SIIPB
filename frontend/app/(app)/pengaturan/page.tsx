@@ -27,6 +27,7 @@ import { fillTemplate, templateVars } from '@/services/notification';
 import { recordBackup, recordRestoreTest, shiftDemoDays } from '@/services/settings';
 import * as repo from '@/services/repo';
 import type { EmailTemplate, RecipientKind, Settings } from '@/types';
+import { TableWrap } from '@/components/ui/table-wrap';
 
 type Tab = 'umum' | 'smtp' | 'notifikasi' | 'template' | 'keamanan' | 'backup' | 'demo';
 const TABS: [Tab, string, IconName][] = [
@@ -248,7 +249,7 @@ function Notifikasi({ s }: { s: Settings }) {
         </form>
       </Card>
       <Card title="Aturan pengingat & eskalasi" desc="Waktu, penerima, dan template dapat dikonfigurasi" flush>
-        <div className="table-wrap">
+        <TableWrap>
           <table className="table">
             <thead>
               <tr>
@@ -298,7 +299,7 @@ function Notifikasi({ s }: { s: Settings }) {
               ))}
             </tbody>
           </table>
-        </div>
+        </TableWrap>
         <p className="small muted" style={{ padding: '12px 20px' }}>
           Perubahan pada tabel ini langsung tersimpan. Peminjam selalu menerima notifikasi.
         </p>
@@ -318,7 +319,7 @@ function Templates() {
   return (
     <>
       <Card title="Template email" desc="Gunakan placeholder {{…}} yang diisi otomatis oleh sistem" flush>
-        <div className="table-wrap">
+        <TableWrap>
           <table className="table">
             <thead>
               <tr>
@@ -352,7 +353,7 @@ function Templates() {
               ))}
             </tbody>
           </table>
-        </div>
+        </TableWrap>
       </Card>
       <Modal
         open={!!edit}
@@ -550,7 +551,7 @@ function Backup({ s }: { s: Settings }) {
         </p>
       </Card>
       <Card title="Riwayat backup" flush>
-        <div className="table-wrap">
+        <TableWrap>
           <table className="table">
             <thead>
               <tr>
@@ -592,7 +593,7 @@ function Backup({ s }: { s: Settings }) {
                 ))}
             </tbody>
           </table>
-        </div>
+        </TableWrap>
       </Card>
     </>
   );

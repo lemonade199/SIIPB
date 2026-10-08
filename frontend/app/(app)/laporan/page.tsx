@@ -22,6 +22,7 @@ import { buildReport, logReport, type ReportColumn } from '@/services/report';
 import * as repo from '@/services/repo';
 import { isApiMode } from '@/lib/config';
 import type { ReportFilters, ReportType } from '@/types';
+import { TableWrap } from '@/components/ui/table-wrap';
 
 function defaultFrom() {
   const d = parseDate(today());
@@ -30,6 +31,10 @@ function defaultFrom() {
   return toDateStr(d);
 }
 
+
+/** Kolom pendek (kode, tanggal, angka) tidak dipecah ke baris baru; kolom teks panjang dibatasi 2 baris. */
+const NOWRAP_COLS = new Set(['kode', 'transaksi', 'pinjam', 'batas', 'kembali', 'tgl', 'sejak', 'seri', 'tahun', 'terlambat', 'status']);
+const TEXT_COLS = new Set(['barang', 'nama', 'keterangan', 'merek']);
 export default function LaporanPage() {
   useTitle('Laporan');
   const { user, can } = useAuth();
@@ -70,6 +75,7 @@ export default function LaporanPage() {
   const s = db.data.settings;
 
   const cell = (c: ReportColumn, v: string | number | undefined) => {
+    if (TEXT_COLS.has(c.key) && v) return <div className="clamp-2">{v}</div>;
     if (c.badge) return <Badge status={String(v)} />;
     if (c.money) return rupiah(v);
     return v === '' || v === undefined || v === null ? '—' : v;
@@ -143,7 +149,7 @@ export default function LaporanPage() {
           })}
         </div>
       </div>
-      <div className="split">
+      <div className="split report-split">
         <section className="card">
           <div className="toolbar no-print">
             {!posisi && (
@@ -190,7 +196,7 @@ export default function LaporanPage() {
                 </div>
               </div>
             </div>
-            <div className="table-wrap">
+            <TableWrap>
               <table className="table">
                 <thead>
                   <tr>
@@ -206,7 +212,7 @@ export default function LaporanPage() {
                       <tr key={i}>
                         <td className="mono">{i + 1}</td>
                         {rep.columns.map((c) => (
-                          <td key={c.key} className={c.money ? 'nowrap' : undefined}>
+                          <td key={c.key} className={c.money || NOWRAP_COLS.has(c.key) ? 'nowrap' : TEXT_COLS.has(c.key) ? 'text-col' : undefined}>
                             {cell(c, r[c.key])}
                           </td>
                         ))}
@@ -221,7 +227,7 @@ export default function LaporanPage() {
                   )}
                 </tbody>
               </table>
-            </div>
+            </TableWrap>
             <div className="print-only" style={{ marginTop: 12, fontSize: 11 }}>
               {rep.summary} · Dicetak {fmtDateTime(nowISO())} oleh {user.name}
             </div>
