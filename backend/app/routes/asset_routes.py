@@ -434,7 +434,7 @@ def asset_qr(asset_id: int):
         payload = f"SIIPB:{asset.inventory_code}"
     buf = io.BytesIO()
     if fmt == "png":
-        qrcode.make(payload, box_size=10, border=2).save(buf, format="PNG")
+        qrcode.make(payload, box_size=10, border=2).save(buf)
         mime = "image/png"
     else:
         qrcode.make(payload, image_factory=qrcode.image.svg.SvgPathImage, box_size=10, border=2).save(buf)
