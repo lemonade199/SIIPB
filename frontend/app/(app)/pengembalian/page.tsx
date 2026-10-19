@@ -40,7 +40,6 @@ export default function PengembalianPage() {
       <PageHead
         crumb="Beranda / Pengembalian"
         title="Pengembalian"
-        desc="Petugas mencatat barang yang kembali, memeriksa kondisi dan kelengkapan, lalu sistem memperbarui status barang."
         actions={
           canR && (
             <Button variant="primary" icon="in" href="/pengembalian/baru">
@@ -107,7 +106,6 @@ export default function PengembalianPage() {
           <div className="card-header">
             <div>
               <div className="card-title">Riwayat pengembalian</div>
-              <div className="card-desc">Riwayat peminjaman tidak dihapus setelah barang kembali</div>
             </div>
           </div>
           <div className="toolbar" style={{ marginTop: 12, borderTop: '1px solid var(--border)' }}>

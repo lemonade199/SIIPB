@@ -125,7 +125,7 @@ export default function LaporanPage() {
   return (
     <>
       <div className="no-print">
-        <PageHead crumb="Beranda / Laporan" title="Laporan" desc="Rekap inventaris dan transaksi — unduh PDF, Excel, atau cetak langsung." />
+        <PageHead crumb="Beranda / Laporan" title="Laporan" />
         <div className="grid g-auto mb-[18px]">
           {(Object.keys(REPORTS) as ReportType[]).map((k) => {
             const r = REPORTS[k];
@@ -143,7 +143,6 @@ export default function LaporanPage() {
                 <span className="strong" style={{ fontSize: 15 }}>
                   {r.label}
                 </span>
-                <span className="stat-sub">{r.desc}</span>
               </button>
             );
           })}

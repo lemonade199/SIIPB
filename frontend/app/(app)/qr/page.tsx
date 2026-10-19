@@ -102,7 +102,7 @@ export default function QrPage() {
   return (
     <>
       <div className="no-print">
-        <PageHead crumb="Beranda / QR / Barcode" title="QR / Barcode" desc="Identitas digital barang: pindai untuk akses cepat ke detail, cetak label untuk ditempel pada barang." />
+        <PageHead crumb="Beranda / QR / Barcode" title="QR / Barcode" />
       </div>
       <div className="stack">
         <div className="no-print">
@@ -136,9 +136,6 @@ export default function QrPage() {
                   </Button>
                 </div>
                 <video ref={videoRef} className={cn(!camOn && 'hidden')} playsInline muted style={{ width: '100%', maxWidth: 360, borderRadius: 10, background: '#000' }} />
-                <p className="small muted">
-                  Pemindai USB/Bluetooth bekerja seperti keyboard. Isi QR berformat <span className="mono">SIIPB:INV-XXX-0000</span>.
-                </p>
               </div>
               <div>{result === null ? <Empty icon="scan">Hasil pindaian akan tampil di sini.</Empty> : <ScanResult raw={result} />}</div>
             </div>

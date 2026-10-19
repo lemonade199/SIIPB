@@ -218,7 +218,7 @@ export default function ItemDetailPage() {
             )}
           </Card>
 
-          <Card title="Riwayat pergerakan & status" desc="item_movements — dicatat otomatis oleh sistem">
+          <Card title="Riwayat pergerakan & status">
             <ul className="timeline">
               {moves.map((m) => (
                 <li key={m.id}>

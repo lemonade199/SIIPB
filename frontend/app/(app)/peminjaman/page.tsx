@@ -77,7 +77,6 @@ export default function PeminjamanPage() {
       <PageHead
         crumb="Beranda / Peminjaman"
         title="Peminjaman"
-        desc="Seluruh transaksi peminjaman dicatat oleh petugas. Peminjam hanya menerima notifikasi email."
         actions={
           can('borrowing.manage') && (
             <Button variant="primary" icon="plus" href="/peminjaman/baru">

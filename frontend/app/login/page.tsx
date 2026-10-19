@@ -10,8 +10,9 @@ import { useTitle } from '@/hooks/use-title';
 import { Tag } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/dialog';
-import { TextField } from '@/components/ui/form';
-import { Icon, type IconName } from '@/components/ui/icon';
+import { Field, TextField } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Icon } from '@/components/ui/icon';
 import { Alert, Avatar } from '@/components/ui/misc';
 import { useToast } from '@/components/providers/feedback-provider';
 import { schedulerToastText } from '@/components/providers/data-provider';
@@ -25,19 +26,13 @@ import { autoScheduler } from '@/services/scheduler';
 import { can } from '@/services/session';
 import type { User } from '@/types';
 
-const FEATURES: [IconName, string, string][] = [
-  ['box', 'Inventaris terpusat', 'Kode/QR, kategori, lokasi, kondisi, status, dan foto barang.'],
-  ['out', 'Transaksi dicatat petugas', 'Peminjam tidak mengisi formulir dan tidak wajib memiliki akun.'],
-  ['bell', 'Pengingat otomatis', 'Email H-3, H-1, H, H+1 serta eskalasi H+3 dan H+7.'],
-  ['shield', 'Aman & dapat ditelusuri', 'RBAC, JWT, SSO OIDC, audit log, dan backup.'],
-];
-
 export default function LoginPage() {
   useTitle('Masuk');
   const router = useRouter();
   const toast = useToast();
   const { user } = useAuth();
   const [form, setForm] = useState({ username: '', password: '' });
+  const [showPw, setShowPw] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
   const [ssoOpen, setSsoOpen] = useState(false);
@@ -48,20 +43,17 @@ export default function LoginPage() {
   const institution = pub?.institution || settings.institution;
   const oidcEnabled = pub ? pub.oidc_enabled : settings.security.oidc_enabled;
 
-
-  // Sudah login → langsung ke halaman awal.
   useEffect(() => {
     if (user) router.replace(homeFor((p) => can(p, user)));
   }, [user, router]);
 
   const afterLogin = (u: User, via?: string) => {
-    toast(via ? `Masuk melalui SSO sebagai ${u.name}.` : `Selamat datang, ${u.name}.`);
+    toast(via ? `Masuk via SSO sebagai ${u.name}.` : `Selamat datang, ${u.name}.`);
     const res = isApiMode ? null : autoScheduler();
     if (res && (res.sent || res.late_marked)) setTimeout(() => toast(schedulerToastText(res, settings.scheduler.time), 'warn'), 500);
     router.replace(homeFor((p) => can(p, u)));
   };
 
-  // Mode api: info publik (nama instansi, SSO aktif) + selesaikan login SSO (#sso_code dari backend).
   useEffect(() => {
     if (!isApiMode) return;
     fetch(`${API_BASE_URL}/settings/public`)
@@ -74,7 +66,7 @@ export default function LoginPage() {
     if (!code && !ssoErr) return;
     window.history.replaceState(null, '', window.location.pathname);
     if (ssoErr) {
-      queueMicrotask(() => setError(`Login SSO gagal: ${ssoErr}`));
+      queueMicrotask(() => setError(`Gagal masuk: ${ssoErr}`));
       return;
     }
     queueMicrotask(() => setBusy(true));
@@ -83,7 +75,6 @@ export default function LoginPage() {
       if (!r.ok) return setError(r.error);
       afterLogin(r.user, 'SSO');
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- hanya sekali saat halaman dibuka
   }, []);
 
   const submit = async (username: string, password: string) => {
@@ -101,9 +92,8 @@ export default function LoginPage() {
   };
 
   const onSSO = () => {
-    if (!oidcEnabled) return toast('SSO/OIDC belum diaktifkan oleh administrator.', 'warn');
+    if (!oidcEnabled) return toast('SSO belum diaktifkan.', 'warn');
     if (isApiMode) {
-      // Alur OAuth 2.0 / OIDC ditangani backend (Authlib): state & nonce divalidasi di server.
       window.location.href = authApi.ssoUrl();
       return;
     }
@@ -111,88 +101,100 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="login">
-      <div className="login-side">
-        <div className="brand" style={{ padding: 0 }}>
-          <span className="brand-logo" style={{ width: 44, height: 44 }}>
-            <Icon name="box" size={24} />
-          </span>
-          <div>
-            <div className="brand-name" style={{ fontSize: 20 }}>
-              SIIPB
-            </div>
-            <div className="brand-sub" style={{ fontSize: 13 }}>
-              {institution}
+    <div className="login" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '24px' }}>
+      <div style={{ display: 'flex', width: '100%', maxWidth: '960px', borderRadius: '24px', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)' }}>
+        
+        {/* Sisi Kiri: Panel Informasi */}
+        <div className="login-side" style={{ flex: 1, padding: '48px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '520px' }}>
+          <div className="brand" style={{ padding: 0 }}>
+            <span className="brand-logo" style={{ width: 44, height: 44 }}>
+              <Icon name="box" size={24} />
+            </span>
+            <div>
+              <div className="brand-name" style={{ fontSize: 20 }}>
+                SIIPB
+              </div>
+              <div className="brand-sub" style={{ fontSize: 13 }}>
+                {institution}
+              </div>
             </div>
           </div>
-        </div>
-        <div style={{ display: 'grid', gap: 12 }}>
-          <h1>Sistem Informasi Inventaris Barang, Peminjaman, dan Pengembalian Barang</h1>
-          <p style={{ color: '#c8d9e6', fontSize: 15, maxWidth: 480 }}>
-            Ruang kerja petugas Sarpras/IT untuk mendata inventaris, mencatat transaksi, memantau keterlambatan, dan menyusun laporan.
-          </p>
-        </div>
-        <ul>
-          {FEATURES.map(([ic, title, text]) => (
-            <li key={title}>
-              <span className="ico">
-                <Icon name={ic} size={16} />
-              </span>
-              <span>
-                <b>{title}</b>
-                {text}
-              </span>
-            </li>
-          ))}
-        </ul>
-        <span style={{ marginTop: 'auto', fontSize: 12, color: '#9fb3c4' }}>{isApiMode ? 'Terhubung ke Flask REST API' : 'Mode demo · data tersimpan di browser ini'}</span>
-      </div>
 
-      <div className="login-main">
-        <div className="login-card stack">
-          <div>
-            <h2 style={{ fontSize: 24, fontWeight: 650 }}>Masuk</h2>
-            <p className="muted">Khusus pengguna internal: administrator, petugas, dan pimpinan.</p>
+          <div style={{ display: 'grid', gap: 12, margin: 'auto 0' }}>
+            <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.15em', opacity: 0.8, fontWeight: 600 }}>
+              Portal Akses
+            </div>
+            <h1 style={{ fontSize: 26, lineHeight: 1.3, fontWeight: 650 }}>
+              Manajemen Inventaris & Sirkulasi Barang
+            </h1>
+            <p style={{ color: '#c8d9e6', fontSize: 14, lineHeight: 1.6, maxWidth: 360 }}>
+              Kelola data aset, peminjaman, dan pemantauan pengembalian instansi secara terpusat.
+            </p>
           </div>
-          <form
-            className="stack"
-            style={{ gap: 14 }}
-            noValidate
-            onSubmit={(e) => {
-              e.preventDefault();
-              submit(form.username, form.password);
-            }}
-          >
-            {error && <Alert type="danger">{error}</Alert>}
-            <TextField
-              label="Username atau email"
-              required
-              autoComplete="username"
-              value={form.username}
-              error={errors.username}
-              onChange={(e) => setForm({ ...form, username: e.target.value })}
-            />
-            <TextField
-              label="Kata sandi"
-              type="password"
-              required
-              autoComplete="current-password"
-              value={form.password}
-              error={errors.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-            />
-            <Button type="submit" variant="primary" icon="lock" block disabled={busy}>
-              {busy ? 'Memeriksa…' : 'Masuk'}
-            </Button>
-          </form>
-          <div className="or">atau</div>
-          <Button icon="key" block onClick={onSSO}>
-            Masuk dengan SSO Organisasi
-          </Button>
-          <Alert type="info">
-            Peminjam <b>tidak perlu login</b>. Informasi peminjaman, pengingat, dan pemberitahuan keterlambatan dikirim otomatis ke email peminjam.
-          </Alert>
+
         </div>
+
+        {/* Sisi Kanan: Panel Form Masuk */}
+        <div className="login-main" style={{ flex: 1, padding: '48px', display: 'flex', flexDirection: 'column', justifyContent: 'center', background: '#ffffff' }}>
+          <div className="login-card stack" style={{ width: '100%', boxShadow: 'none', padding: 0, margin: 0 }}>
+            <div>
+              <h2 style={{ fontSize: 24, fontWeight: 650, marginBottom: 4, color: '#111827' }}>Sign in</h2>
+              <p className="muted" style={{ fontSize: 13 }}>Silakan masukkan kredensial akun Anda.</p>
+            </div>
+
+            <form
+              className="stack"
+              style={{ gap: 14, marginTop: 16 }}
+              noValidate
+              onSubmit={(e) => {
+                e.preventDefault();
+                submit(form.username, form.password);
+              }}
+            >
+              {error && <Alert type="danger">{error}</Alert>}
+              <TextField
+                label="Username atau email"
+                required
+                autoComplete="username"
+                value={form.username}
+                error={errors.username}
+                onChange={(e) => setForm({ ...form, username: e.target.value })}
+              />
+              <Field label="Kata sandi" required error={errors.password} htmlFor="login-password">
+                <div style={{ position: 'relative' }}>
+                  <Input
+                    id="login-password"
+                    type={showPw ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    value={form.password}
+                    aria-invalid={!!errors.password || undefined}
+                    style={{ paddingRight: 44 }}
+                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPw((v) => !v)}
+                    aria-label={showPw ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
+                    aria-pressed={showPw}
+                    title={showPw ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
+                    style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', width: 36, height: 36, display: 'grid', placeItems: 'center', border: 0, background: 'transparent', color: 'var(--subtle)', borderRadius: 6 }}
+                  >
+                    <Icon name={showPw ? 'eyeOff' : 'eye'} size={18} />
+                  </button>
+                </div>
+              </Field>
+              <Button type="submit" variant="primary" icon="lock" block disabled={busy}>
+                {busy ? 'Memeriksa…' : 'Sign in'}
+              </Button>
+            </form>
+
+            <div className="or">atau</div>
+            <Button icon="key" block onClick={onSSO}>
+              Sign in with SSO
+            </Button>
+          </div>
+        </div>
+
       </div>
 
       <Modal open={ssoOpen} onClose={() => setSsoOpen(false)} title="SSO Organisasi (OpenID Connect)" desc="Simulasi halaman Identity Provider organisasi.">
@@ -229,10 +231,6 @@ export default function LoginPage() {
               );
             })}
           </div>
-          <p className="small muted">
-            Setelah login di IdP, SIIPB menerima <i>authorization code</i>, memvalidasi <span className="mono">state</span>, <span className="mono">nonce</span> dan ID token, lalu
-            menerbitkan JWT internal.
-          </p>
         </div>
       </Modal>
     </div>

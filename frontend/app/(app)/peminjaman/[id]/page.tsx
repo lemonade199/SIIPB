@@ -11,7 +11,6 @@ import { useTitle } from '@/hooks/use-title';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Icon } from '@/components/ui/icon';
 import { Alert, Avatar, Empty, KV, PageHead, Thumb } from '@/components/ui/misc';
 import { BorrowBadge, DueText } from '@/components/domain/borrow-status';
 import { EmailPreview } from '@/components/domain/email-preview';
@@ -233,7 +232,7 @@ export default function BorrowDetailPage() {
             </table>
           </div>
 
-          <Card title="Riwayat notifikasi" desc="notifications & notification_logs" className="no-print">
+          <Card title="Riwayat notifikasi" className="no-print">
             {notifs.length ? (
               <ul className="timeline">
                 {notifs.map((n) => (
@@ -275,13 +274,10 @@ export default function BorrowDetailPage() {
                 ['Telepon', e?.phone],
               ]}
             />
-            <p className="small muted" style={{ marginTop: 10 }}>
-              <Icon name="info" size={14} className="inline align-[-2px]" /> Peminjam tidak memiliki akun dan tidak login.
-            </p>
           </Card>
 
           {isActive(b) && (
-            <Card title="Jadwal pengingat" desc="Notifikasi yang sama tidak dikirim dua kali" className="no-print">
+            <Card title="Jadwal pengingat" className="no-print">
               <ul className="list">
                 {s.rules
                   .filter((r) => r.active)

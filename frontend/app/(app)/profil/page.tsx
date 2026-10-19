@@ -112,7 +112,7 @@ export default function ProfilPage() {
             </form>
           </Card>
           {CAPABILITIES.changePassword && (
-          <Card title="Ganti kata sandi" desc="Untuk login lokal. Di backend, kata sandi disimpan dalam bentuk hash.">
+          <Card title="Ganti kata sandi">
             <form className="stack" style={{ gap: 12 }} noValidate onSubmit={onSubmit}>
               <TextField label="Kata sandi lama" type="password" required value={pw.old} error={errors.old} onChange={(e) => setPw({ ...pw, old: e.target.value })} />
               <TextField

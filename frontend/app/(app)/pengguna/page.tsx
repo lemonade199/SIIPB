@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/dialog';
 import { Checkbox, SelectField, Switch, TextareaField, TextField } from '@/components/ui/form';
 import { Icon } from '@/components/ui/icon';
-import { Alert, Avatar, PageHead, Tabs } from '@/components/ui/misc';
+import { Avatar, PageHead, Tabs } from '@/components/ui/misc';
 import { useConfirm, useToast } from '@/components/providers/feedback-provider';
 import { role } from '@/services/lookup';
 import { type UserInput } from '@/services/users';
@@ -76,7 +76,6 @@ export default function PenggunaPage() {
       <PageHead
         crumb="Beranda / Administrasi"
         title="Pengguna & Role"
-        desc="Pengguna internal dan hak aksesnya. Peminjam bukan pengguna sistem."
         actions={
           !CAPABILITIES.userAdmin ? undefined : tab === 'users' ? (
             <Button variant="primary" icon="plus" onClick={() => openUser(null)}>
@@ -170,10 +169,6 @@ export default function PenggunaPage() {
         ) : (
           <>
             <div style={{ padding: '14px 20px' }}>
-              <Alert type="info">
-                RBAC diterapkan di API (dekorator per endpoint) dan di antarmuka (menu &amp; tombol). Perubahan langsung berlaku dan tercatat di audit log. Role Administrator selalu memiliki
-                seluruh permission.
-              </Alert>
             </div>
             <div className="row" style={{ padding: '0 20px 14px', gap: 16 }}>
               {roles.map((r) => (

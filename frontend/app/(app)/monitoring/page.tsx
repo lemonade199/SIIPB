@@ -15,7 +15,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { StatTile } from '@/components/ui/card';
 import { Select, toOptions } from '@/components/ui/form';
-import { Icon } from '@/components/ui/icon';
 import { Empty, PageHead, Pager, SearchInput, Tabs } from '@/components/ui/misc';
 import { BorrowBadge, DueText } from '@/components/domain/borrow-status';
 import { useToast } from '@/components/providers/feedback-provider';
@@ -126,7 +125,6 @@ export default function MonitoringPage() {
       <PageHead
         crumb="Beranda / Monitoring"
         title="Monitoring Peminjaman"
-        desc="Pantau barang yang sedang dipinjam, akan jatuh tempo, dan terlambat."
         actions={
           <>
             <Button icon="download" onClick={onExport} disabled={f.tab === 'rusak_hilang'}>
@@ -272,10 +270,6 @@ export default function MonitoringPage() {
           </>
         )}
       </section>
-      <p className="small muted" style={{ marginTop: 12 }}>
-        <Icon name="info" size={14} className="inline align-[-2px]" /> Status TERLAMBAT ditetapkan oleh scheduler setiap hari pukul {db.data.settings.scheduler.time} WIB. Transaksi yang sudah dikembalikan tidak pernah menjadi
-        terlambat.
-      </p>
     </>
   );
 }

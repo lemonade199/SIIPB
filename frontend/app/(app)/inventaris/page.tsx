@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, toOptions } from '@/components/ui/form';
-import { Alert, Empty, PageHead, Pager, SearchInput, Thumb } from '@/components/ui/misc';
+import { Empty, PageHead, Pager, SearchInput, Thumb } from '@/components/ui/misc';
 import { cat, loc, conditionLabel } from '@/services/lookup';
 import type { Condition, ID, ItemStatus } from '@/types';
 import { TableWrap } from '@/components/ui/table-wrap';
@@ -83,7 +83,6 @@ export default function InventarisPage() {
       <PageHead
         crumb="Beranda / Inventaris"
         title="Inventaris Barang"
-        desc="Data barang, kategori, lokasi, kondisi, status, foto, dan kode/QR."
         actions={
           <>
             {can('report.export') && (
@@ -100,9 +99,6 @@ export default function InventarisPage() {
         }
       />
       <div className="stack">
-        <Alert type="info">
-          Barang berstatus <b>RUSAK_BERAT</b>, <b>HILANG</b>, atau <b>DALAM_PERBAIKAN</b> tidak dapat dipinjam. Barang tidak dihapus; gunakan <b>Nonaktifkan</b> agar riwayat tetap utuh.
-        </Alert>
         <div className="row">
           {chips.map(([v, l, n]) => (
             <Button key={l} size="sm" variant={f.status === v ? 'primary' : 'outline'} onClick={() => set('status', v)}>

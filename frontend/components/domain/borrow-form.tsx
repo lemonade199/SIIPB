@@ -163,7 +163,7 @@ export function BorrowForm({ id }: { id?: ID }) {
       <form noValidate onSubmit={(ev) => ev.preventDefault()}>
         <div className="split-wide">
           <div className="stack">
-            <Card title="1 · Peminjam" desc="Peminjam tidak perlu hadir di sistem — hanya dipilih oleh petugas.">
+            <Card title="1 · Peminjam">
               <div className="stack" style={{ gap: 10 }}>
                 <TextField label="Cari peminjam dari master data" placeholder="Ketik nama, NIP, atau unit kerja…" autoComplete="off" value={empQ} onChange={(ev) => setEmpQ(ev.target.value)} />
                 <div className="pick-list" style={{ maxHeight: 236 }} role="radiogroup" aria-label="Peminjam">
@@ -271,9 +271,6 @@ export function BorrowForm({ id }: { id?: ID }) {
                   )}
                 </div>
                 {errors.item_ids && <span className="small" style={{ color: 'var(--danger)' }}>{errors.item_ids}</span>}
-                <p className="small muted">
-                  <Icon name="info" size={14} className="inline align-[-2px]" /> Hanya barang berstatus <b>TERSEDIA</b> yang ditampilkan. Barang RUSAK_BERAT, HILANG, dan DALAM_PERBAIKAN tidak dapat dipinjam.
-                </p>
               </div>
             </Card>
 
@@ -351,7 +348,7 @@ export function BorrowForm({ id }: { id?: ID }) {
                 </p>
               </div>
             </Card>
-            <Card title="Jadwal notifikasi ke peminjam" desc="Dikirim otomatis; dapat dikonfigurasi di Pengaturan">
+            <Card title="Jadwal notifikasi ke peminjam">
               {plan.length ? (
                 <ul className="list">
                   {plan.map((x) => (

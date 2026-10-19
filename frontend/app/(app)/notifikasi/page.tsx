@@ -6,14 +6,13 @@ import { useState } from 'react';
 import { db } from '@/lib/mock/db';
 import { fmtDate, fmtDateTime } from '@/lib/date';
 import { EVENT_LABEL } from '@/lib/constants';
-import { capitalize, match, paginate } from '@/lib/utils';
+import { match, paginate } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { patchFilter, usePersistentState } from '@/hooks/use-persistent-state';
 import { useTitle } from '@/hooks/use-title';
 import { Badge, Tag } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/form';
-import { Icon } from '@/components/ui/icon';
 import { Alert, Empty, PageHead, Pager, SearchInput, Tabs } from '@/components/ui/misc';
 import { EmailPreview } from '@/components/domain/email-preview';
 import { useToast } from '@/components/providers/feedback-provider';
@@ -56,7 +55,6 @@ export default function NotifikasiPage() {
       <PageHead
         crumb="Beranda / Notifikasi"
         title="Notifikasi Otomatis"
-        desc="Email ke peminjam saat checkout, pengingat H-3/H-1/H, pemberitahuan H+1, serta eskalasi H+3 dan H+7."
         actions={
           <>
             {can('settings.manage') && (
@@ -88,14 +86,9 @@ export default function NotifikasiPage() {
                 <Badge status={r.active ? 'AKTIF' : 'NONAKTIF'} />
               </div>
               <div className="strong">{r.desc}</div>
-              <div className="stat-sub">Ke: {r.to.map(capitalize).join(' + ')}</div>
             </div>
           ))}
         </div>
-        <p className="small muted">
-          <Icon name="clock" size={14} className="inline align-[-2px]" /> Celery Beat memeriksa transaksi aktif setiap hari pukul <b>{s.scheduler.time}</b> ({s.scheduler.timezone}). Satu
-          jenis notifikasi hanya dikirim sekali per transaksi — kunci unik (transaksi, kejadian).
-        </p>
         <section className="card">
           <Tabs
             label="Jenis data notifikasi"

@@ -123,7 +123,6 @@ export default function AuditPage() {
       <PageHead
         crumb="Beranda / Administrasi"
         title="Audit Log"
-        desc="Setiap perubahan penting tercatat: siapa, kapan, tindakan, data lama dan data baru. Catatan tidak dapat diubah atau dihapus."
         actions={
           <Button icon="download" onClick={onExport}>
             Ekspor Excel

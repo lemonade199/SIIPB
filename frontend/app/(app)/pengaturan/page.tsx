@@ -19,7 +19,7 @@ import { Card } from '@/components/ui/card';
 import { Modal } from '@/components/ui/dialog';
 import { Field, SelectField, Switch, TextareaField, TextField } from '@/components/ui/form';
 import { Icon, type IconName } from '@/components/ui/icon';
-import { Alert, KV, PageHead } from '@/components/ui/misc';
+import { KV, PageHead } from '@/components/ui/misc';
 import { useConfirm, useToast } from '@/components/providers/feedback-provider';
 import { logout } from '@/services/auth';
 import { backupJSON, restoreJSON } from '@/services/backup';
@@ -50,7 +50,7 @@ export default function PengaturanPage() {
 
   return (
     <>
-      <PageHead crumb="Beranda / Administrasi" title="Pengaturan" desc="Konfigurasi SMTP, template, aturan notifikasi, keamanan, dan backup." />
+      <PageHead crumb="Beranda / Administrasi" title="Pengaturan" />
       <div className="split" style={{ gridTemplateColumns: '230px minmax(0,1fr)' }}>
         <nav className="card" style={{ padding: 8 }} aria-label="Bagian pengaturan">
           {tabs.map(([k, l, ic]) => (
@@ -122,7 +122,7 @@ function Umum({ s }: { s: Settings }) {
         <TextField label="Nama unit pengelola" value={v.unit_sarpras} onChange={set('unit_sarpras')} />
         <TextField label="Email petugas Sarpras/IT" type="email" value={v.staff_email} onChange={set('staff_email')} />
         <TextField label="Telepon / ext. petugas" value={v.staff_phone} onChange={set('staff_phone')} />
-        <TextField label="Tempat pengembalian barang" full hint="Dicantumkan pada email ke peminjam." value={v.return_location} onChange={set('return_location')} />
+        <TextField label="Tempat pengembalian barang" full value={v.return_location} onChange={set('return_location')} />
         <SaveBtn />
       </form>
     </Card>
@@ -168,23 +168,10 @@ function Smtp({ s }: { s: Settings }) {
             type="password"
             autoComplete="new-password"
             value={password}
-            hint={passwordSet ? 'Sudah tersimpan (terenkripsi). Kosongkan bila tidak diubah.' : 'Belum diisi — email disimulasikan (mode pengembangan).'}
+            hint={passwordSet ? 'Sudah tersimpan (terenkripsi). Kosongkan bila tidak diubah.' : undefined}
             onChange={(e) => setPassword(e.target.value)}
           />
         )}
-        <div className="full">
-          <Alert type="info">
-            {isApiMode
-              ? 'Kata sandi SMTP disimpan terenkripsi di server dan tidak pernah dikirim kembali ke browser. JWT secret, OAuth client secret, dan kredensial database tetap diatur lewat environment variable / secret manager.'
-              : 'Kata sandi SMTP, JWT secret, OAuth client secret, dan kredensial MinIO disimpan sebagai environment variable / secret manager — tidak ditampilkan di antarmuka dan tidak masuk repository.'}
-          </Alert>
-        </div>
-        <label className="check full">
-          <Checkbox checked={v.simulate_failure} onCheckedChange={(c) => setV({ ...v, simulate_failure: c === true })} />
-          <span>
-            Simulasikan kegagalan SMTP <span className="muted small">(untuk mencoba status GAGAL dan kirim ulang)</span>
-          </span>
-        </label>
         <div className="full row">
           <Button variant="primary" type="submit" icon="check">
             Simpan
@@ -248,7 +235,7 @@ function Notifikasi({ s }: { s: Settings }) {
           <SaveBtn />
         </form>
       </Card>
-      <Card title="Aturan pengingat & eskalasi" desc="Waktu, penerima, dan template dapat dikonfigurasi" flush>
+      <Card title="Aturan pengingat & eskalasi" flush>
         <TableWrap>
           <table className="table">
             <thead>
@@ -300,9 +287,6 @@ function Notifikasi({ s }: { s: Settings }) {
             </tbody>
           </table>
         </TableWrap>
-        <p className="small muted" style={{ padding: '12px 20px' }}>
-          Perubahan pada tabel ini langsung tersimpan. Peminjam selalu menerima notifikasi.
-        </p>
       </Card>
     </>
   );
@@ -318,7 +302,7 @@ function Templates() {
 
   return (
     <>
-      <Card title="Template email" desc="Gunakan placeholder {{…}} yang diisi otomatis oleh sistem" flush>
+      <Card title="Template email" flush>
         <TableWrap>
           <table className="table">
             <thead>
@@ -442,9 +426,6 @@ function Keamanan({ s }: { s: Settings }) {
           <Input value="disimpan di secret manager" readOnly aria-label="Client secret" />
         </Field>
         <div className="full">
-          <Alert type="info">
-            Wajib HTTPS di production. OIDC memakai validasi <span className="mono">state</span>/<span className="mono">nonce</span> dan token sesuai standar. Validasi input dilakukan di backend; unggahan dibatasi ukuran dan tipe.
-          </Alert>
         </div>
         <SaveBtn />
       </form>
@@ -618,7 +599,7 @@ function Demo({ s }: { s: Settings }) {
 
   return (
     <>
-      <Card title="Simulasi waktu" desc="Hanya untuk demo; tidak ada pada sistem production">
+      <Card title="Simulasi waktu">
         <p>Geser &quot;hari ini&quot; untuk mendemonstrasikan pengingat H-3/H-1/H, keterlambatan H+1, dan eskalasi H+3/H+7 tanpa menunggu hari berganti.</p>
         <div className="row" style={{ margin: '14px 0' }}>
           <span className={cn('date-chip', off && 'demo')} style={{ fontSize: 14 }}>

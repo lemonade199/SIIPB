@@ -11,7 +11,7 @@ import { useTitle } from '@/hooks/use-title';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, StatTile } from '@/components/ui/card';
-import { Alert, Empty, KV, PageHead } from '@/components/ui/misc';
+import { Empty, KV, PageHead } from '@/components/ui/misc';
 import { BorrowBadge, DueText } from '@/components/domain/borrow-status';
 import { useToast } from '@/components/providers/feedback-provider';
 import { stats } from '@/services/dashboard';
@@ -31,7 +31,7 @@ const STAT_COLORS: Record<ItemStatus, string> = {
 
 export default function DashboardPage() {
   useTitle('Dashboard');
-  const { user, role, can } = useAuth();
+  const { user, can } = useAuth();
   const toast = useToast();
   if (!user) return null;
 
@@ -79,11 +79,6 @@ export default function DashboardPage() {
         }
       />
 
-      {role?.code === 'pimpinan' && (
-        <Alert type="info" className="mb-4">
-          Anda masuk sebagai <b>Pimpinan</b>: dapat melihat dashboard, monitoring, dan laporan, serta menerima eskalasi H+7. Pencatatan transaksi dilakukan oleh petugas.
-        </Alert>
-      )}
 
       <div className="grid mb-[18px]" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))' }}>
         <StatTile label="Total barang aktif" value={num(st.total)} sub="Seluruh inventaris" icon="box" tone="primary" href="/inventaris" />
@@ -105,7 +100,6 @@ export default function DashboardPage() {
         <div className="stack">
           <Card
             title="Perlu tindakan"
-            desc="Terlambat dan jatuh tempo ≤ 3 hari, diurutkan dari batas paling awal"
             actions={
               <Button size="sm" href="/monitoring">
                 Monitoring
@@ -145,7 +139,7 @@ export default function DashboardPage() {
             )}
           </Card>
 
-          <Card title="Statistik peminjaman" desc="Jumlah transaksi peminjaman per bulan (6 bulan terakhir)">
+          <Card title="Statistik peminjaman">
             <div className="bars" role="img" aria-label={`Jumlah peminjaman per bulan: ${st.months.map((m) => `${m.label} ${m.count}`).join(', ')}`}>
               {st.months.map((m) => (
                 <div key={m.key} className="bar" title={`${m.label}: ${m.count} transaksi`}>
@@ -174,7 +168,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="stack">
-          <Card title="Status barang" desc="Status selalu mengikuti transaksi">
+          <Card title="Status barang">
             <ul className="list">
               {ITEM_STATUS.map((s) => {
                 const n = st.byStatus[s] || 0;
@@ -227,7 +221,7 @@ export default function DashboardPage() {
           </Card>
 
           {st.drafts.length > 0 && (
-            <Card title="Draf belum diserahkan" desc="Belum checkout — status barang belum berubah">
+            <Card title="Draf belum diserahkan">
               <ul className="list">
                 {st.drafts.map((b) => (
                   <li key={b.id}>

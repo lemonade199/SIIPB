@@ -15,7 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Modal } from '@/components/ui/dialog';
 import { SelectField, TextareaField, TextField, toOptions } from '@/components/ui/form';
 import { Icon, type IconName } from '@/components/ui/icon';
-import { Alert, Empty, PageHead, SearchInput } from '@/components/ui/misc';
+import { Empty, PageHead, SearchInput } from '@/components/ui/misc';
 import { useConfirm, useToast } from '@/components/providers/feedback-provider';
 import { activeBorrowings, unit } from '@/services/lookup';
 import { MASTER, type MasterForm, type MasterKey } from '@/services/master';
@@ -229,7 +229,6 @@ function MasterTableView({ tabKey: key }: { tabKey: MasterKey }) {
       <PageHead
         crumb="Beranda / Master Data"
         title="Master Data"
-        desc="Data referensi untuk inventaris dan transaksi."
         actions={
           <Button variant="primary" icon="plus" onClick={() => openForm(null)}>
             Tambah {D.noun}
@@ -238,9 +237,6 @@ function MasterTableView({ tabKey: key }: { tabKey: MasterKey }) {
       />
       <section className="card">
         <MasterNav active={key} />
-        <div style={{ padding: '14px 20px 0' }}>
-          <Alert type="info">{V.desc}</Alert>
-        </div>
         <div className="toolbar">
           <SearchInput value={f.q} onChange={(v) => setF((p) => ({ ...p, q: v }))} placeholder={`Cari ${D.noun}…`} label="Cari" />
           <label className="check small">
@@ -361,10 +357,6 @@ function ParameterView() {
       <section className="card">
         <MasterNav active="parameter" />
         <div style={{ padding: '14px 20px' }}>
-          <Alert type="info">
-            Kode status dan kondisi bersifat tetap karena terikat aturan bisnis (mis. <b>RUSAK_BERAT</b>, <b>HILANG</b>, <b>DALAM_PERBAIKAN</b> tidak dapat dipinjam). Label dan keterangan dapat
-            disesuaikan dan dipakai di seluruh tampilan serta laporan.
-          </Alert>
         </div>
         <div className="px-5 pb-2 text-[15px] font-semibold">Status barang</div>
         <TableWrap>
