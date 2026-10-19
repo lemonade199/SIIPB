@@ -1,10 +1,10 @@
-"""Authentication: refresh_tokens (hashed) and external_identities (OAuth/OIDC/SSO)."""
+"""Authentication: refresh_tokens (hashed)."""
 from __future__ import annotations
 
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import CHAR, ForeignKey, String, UniqueConstraint
+from sqlalchemy import CHAR, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import (
@@ -13,7 +13,6 @@ from app.models.base import (
     CreatedAtMixin,
     DateTime6,
     IdMixin,
-    TimestampMixin,
     table_args,
 )
 
@@ -39,25 +38,3 @@ class RefreshToken(IdMixin, CreatedAtMixin, Base):
 
     def is_valid(self, now: datetime) -> bool:
         return self.revoked_at is None and self.expires_at > now
-
-
-class ExternalIdentity(IdMixin, TimestampMixin, Base):
-    """Identity is (provider, provider_subject) — never email alone."""
-
-    __tablename__ = "external_identities"
-    __table_args__ = table_args(
-        UniqueConstraint(
-            "provider",
-            "provider_subject",
-            name="uq_external_identities_provider_provider_subject",
-        ),
-    )
-
-    user_id: Mapped[int] = mapped_column(
-        BigIntU, ForeignKey("users.id", ondelete="CASCADE"), index=True
-    )
-    provider: Mapped[str] = mapped_column(String(50))
-    provider_subject: Mapped[str] = mapped_column(String(255))
-    email: Mapped[str | None] = mapped_column(String(255), index=True)
-
-    user: Mapped[User] = relationship(back_populates="external_identities")

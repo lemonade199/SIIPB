@@ -1,4 +1,4 @@
-"""users (login accounts) and user_roles (users <-> roles)."""
+"""users (login accounts, single role, and integrated Google OAuth)."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -20,7 +20,7 @@ from app.models.base import (
 )
 
 if TYPE_CHECKING:
-    from app.models.auth import ExternalIdentity, RefreshToken
+    from app.models.auth import RefreshToken
     from app.models.organizational_unit import OrganizationalUnit
     from app.models.role import Role
 
@@ -40,58 +40,46 @@ class User(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
     unit_id: Mapped[int | None] = mapped_column(
         BigIntU, ForeignKey("organizational_units.id", ondelete="RESTRICT"), index=True
     )
+    role_id: Mapped[int] = mapped_column(
+        BigIntU, ForeignKey("roles.id", ondelete="RESTRICT"), index=True
+    )
     is_active: Mapped[bool] = mapped_column(
         Boolean, default=True, server_default=TRUE, index=True
     )
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime6)
 
+    # Integrated Google OAuth / OIDC Identity
+    google_subject: Mapped[str | None] = mapped_column(String(255), unique=True, index=True)
+    google_email: Mapped[str | None] = mapped_column(String(255))
+    google_linked_at: Mapped[datetime | None] = mapped_column(DateTime6)
+
     unit: Mapped[OrganizationalUnit | None] = relationship(back_populates="users")
-    role_links: Mapped[list[UserRole]] = relationship(
-        back_populates="user",
-        foreign_keys="UserRole.user_id",
-        cascade="all, delete-orphan",
-    )
-    roles: Mapped[list[Role]] = relationship(
-        secondary="user_roles",
-        primaryjoin="User.id == UserRole.user_id",
-        secondaryjoin="Role.id == UserRole.role_id",
-        viewonly=True,
-    )
+    role: Mapped[Role] = relationship(back_populates="users", foreign_keys=[role_id])
     refresh_tokens: Mapped[list[RefreshToken]] = relationship(
-        back_populates="user", cascade="all, delete-orphan"
-    )
-    external_identities: Mapped[list[ExternalIdentity]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
 
     @property
+    def roles(self) -> list[Role]:
+        """Backward-compatible property returning list of roles."""
+        return [self.role] if self.role else []
+
+    @property
+    def external_identities(self) -> list[dict[str, str]]:
+        """Backward-compatible property for Google SSO status."""
+        if self.google_subject:
+            return [{"provider": "google", "provider_subject": self.google_subject, "email": self.google_email or self.email}]
+        return []
+
+    @property
     def permission_codes(self) -> set[str]:
-        return {p.code for r in self.roles if r.is_active for p in r.permissions}
+        if self.role and self.role.is_active:
+            perms = self.role.permissions or []
+            return {p if isinstance(p, str) else p.code for p in perms}
+        return set()
 
     def has_permission(self, code: str) -> bool:
         return code in self.permission_codes
 
     def __repr__(self) -> str:
         return f"<User {self.username}>"
-
-
-class UserRole(Base):
-    __tablename__ = "user_roles"
-    __table_args__ = table_args()
-
-    user_id: Mapped[int] = mapped_column(
-        BigIntU, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
-    )
-    role_id: Mapped[int] = mapped_column(
-        BigIntU, ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True, index=True
-    )
-    assigned_at: Mapped[datetime] = mapped_column(
-        DateTime6, server_default=CURRENT_TS6
-    )
-    assigned_by: Mapped[int | None] = mapped_column(
-        BigIntU, ForeignKey("users.id", ondelete="SET NULL"), index=True
-    )
-
-    user: Mapped[User] = relationship(back_populates="role_links", foreign_keys=[user_id])
-    role: Mapped[Role] = relationship(back_populates="user_links")
-    assigner: Mapped[User | None] = relationship(foreign_keys=[assigned_by])
