@@ -10,7 +10,6 @@ from app.middleware.auth_middleware import jwt_required, permission_required
 from app.models import (
     Notification,
     NotificationEvent,
-    NotificationLog,
     NotificationRead,
     NotificationStatus,
     NotificationTemplate,
@@ -186,8 +185,6 @@ def resend_notification(notification_id: int):
         if notif.status == NotificationStatus.SENT.value:
             return error_response("Notifikasi sudah terkirim", error_code="ALREADY_SENT")
         notif.status = NotificationStatus.QUEUED.value
-        session.add(NotificationLog(notification_id=notif.id, status=NotificationStatus.QUEUED.value,
-                                    message="Dikirim ulang oleh petugas"))
         record_audit(session, "RESEND", "notification", "notification", notif.id, g.current_user["id"])
         session.commit()
         dispatch([notif.id], session=session)

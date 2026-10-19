@@ -7,7 +7,8 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Permission, Role, RolePermission, User, UserRole
+from app.models import Role, User
+from app.models.permission import ALL_PERMISSION_CODES, get_all_permissions
 from app.services.audit_service import record_audit
 from app.services.auth_service import login_method
 from app.utils.security import hash_password, validate_password_strength
@@ -43,9 +44,10 @@ def serialize_user(u: User) -> dict[str, Any]:
 
 def serialize_role(session: Session, r: Role) -> dict[str, Any]:
     users = session.scalar(
-        select(func.count()).select_from(UserRole).join(User, User.id == UserRole.user_id)
-        .where(UserRole.role_id == r.id, User.deleted_at.is_(None))
+        select(func.count(User.id)).where(User.role_id == r.id, User.deleted_at.is_(None))
     ) or 0
+    perms = r.permissions or []
+    perm_codes = [p if isinstance(p, str) else p.code for p in perms]
     return {
         "id": r.id,
         "code": r.code,
@@ -53,16 +55,13 @@ def serialize_role(session: Session, r: Role) -> dict[str, Any]:
         "description": r.description,
         "is_active": r.is_active,
         "system": r.code in SYSTEM_ROLES,
-        "permissions": sorted(p.code for p in r.permissions),
+        "permissions": sorted(perm_codes),
         "user_count": users,
     }
 
 
-def list_permissions(session: Session) -> list[dict[str, Any]]:
-    return [
-        {"id": p.id, "code": p.code, "name": p.name, "module": p.module, "description": p.description}
-        for p in session.scalars(select(Permission).order_by(Permission.module, Permission.code)).all()
-    ]
+def list_permissions(session: Session | None = None) -> list[dict[str, Any]]:
+    return get_all_permissions()
 
 
 # ---------------------------------------------------------------- users
@@ -87,8 +86,7 @@ def _active_admin_count(session: Session, exclude_user: int | None = None) -> in
     q = (
         select(func.count(func.distinct(User.id)))
         .select_from(User)
-        .join(UserRole, UserRole.user_id == User.id)
-        .join(Role, Role.id == UserRole.role_id)
+        .join(Role, Role.id == User.role_id)
         .where(Role.code == "ADMIN", User.is_active.is_(True), User.deleted_at.is_(None))
     )
     if exclude_user:
@@ -115,13 +113,12 @@ def _check_unique(session: Session, data: dict[str, Any], user_id: int | None = 
 
 
 def _set_roles(session: Session, user: User, role_ids: list[int], actor_id: int) -> None:
-    roles = [session.get(Role, rid) for rid in role_ids]
-    if not role_ids or any(r is None for r in roles):
+    if not role_ids:
         raise UserError("Role tidak valid", {"role_id": "Pilih role yang valid."})
-    user.role_links.clear()
-    session.flush()
-    for r in roles:
-        user.role_links.append(UserRole(role_id=r.id, assigned_by=actor_id))
+    role = session.get(Role, role_ids[0])
+    if not role:
+        raise UserError("Role tidak valid", {"role_id": "Pilih role yang valid."})
+    user.role_id = role.id
     session.flush()
     session.refresh(user)
 
@@ -138,6 +135,9 @@ def create_user(session: Session, data: dict[str, Any], actor_id: int) -> User:
     role_ids = _role_ids(data)
     if not role_ids:
         raise UserError("Role wajib dipilih", {"role_id": "Pilih role."})
+    role = session.get(Role, role_ids[0])
+    if not role:
+        raise UserError("Role tidak valid", {"role_id": "Pilih role yang valid."})
     user = User(
         username=data["username"].strip(),
         email=data["email"].strip(),
@@ -146,10 +146,10 @@ def create_user(session: Session, data: dict[str, Any], actor_id: int) -> User:
         unit_id=data.get("unit_id"),
         password_hash=hash_password(password) if password else None,
         is_active=data.get("is_active", True),
+        role_id=role.id,
     )
     session.add(user)
     session.flush()
-    _set_roles(session, user, role_ids, actor_id)
     record_audit(session, "CREATE", "users", "user", user.id, actor_id, new_data={
         "username": user.username, "email": user.email, "full_name": user.full_name,
         "roles": [r.code for r in user.roles],
@@ -224,12 +224,15 @@ def delete_user(session: Session, user_id: int, actor_id: int) -> None:
 
 
 # ---------------------------------------------------------------- roles
-def _perm_ids(session: Session, codes: list[str]) -> list[int]:
-    perms = session.scalars(select(Permission).where(Permission.code.in_(codes))).all()
-    unknown = set(codes) - {p.code for p in perms}
+def validate_permission_codes(codes: list[str]) -> list[str]:
+    clean_codes = list(dict.fromkeys(codes))
+    unknown = set(clean_codes) - ALL_PERMISSION_CODES
     if unknown:
-        raise UserError(f"Permission tidak dikenal: {', '.join(sorted(unknown))}", {"permissions": "Permission tidak dikenal."})
-    return [p.id for p in perms]
+        raise UserError(
+            f"Permission tidak dikenal: {', '.join(sorted(unknown))}",
+            {"permissions": "Permission tidak dikenal."},
+        )
+    return clean_codes
 
 
 def save_role(session: Session, data: dict[str, Any], actor_id: int, role_id: int | None = None) -> Role:
@@ -257,14 +260,10 @@ def save_role(session: Session, data: dict[str, Any], actor_id: int, role_id: in
             raise UserError("Role Administrator tidak dapat dinonaktifkan")
         role.is_active = bool(data["is_active"])
     if data.get("permissions") is not None:
-        codes = list(dict.fromkeys(data["permissions"]))
         if role.code == "ADMIN":
-            codes = [p.code for p in session.scalars(select(Permission)).all()]  # admin selalu penuh
-        ids = _perm_ids(session, codes)
-        role.permission_links.clear()
-        session.flush()
-        for pid in ids:
-            role.permission_links.append(RolePermission(permission_id=pid))
+            role.permissions = sorted(ALL_PERMISSION_CODES)  # admin selalu penuh
+        else:
+            role.permissions = sorted(validate_permission_codes(data["permissions"]))
     session.flush()
     session.refresh(role)
     new = serialize_role(session, role)
@@ -281,7 +280,7 @@ def delete_role(session: Session, role_id: int, actor_id: int) -> None:
         raise UserError("Role tidak ditemukan", status=404)
     if role.code in SYSTEM_ROLES:
         raise UserError("Role bawaan sistem tidak dapat dihapus")
-    if serialize_role(session, role)["user_count"]:
+    if session.scalars(select(User.id).where(User.role_id == role.id)).first():
         raise UserError("Role masih dipakai pengguna")
     record_audit(session, "DELETE", "users", "role", role.id, actor_id, old_data={"code": role.code})
     session.delete(role)
