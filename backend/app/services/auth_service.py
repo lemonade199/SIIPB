@@ -1,4 +1,5 @@
 """Authentication and JWT Token Service."""
+import logging
 from datetime import datetime, timedelta
 from typing import Any
 from sqlalchemy import select
@@ -7,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.config import Config
 from app.models import RefreshToken, User
 from app.services.audit_service import record_audit
+from app.services.settings_service import get_settings
 from app.utils.security import (
     create_access_token,
     generate_refresh_token,
@@ -16,6 +18,82 @@ from app.utils.security import (
     validate_password_strength,
     verify_password,
 )
+
+logger = logging.getLogger(__name__)
+
+
+def get_token_ttl(session: Session) -> tuple[int, int]:
+    """Mengambil masa berlaku token efektif (access token dalam menit, refresh token dalam hari).
+
+    Prioritas:
+    1. Pengaturan tersimpan pada system_settings (key: 'app.settings' -> security.jwt_access_minutes, security.jwt_refresh_days).
+    2. Fallback: Config.JWT_ACCESS_TTL_MINUTES dan Config.JWT_REFRESH_TTL_DAYS.
+
+    Nilai yang tidak valid (<= 0 atau bukan angka) dialihkan ke fallback yang aman dengan peringatan log.
+    """
+    sec = get_settings(session).get("security") or {}
+
+    raw_access = sec.get("jwt_access_minutes")
+    if raw_access is None:
+        access_minutes = Config.JWT_ACCESS_TTL_MINUTES
+    elif isinstance(raw_access, bool):
+        logger.warning(
+            "Konfigurasi security.jwt_access_minutes bertipe boolean (%r). Menggunakan fallback %d menit.",
+            raw_access,
+            Config.JWT_ACCESS_TTL_MINUTES,
+        )
+        access_minutes = Config.JWT_ACCESS_TTL_MINUTES
+    else:
+        try:
+            val = int(raw_access)
+            if val <= 0:
+                logger.warning(
+                    "Konfigurasi security.jwt_access_minutes bernilai non-positif (%r). Menggunakan fallback %d menit.",
+                    raw_access,
+                    Config.JWT_ACCESS_TTL_MINUTES,
+                )
+                access_minutes = Config.JWT_ACCESS_TTL_MINUTES
+            else:
+                access_minutes = val
+        except (TypeError, ValueError):
+            logger.warning(
+                "Konfigurasi security.jwt_access_minutes tidak valid (%r). Menggunakan fallback %d menit.",
+                raw_access,
+                Config.JWT_ACCESS_TTL_MINUTES,
+            )
+            access_minutes = Config.JWT_ACCESS_TTL_MINUTES
+
+    raw_refresh = sec.get("jwt_refresh_days")
+    if raw_refresh is None:
+        refresh_days = Config.JWT_REFRESH_TTL_DAYS
+    elif isinstance(raw_refresh, bool):
+        logger.warning(
+            "Konfigurasi security.jwt_refresh_days bertipe boolean (%r). Menggunakan fallback %d hari.",
+            raw_refresh,
+            Config.JWT_REFRESH_TTL_DAYS,
+        )
+        refresh_days = Config.JWT_REFRESH_TTL_DAYS
+    else:
+        try:
+            val = int(raw_refresh)
+            if val <= 0:
+                logger.warning(
+                    "Konfigurasi security.jwt_refresh_days bernilai non-positif (%r). Menggunakan fallback %d hari.",
+                    raw_refresh,
+                    Config.JWT_REFRESH_TTL_DAYS,
+                )
+                refresh_days = Config.JWT_REFRESH_TTL_DAYS
+            else:
+                refresh_days = val
+        except (TypeError, ValueError):
+            logger.warning(
+                "Konfigurasi security.jwt_refresh_days tidak valid (%r). Menggunakan fallback %d hari.",
+                raw_refresh,
+                Config.JWT_REFRESH_TTL_DAYS,
+            )
+            refresh_days = Config.JWT_REFRESH_TTL_DAYS
+
+    return access_minutes, refresh_days
 
 
 def authenticate_user(session: Session, username_or_email: str, password: str) -> dict[str, Any]:
@@ -46,6 +124,8 @@ def authenticate_user(session: Session, username_or_email: str, password: str) -
     now = datetime.now()
     user.last_login_at = now
 
+    access_ttl_minutes, refresh_ttl_days = get_token_ttl(session)
+
     # Issue tokens
     roles = [r.code for r in user.roles if r.is_active]
     permissions = list(user.permission_codes)
@@ -55,10 +135,11 @@ def authenticate_user(session: Session, username_or_email: str, password: str) -
         username=user.username,
         roles=roles,
         permissions=permissions,
+        expires_delta=timedelta(minutes=access_ttl_minutes),
     )
 
     raw_refresh_token, token_hash = generate_refresh_token()
-    refresh_expires_at = now + timedelta(days=Config.JWT_REFRESH_TTL_DAYS)
+    refresh_expires_at = now + timedelta(days=refresh_ttl_days)
 
     token_record = RefreshToken(
         user_id=user.id,
@@ -82,7 +163,7 @@ def authenticate_user(session: Session, username_or_email: str, password: str) -
         "access_token": access_token,
         "refresh_token": raw_refresh_token,
         "token_type": "Bearer",
-        "expires_in": Config.JWT_ACCESS_TTL_MINUTES * 60,
+        "expires_in": access_ttl_minutes * 60,
         "user": user_profile(user),
     }
 
@@ -105,11 +186,13 @@ def refresh_access_token(session: Session, raw_refresh_token: str) -> dict[str, 
     roles = [r.code for r in user.roles if r.is_active]
     permissions = list(user.permission_codes)
 
+    access_ttl_minutes, _ = get_token_ttl(session)
     new_access_token = create_access_token(
         user_id=user.id,
         username=user.username,
         roles=roles,
         permissions=permissions,
+        expires_delta=timedelta(minutes=access_ttl_minutes),
     )
 
     session.commit()
@@ -117,7 +200,7 @@ def refresh_access_token(session: Session, raw_refresh_token: str) -> dict[str, 
     return {
         "access_token": new_access_token,
         "token_type": "Bearer",
-        "expires_in": Config.JWT_ACCESS_TTL_MINUTES * 60,
+        "expires_in": access_ttl_minutes * 60,
     }
 
 
@@ -150,33 +233,21 @@ def resolve_oauth_user(
     email: str | None = None,
 ) -> User:
     """Cari pengguna internal untuk identitas OAuth (provider, subject); tautkan via email terverifikasi."""
-    from app.models.auth import ExternalIdentity
-
-    # 1. Lookup by (provider, provider_subject)
-    identity = session.scalars(
-        select(ExternalIdentity).where(
-            ExternalIdentity.provider == provider,
-            ExternalIdentity.provider_subject == provider_subject,
-        )
+    # 1. Lookup by google_subject directly on User
+    user = session.scalars(
+        select(User).where(User.google_subject == provider_subject, User.deleted_at.is_(None))
     ).first()
 
-    user: User | None = None
-    if identity:
-        user = identity.user
-    elif email:
+    if not user and email:
         # Check if internal user exists with this email
         user = session.scalars(
             select(User).where(User.email == email, User.deleted_at.is_(None))
         ).first()
         if user:
-            # Link new external identity
-            identity = ExternalIdentity(
-                user_id=user.id,
-                provider=provider,
-                provider_subject=provider_subject,
-                email=email,
-            )
-            session.add(identity)
+            # Link Google identity directly to User
+            user.google_subject = provider_subject
+            user.google_email = email
+            user.google_linked_at = datetime.now()
             session.flush()
 
     if not user:
@@ -201,15 +272,18 @@ def authenticate_oauth_identity(
     roles = [r.code for r in user.roles if r.is_active]
     permissions = list(user.permission_codes)
 
+    access_ttl_minutes, refresh_ttl_days = get_token_ttl(session)
+
     access_token = create_access_token(
         user_id=user.id,
         username=user.username,
         roles=roles,
         permissions=permissions,
+        expires_delta=timedelta(minutes=access_ttl_minutes),
     )
 
     raw_refresh_token, token_hash = generate_refresh_token()
-    refresh_expires_at = now + timedelta(days=Config.JWT_REFRESH_TTL_DAYS)
+    refresh_expires_at = now + timedelta(days=refresh_ttl_days)
 
     token_record = RefreshToken(
         user_id=user.id,
@@ -234,7 +308,7 @@ def authenticate_oauth_identity(
         "access_token": access_token,
         "refresh_token": raw_refresh_token,
         "token_type": "Bearer",
-        "expires_in": Config.JWT_ACCESS_TTL_MINUTES * 60,
+        "expires_in": access_ttl_minutes * 60,
         "user": user_profile(user),
     }
 
@@ -256,7 +330,7 @@ def user_profile(user: User) -> dict[str, Any]:
 
 def login_method(user: User) -> str:
     local = bool(user.password_hash)
-    sso = bool(user.external_identities)
+    sso = bool(user.google_subject)
     return "LOKAL + SSO" if local and sso else ("SSO" if sso else "LOKAL")
 
 
@@ -305,16 +379,23 @@ def exchange_sso_code(session: Session, code: str) -> dict[str, Any]:
     user = record.user
     if not user.is_active or user.deleted_at is not None:
         raise ValueError("Akun dinonaktifkan, hubungi administrator")
+    access_ttl_minutes, refresh_ttl_days = get_token_ttl(session)
     raw_refresh, refresh_hash = generate_refresh_token()
     session.add(RefreshToken(user_id=user.id, token_hash=refresh_hash,
-                             expires_at=now + timedelta(days=Config.JWT_REFRESH_TTL_DAYS)))
+                             expires_at=now + timedelta(days=refresh_ttl_days)))
     roles = [r.code for r in user.roles if r.is_active]
-    access = create_access_token(user.id, user.username, roles, list(user.permission_codes))
+    access = create_access_token(
+        user.id,
+        user.username,
+        roles,
+        list(user.permission_codes),
+        expires_delta=timedelta(minutes=access_ttl_minutes),
+    )
     session.commit()
     return {
         "access_token": access,
         "refresh_token": raw_refresh,
         "token_type": "Bearer",
-        "expires_in": Config.JWT_ACCESS_TTL_MINUTES * 60,
+        "expires_in": access_ttl_minutes * 60,
         "user": user_profile(user),
     }

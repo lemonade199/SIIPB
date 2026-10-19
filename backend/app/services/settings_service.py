@@ -128,6 +128,28 @@ def get_settings(session: Session) -> dict[str, Any]:
     ]
     pw = _row(session, SMTP_PASSWORD_KEY)
     data["smtp"]["password_set"] = bool(pw and pw.value) or bool(Config.SMTP_PASSWORD)
+
+    # Dukungan kompatibilitas key individual legacy di system_settings jika belum dioverride di app.settings
+    sec_stored = stored.get("security") if isinstance(stored, dict) and isinstance(stored.get("security"), dict) else {}
+    if "jwt_access_minutes" not in sec_stored:
+        leg_acc = _row(session, "security.jwt_access_ttl_minutes") or _row(session, "security.jwt_access_minutes")
+        if leg_acc and leg_acc.value:
+            try:
+                v = int(leg_acc.value)
+                if v > 0:
+                    data.setdefault("security", {})["jwt_access_minutes"] = v
+            except (TypeError, ValueError):
+                pass
+    if "jwt_refresh_days" not in sec_stored:
+        leg_ref = _row(session, "security.jwt_refresh_ttl_days") or _row(session, "security.jwt_refresh_days")
+        if leg_ref and leg_ref.value:
+            try:
+                v = int(leg_ref.value)
+                if v > 0:
+                    data.setdefault("security", {})["jwt_refresh_days"] = v
+            except (TypeError, ValueError):
+                pass
+
     return data
 
 
@@ -153,6 +175,39 @@ def _validate(patch: dict[str, Any]) -> dict[str, str]:
         if bad:
             errors["rules"] = f"Penerima tidak dikenal: {', '.join(sorted(bad))}"
     sec = patch.get("security") or {}
+    if "jwt_access_minutes" in sec:
+        raw = sec["jwt_access_minutes"]
+        if isinstance(raw, bool):
+            errors["security.jwt_access_minutes"] = "Masa berlaku access token harus berupa angka positif (menit)."
+        else:
+            try:
+                val = int(raw)
+                if val <= 0:
+                    raise ValueError
+            except (TypeError, ValueError):
+                errors["security.jwt_access_minutes"] = "Masa berlaku access token harus berupa angka positif (menit)."
+    if "jwt_refresh_days" in sec:
+        raw = sec["jwt_refresh_days"]
+        if isinstance(raw, bool):
+            errors["security.jwt_refresh_days"] = "Masa berlaku refresh token harus berupa angka positif (hari)."
+        else:
+            try:
+                val = int(raw)
+                if val <= 0:
+                    raise ValueError
+            except (TypeError, ValueError):
+                errors["security.jwt_refresh_days"] = "Masa berlaku refresh token harus berupa angka positif (hari)."
+    if "session_hours" in sec:
+        raw = sec["session_hours"]
+        if isinstance(raw, bool):
+            errors["security.session_hours"] = "Sesi antarmuka harus berupa angka positif (jam)."
+        else:
+            try:
+                val = int(raw)
+                if val <= 0:
+                    raise ValueError
+            except (TypeError, ValueError):
+                errors["security.session_hours"] = "Sesi antarmuka harus berupa angka positif (jam)."
     if "upload_max_mb" in sec:
         try:
             if not 1 <= int(sec["upload_max_mb"]) <= 50:
@@ -250,6 +305,40 @@ def smtp_config(session: Session) -> dict[str, Any]:
         "from_name": s.get("from_name") or Config.SMTP_SENDER_NAME,
         "from_email": s.get("from_email") or Config.SMTP_SENDER_EMAIL,
         "simulate_failure": bool(s.get("simulate_failure")),
+    }
+
+
+def token_ttl_config(session: Session) -> dict[str, int]:
+    """Konfigurasi masa berlaku token efektif (pengaturan DB > Config bawaan).
+
+    Returns:
+        {"jwt_access_minutes": int, "jwt_refresh_days": int}
+    """
+    s = get_settings(session).get("security") or {}
+    raw_access = s.get("jwt_access_minutes")
+    raw_refresh = s.get("jwt_refresh_days")
+
+    access_minutes = Config.JWT_ACCESS_TTL_MINUTES
+    if raw_access is not None and not isinstance(raw_access, bool):
+        try:
+            val = int(raw_access)
+            if val > 0:
+                access_minutes = val
+        except (TypeError, ValueError):
+            pass
+
+    refresh_days = Config.JWT_REFRESH_TTL_DAYS
+    if raw_refresh is not None and not isinstance(raw_refresh, bool):
+        try:
+            val = int(raw_refresh)
+            if val > 0:
+                refresh_days = val
+        except (TypeError, ValueError):
+            pass
+
+    return {
+        "jwt_access_minutes": access_minutes,
+        "jwt_refresh_days": refresh_days,
     }
 
 
