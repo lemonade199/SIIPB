@@ -3,7 +3,7 @@
 # Prasyarat (lihat docs/DEVOPS-DEPLOYMENT.md):
 #   Secrets  : AWS_DEPLOY_ROLE_ARN, EC2_SSH_PRIVATE_KEY
 #   Variables: AWS_REGION, EC2_HOST, EC2_SECURITY_GROUP_ID, APP_DOMAIN, INSTITUTION_NAME
-# Autentikasi AWS memakai OIDC (role dari Terraform) — tidak ada access key statis di GitHub.
+# Autentikasi AWS memakai OIDC (role dari stack CloudFormation 03-app) — tidak ada access key statis di GitHub.
 name: Deploy Production
 
 on:

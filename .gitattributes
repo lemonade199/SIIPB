@@ -1,8 +1,7 @@
 # Skrip & konfigurasi yang dieksekusi di Linux (EC2/container) wajib berakhiran LF,
 # meskipun repo di-checkout di Windows (core.autocrlf=true).
 *.sh        text eol=lf
-*.tftpl     text eol=lf
-*.tf        text eol=lf
 *.conf      text eol=lf
 Dockerfile* text eol=lf
 deploy/**   text eol=lf
+infrastructure/cloudformation/** text eol=lf

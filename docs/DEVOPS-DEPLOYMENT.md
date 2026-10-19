@@ -1,8 +1,8 @@
-# SIIPB — Panduan DevOps: Terraform, CI/CD, dan Operasional AWS
+# SIIPB — Panduan DevOps: AWS CloudFormation, CI/CD, dan Operasional
 
-Dokumen ini menjelaskan cara membangun infrastruktur production SIIPB di AWS secara otomatis
-(Infrastructure as Code dengan Terraform), menyiapkan pipeline rilis GitHub Actions, dan
-menjalankan pemantauan serta backup.
+Panduan ini menjelaskan cara membangun infrastruktur production SIIPB di AWS secara otomatis
+dengan **AWS CloudFormation** (Infrastructure as Code), menyiapkan pipeline rilis GitHub Actions,
+dan menjalankan pemantauan serta backup.
 
 ## Arsitektur
 
@@ -24,44 +24,74 @@ menjalankan pemantauan serta backup.
  │  Private subnet  ▼ (tanpa rute internet)                                            │
  │  RDS MariaDB 11.4 · terenkripsi · automated backup harian 00.00 WIB · retensi 7 hari│
  └────────────────────────────────────────────────────────────────────────────────────┘
-  ECR: siipb-backend, siipb-worker, siipb-frontend      Secrets Manager: siipb/production/app
-  S3: siipb-production-files-xxxx (uploads/, backups/)  CloudWatch Alarms → SNS email + billing alert
+  ECR: siipb-backend, siipb-worker, siipb-frontend     Secrets Manager: siipb/production/{db,secret-key,jwt,app-config}
+  S3: bucket berkas (uploads/, backups/)               CloudWatch Alarms → SNS email · billing alert (us-east-1)
   GitHub Actions ── OIDC (tanpa access key) ──► ECR push + SSH sementara ke EC2
 ```
 
-## Peta tugas → berkas
+## Struktur berkas
+
+```text
+infrastructure/cloudformation/
+├── templates/
+│   ├── 01-network.yaml   VPC, subnet publik/privat, route table, S3 endpoint, Security Group
+│   ├── 02-data.yaml      RDS MariaDB, S3, ECR (3 repo), Secrets Manager
+│   ├── 03-app.yaml       IAM + OIDC GitHub, EC2 + Elastic IP + user data, Route 53, log, SNS, alarm
+│   └── 04-billing.yaml   billing alert (region us-east-1)
+├── params.env.example    contoh parameter → salin ke params.env
+└── deploy-stacks.sh      deploy semua stack berurutan + tampilkan nilai untuk GitHub
+deploy/                   berkas yang disalin CI ke EC2 (/opt/siipb)
+├── docker-compose.prod.yml
+├── nginx/                siipb.http.conf, siipb.https.conf, snippets/siipb-locations.conf
+└── scripts/              deploy.sh, fetch-secrets.sh, setup-ssl.sh
+.github/workflows/deploy.yml   CI/CD: pytest → build → push ECR → SSH deploy
+infrastructure/scripts/rds_restore_test.sh   simulasi restore RDS
+```
+
+## Peta tugas → implementasi
 
 | Tugas | Implementasi |
 |---|---|
-| **1. Provisioning** VPC, subnet publik/privat | `infrastructure/terraform/modules/network` |
-| EC2 Ubuntu di public subnet + Elastic IP | `modules/compute` (+ `templates/user_data.sh.tftpl`) |
-| RDS MariaDB di private subnet | `modules/database` (`publicly_accessible = false`) |
-| S3 untuk berkas & foto barang | `modules/storage` (privat, terenkripsi, versioning, lifecycle) |
-| Security Group 80/443/22 dari IP Anda + SMTP keluar | `modules/security` (`admin_cidrs`, `web_ingress_cidrs`, `smtp_ports`) |
+| **1. Provisioning** VPC, public subnet (server) & private subnet (DB) | `01-network.yaml` |
+| EC2 Ubuntu di public subnet | `03-app.yaml` (`AppInstance`, Elastic IP, IMDSv2, disk terenkripsi) |
+| RDS MariaDB di private subnet | `02-data.yaml` (`PubliclyAccessible: false`, subnet privat tanpa rute internet) |
+| S3 untuk berkas & foto barang | `02-data.yaml` (`FilesBucket`: privat, terenkripsi, versioning, lifecycle) |
+| SG 80/443, 22 khusus IP Anda, port SMTP | `01-network.yaml` (`AdminCidr` untuk SSH; egress 25/465/587) |
 | **2. Containerization** Dockerfile frontend/backend/worker | `frontend/Dockerfile`, `backend/Dockerfile`, `backend/Dockerfile.worker` |
-| docker-compose lokal (Redis + MariaDB) | `docker-compose.yml` (+ `docker-compose.dev.yml`) |
-| Amazon ECR | `modules/ecr` (scan on push, lifecycle 15 image) |
-| **3. Web server & domain** Nginx reverse proxy di EC2 | `deploy/nginx/*` dipasang oleh user_data & `deploy.sh` |
-| DNS subdomain → Elastic IP | `modules/dns` (Route 53) atau record A manual (output `dns_record`) |
-| Certbot / HTTPS wajib | `deploy/scripts/setup-ssl.sh` + `deploy/nginx/siipb.https.conf` |
-| **4. CI/CD** | `.github/workflows/deploy.yml` (pytest → build → push ECR → SSH → deploy) |
-| **5. Secrets** | `modules/secrets` (Secrets Manager) → `deploy/scripts/fetch-secrets.sh` → `app.env` → container |
-| **6. Monitoring & backup** | `modules/database` (automated backup), `modules/monitoring` (alarm, billing), `infrastructure/scripts/rds_restore_test.sh` |
+| docker-compose lokal + Redis + MariaDB | `docker-compose.yml` (+ `docker-compose.dev.yml`) |
+| Amazon ECR | `02-data.yaml` (scan on push, simpan 15 image terakhir) |
+| **3. Web server & domain** Nginx reverse proxy di EC2 | `deploy/nginx/*`, dipasang user data & `deploy.sh` |
+| DNS subdomain → Elastic IP | `03-app.yaml` (`DnsRecord` bila Route 53) atau record A manual |
+| Certbot / HTTPS wajib | `deploy/scripts/setup-ssl.sh` + `siipb.https.conf` |
+| **4. CI/CD** | `.github/workflows/deploy.yml` |
+| **5. Secrets** | Secrets Manager (`02-data.yaml`) → `fetch-secrets.sh` → `app.env` → container |
+| **6. Monitoring & backup** | Automated Backups RDS, CloudWatch Agent + alarm (`03-app.yaml`), billing (`04-billing.yaml`), `rds_restore_test.sh` |
 
 ---
 
 ## Tahap 0 — Prasyarat
 
-1. Akun AWS dengan user/role administrator. Jangan pakai akun root untuk pekerjaan harian.
-2. Pasang alat di laptop:
-   - [Terraform](https://developer.hashicorp.com/terraform/install) ≥ 1.10 (`terraform version`)
-   - [AWS CLI v2](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html), lalu `aws configure` (atau `aws configure sso`)
-   - Git, OpenSSH (`ssh`, `ssh-keygen`), `jq` (untuk skrip uji restore)
-3. Aktifkan billing alert (sekali, oleh pemilik akun): **Billing and Cost Management → Billing preferences →
-   Alert preferences → Receive CloudWatch billing alerts**. Tanpa langkah ini, metrik `EstimatedCharges` tidak ada.
-4. Pastikan Anda bisa mengubah DNS `averus.my.id`, baik di Route 53 maupun di panel registrar.
+1. **Akun AWS** dengan user IAM/SSO administrator. Jangan pakai akun root untuk pekerjaan harian.
+2. **Alat di laptop** (Windows: jalankan semua perintah di **Git Bash**):
+   - AWS CLI v2:
+     ```bash
+     winget install Amazon.AWSCLI
+     ```
+     Lalu buka ulang terminal dan login:
+     ```bash
+     aws configure
+     ```
+     Isi Access Key admin, region `ap-southeast-1`, dan output `json`.
+   - Git dan OpenSSH (sudah ada bersama Git for Windows).
+   - `jq`, hanya untuk skrip uji restore:
+     ```bash
+     winget install jqlang.jq
+     ```
+3. **Aktifkan billing alert** (sekali, oleh pemilik akun): Billing and Cost Management → Billing preferences →
+   Alert preferences → centang **Receive CloudWatch billing alerts** → Update.
+4. Akses untuk mengubah DNS `averus.my.id`, baik di Route 53 maupun di panel registrar.
 
-Cek identitas AWS:
+Verifikasi bahwa CLI sudah login:
 
 ```bash
 aws sts get-caller-identity
@@ -71,108 +101,118 @@ aws sts get-caller-identity
 
 ```bash
 cp .env.example .env
+```
+
+Isi `DB_PASSWORD`, `DB_ROOT_PASSWORD`, `SECRET_KEY`, `JWT_SECRET_KEY`, dan `SEED_ADMIN_PASSWORD` di `.env`, lalu:
+
+```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 ```
 
-Sebelum menjalankan, isi `DB_PASSWORD`, `DB_ROOT_PASSWORD`, `SECRET_KEY`, `JWT_SECRET_KEY`, dan `SEED_ADMIN_PASSWORD` di `.env`.
-Setelah itu buka http://localhost (Swagger: http://localhost/api/docs). Ada tujuh container: `mariadb`, `redis`, `backend`,
-`celery_worker`, `celery_beat`, `frontend`, dan `nginx`, dan semuanya harus berstatus *healthy*:
+Buka http://localhost (Swagger: http://localhost/api/docs). Ketujuh container (`mariadb`, `redis`, `backend`,
+`celery_worker`, `celery_beat`, `frontend`, `nginx`) harus berstatus *healthy*:
 
 ```bash
 docker compose ps
 ```
 
-## Tahap 2 — Kunci SSH deploy
+## Tahap 2 — Buat kunci SSH deploy
 
 ```bash
 ssh-keygen -t ed25519 -f ~/.ssh/siipb_deploy -C "siipb-deploy" -N ""
 ```
 
-- `~/.ssh/siipb_deploy.pub` diisi ke `ssh_public_key` di Terraform.
-- `~/.ssh/siipb_deploy` (private key) diisi ke GitHub secret `EC2_SSH_PRIVATE_KEY`. Jangan di-commit.
+- `~/.ssh/siipb_deploy.pub` dipakai CloudFormation (parameter `SSH_PUBLIC_KEY_FILE`).
+- `~/.ssh/siipb_deploy` (private key) nanti diisi ke GitHub secret `EC2_SSH_PRIVATE_KEY`. Jangan di-commit.
 
-## Tahap 3 — Bootstrap Terraform state (sekali saja)
-
-State Terraform menyimpan password RDS dan secret aplikasi, jadi state disimpan di bucket S3 yang terenkripsi, bukan di laptop.
+## Tahap 3 — Isi parameter
 
 ```bash
-cd infrastructure/terraform/bootstrap
-terraform init
-terraform apply -var="aws_region=ap-southeast-1"
-terraform output -raw backend_hcl > ../backend.hcl
-cd ..
+cd infrastructure/cloudformation
+cp params.env.example params.env
 ```
 
-## Tahap 4 — Isi variabel
+Cek IP publik Anda:
 
 ```bash
-cp terraform.tfvars.example terraform.tfvars
+curl https://checkip.amazonaws.com
 ```
 
-Sunting `terraform.tfvars`:
+Sunting `params.env`, minimal bagian berikut:
 
 | Variabel | Isi |
 |---|---|
-| `admin_cidrs` | IP publik Anda + `/32` (cek: `curl https://checkip.amazonaws.com`) |
-| `ssh_public_key` | isi `~/.ssh/siipb_deploy.pub` |
-| `domain_name` | `siipb.averus.my.id` |
-| `route53_zone_id` | ID hosted zone bila DNS di Route 53; kosongkan bila DNS di registrar |
-| `letsencrypt_email`, `alarm_email` | email aktif |
-| `smtp_*` | kredensial SMTP (mis. Gmail App Password) |
+| `ADMIN_CIDR` | IP publik Anda + `/32`, mis. `36.71.10.20/32` |
+| `DOMAIN_NAME` | `siipb.averus.my.id` |
+| `HOSTED_ZONE_ID` | ID hosted zone bila DNS di Route 53; kosongkan bila DNS di registrar |
+| `LETSENCRYPT_EMAIL`, `ALARM_EMAIL` | email aktif |
+| `SMTP_USERNAME`, `SMTP_SENDER_EMAIL` | akun SMTP (mis. Gmail + App Password) |
 
-Berikan nilai rahasia lewat variabel lingkungan supaya tidak tersimpan di berkas.
-
-Bash:
+Password **tidak** ditulis ke berkas. Berikan lewat variabel lingkungan di terminal yang sama:
 
 ```bash
-export TF_VAR_seed_admin_password='GantiDenganSandiKuat!2026'
-export TF_VAR_smtp_password='app-password-smtp'
+export SEED_ADMIN_PASSWORD='GantiDenganSandiKuat2026'
+export SMTP_PASSWORD='app-password-gmail'
 ```
 
-PowerShell:
+`SEED_ADMIN_PASSWORD` wajib saat pertama kali, sedangkan `SMTP_PASSWORD` opsional (kosong berarti email hanya disimulasikan).
 
-```powershell
-$env:TF_VAR_seed_admin_password = 'GantiDenganSandiKuat!2026'
-$env:TF_VAR_smtp_password = 'app-password-smtp'
-```
+> Password RDS, `SECRET_KEY`, dan `JWT_SECRET_KEY` **dibangkitkan otomatis oleh AWS Secrets Manager**, jadi tidak pernah ada di repo atau di laptop.
+> Hindari tanda kutip tunggal (`'`) di semua password.
 
-> Nilai secret **tidak boleh** mengandung tanda kutip tunggal (`'`).
-> Password RDS, `SECRET_KEY`, dan `JWT_SECRET_KEY` dibangkitkan otomatis oleh Terraform (`random_password`).
+## Tahap 4 — Deploy infrastruktur
 
-## Tahap 5 — Provisioning infrastruktur
+Masih di folder `infrastructure/cloudformation`:
 
 ```bash
-terraform init -backend-config=backend.hcl
-terraform plan -out=tfplan
-terraform apply tfplan
+chmod +x deploy-stacks.sh
+./deploy-stacks.sh
 ```
 
-Proses ini memakan waktu ±10–15 menit; RDS adalah bagian paling lama. Setelah selesai:
+Skrip membuat 4 stack secara berurutan (total ±20–30 menit):
+
+| Stack | Region | Isi | Waktu |
+|---|---|---|---|
+| `siipb-production-network` | ap-southeast-1 | VPC, subnet, SG | ±2 menit |
+| `siipb-production-data` | ap-southeast-1 | RDS, S3, ECR, Secrets Manager | ±10–15 menit |
+| `siipb-production-app` | ap-southeast-1 | IAM, EC2, EIP, DNS, alarm | ±5–10 menit |
+| `siipb-production-billing` | us-east-1 | billing alert | ±1 menit |
+
+Stack `app` memakai **CreationPolicy**: stack baru dinyatakan sukses setelah bootstrap EC2 (Docker, Nginx,
+Certbot, CloudWatch Agent) selesai dan mengirim sinyal. Bila bootstrap gagal, stack otomatis gagal dan di-rollback.
+
+Di akhir, skrip menampilkan semua output beserta nilai yang perlu diisi ke GitHub. Untuk menampilkannya lagi:
 
 ```bash
-terraform output
-terraform output github_settings
+./deploy-stacks.sh outputs
 ```
 
-Selanjutnya:
+Lalu:
 
-1. **Konfirmasi dua email langganan SNS** dari AWS Notifications: satu untuk alarm dan satu untuk billing. Alarm tidak akan terkirim sebelum dikonfirmasi.
-2. Tunggu ±5 menit agar user_data selesai. Cek dengan:
+1. **Konfirmasi dua email "AWS Notification - Subscription Confirmation"**, satu untuk alarm dan satu untuk billing. Alarm tidak terkirim sebelum dikonfirmasi.
+2. Opsional: cek log bootstrap.
    ```bash
-   ssh -i ~/.ssh/siipb_deploy ubuntu@<ec2_public_ip> 'cat /opt/siipb/.bootstrap-done; tail -5 /var/log/siipb-bootstrap.log'
+   ssh -i ~/.ssh/siipb_deploy ubuntu@<PublicIp> 'cat /opt/siipb/.bootstrap-done'
    ```
-   Pada tahap ini Nginx sudah berjalan, tetapi aplikasi belum (502) sampai deploy pertama.
+   Pada tahap ini Nginx sudah aktif, tetapi aplikasi masih menampilkan 502 sampai deploy pertama (Tahap 6).
 
-> Bila akun AWS sudah memiliki OIDC provider `token.actions.githubusercontent.com`, set `create_github_oidc_provider = false`.
+Bila terjadi error, buka **CloudFormation console → stack → tab Events**. Cari baris `CREATE_FAILED` pertama; kolom *Status reason* menjelaskan penyebabnya.
+Setelah diperbaiki, jalankan `./deploy-stacks.sh` lagi. Stack yang gagal saat pertama kali dibuat (`ROLLBACK_COMPLETE`) harus dihapus dulu:
 
-## Tahap 6 — DNS
+```bash
+aws cloudformation delete-stack --stack-name <nama-stack>
+```
 
-- **Route 53** (`route53_zone_id` diisi): record A dibuat otomatis.
-- **Registrar lain**: buat record berikut (nilai juga ada di output `dns_record`):
+> Bila akun sudah punya OIDC provider GitHub (`token.actions.githubusercontent.com`), set `CREATE_GITHUB_OIDC_PROVIDER=false`.
+
+## Tahap 5 — DNS
+
+- **Route 53** (`HOSTED_ZONE_ID` diisi): record A dibuat otomatis.
+- **Registrar lain**: buat record berikut di panel DNS `averus.my.id`:
 
   | Host | Tipe | Nilai | TTL |
   |---|---|---|---|
-  | `siipb` | A | `<ec2_public_ip>` | 300 |
+  | `siipb` | A | `<PublicIp>` | 300 |
 
 Cek propagasi:
 
@@ -180,50 +220,55 @@ Cek propagasi:
 nslookup siipb.averus.my.id
 ```
 
-## Tahap 7 — GitHub Actions
+Hasilnya harus menunjukkan Elastic IP.
 
-Di repository GitHub, buka **Settings → Environments**, lalu buat environment `production` (opsional: tambahkan *required reviewers*).
-Lalu di **Settings → Secrets and variables → Actions**:
+## Tahap 6 — GitHub Actions & deploy pertama
 
-| Jenis | Nama | Nilai |
-|---|---|---|
-| Secret | `AWS_DEPLOY_ROLE_ARN` | output `github_actions_role_arn` |
-| Secret | `EC2_SSH_PRIVATE_KEY` | isi `~/.ssh/siipb_deploy` (lengkap dengan baris BEGIN/END) |
-| Variable | `AWS_REGION` | mis. `ap-southeast-1` |
-| Variable | `EC2_HOST` | output `ec2_public_ip` |
-| Variable | `EC2_SECURITY_GROUP_ID` | output `ec2_security_group_id` |
-| Variable | `APP_DOMAIN` | `siipb.averus.my.id` |
-| Variable | `INSTITUTION_NAME` | nama instansi (ditanam saat build frontend) |
+1. Di GitHub, buka **Settings → Environments → New environment**, lalu buat `production` (opsional: tambahkan *required reviewers*).
+2. Isi **Settings → Secrets and variables → Actions** (nilainya dari `./deploy-stacks.sh outputs`):
 
-Alur `deploy.yml` setiap ada push ke `main`:
+   | Jenis | Nama | Nilai |
+   |---|---|---|
+   | Secret | `AWS_DEPLOY_ROLE_ARN` | output `GitHubActionsRoleArn` |
+   | Secret | `EC2_SSH_PRIVATE_KEY` | seluruh isi `~/.ssh/siipb_deploy` (termasuk baris BEGIN/END) |
+   | Variable | `AWS_REGION` | `ap-southeast-1` |
+   | Variable | `EC2_HOST` | output `PublicIp` |
+   | Variable | `EC2_SECURITY_GROUP_ID` | output `Ec2SecurityGroupId` |
+   | Variable | `APP_DOMAIN` | `siipb.averus.my.id` |
+   | Variable | `INSTITUTION_NAME` | nama instansi (ditanam saat build frontend) |
+
+3. Merge/push ke `main`, atau buka **Actions → Deploy Production → Run workflow**.
+
+Alur `deploy.yml`:
 
 1. **test**: `pytest` dengan MariaDB service container.
-2. **build**: membangun 3 image (`backend`, `worker`, `frontend`) lalu push ke ECR dengan tag `<commit-sha>` dan `latest`.
+2. **build** (3 job paralel): image `backend`, `worker`, dan `frontend` di-push ke ECR dengan tag `<commit-sha>` dan `latest`.
 3. **deploy**:
-   - membuka port 22 sementara untuk IP runner, lalu menyalin `deploy/` ke `/opt/siipb`;
+   - membuka port 22 untuk IP runner saja, lalu menyalin `deploy/` ke `/opt/siipb`;
    - menjalankan `deploy.sh <sha>`, yang mengambil secret, login ECR, pull image, mengganti container satu per satu sambil menunggu healthcheck, dan rollback otomatis bila gagal;
-   - menjalankan smoke test, lalu menutup kembali port 22.
+   - menjalankan smoke test `/api/health`, lalu menutup kembali port 22 (selalu, walaupun job gagal).
 
-Deploy pertama bisa dipicu dengan push ke `main` atau lewat **Actions → Deploy Production → Run workflow**.
+## Tahap 7 — HTTPS (Certbot)
 
-## Tahap 8 — HTTPS (Certbot)
-
-Jalankan sekali setelah DNS mengarah ke Elastic IP dan deploy pertama sukses:
+Jalankan sekali setelah DNS mengarah ke Elastic IP **dan** deploy pertama sukses:
 
 ```bash
-ssh -i ~/.ssh/siipb_deploy ubuntu@<ec2_public_ip>
+ssh -i ~/.ssh/siipb_deploy ubuntu@<PublicIp>
 /opt/siipb/scripts/setup-ssl.sh
 ```
 
-Skrip ini memverifikasi DNS, menerbitkan sertifikat (`certbot --webroot`), lalu memasang `siipb.https.conf`
-(HTTP → 301 HTTPS, HSTS, TLS 1.2/1.3) dan menguji perpanjangan otomatis (`certbot renew --dry-run`).
-Deploy berikutnya otomatis memakai konfigurasi HTTPS karena sertifikat sudah ada.
+Skrip ini:
 
-Buka https://siipb.averus.my.id, login sebagai admin dengan `seed_admin_password`, lalu **segera ganti kata sandi**.
+- memverifikasi DNS;
+- menerbitkan sertifikat Let's Encrypt (`certbot --webroot`);
+- mengaktifkan `siipb.https.conf` (HTTP → 301 HTTPS, HSTS, TLS 1.2/1.3);
+- menguji perpanjangan otomatis.
 
-## Tahap 9 — Monitoring
+Deploy berikutnya otomatis memakai konfigurasi HTTPS.
 
-Terraform sudah membuat komponen berikut:
+Buka **https://siipb.averus.my.id**, login sebagai `admin` dengan `SEED_ADMIN_PASSWORD`, lalu **segera ganti kata sandi**.
+
+## Tahap 8 — Monitoring
 
 | Alarm | Kondisi |
 |---|---|
@@ -231,18 +276,18 @@ Terraform sudah membuat komponen berikut:
 | `siipb-production-ec2-memory-high` | RAM > 85% (CloudWatch Agent) |
 | `siipb-production-ec2-disk-high` | Disk `/` > 85% (CloudWatch Agent) |
 | `siipb-production-ec2-status-check` | status check EC2 gagal |
-| `siipb-production-rds-*` | CPU RDS > 80%, sisa storage < 2 GiB, freeable memory < 64 MiB |
-| `siipb-production-billing-estimated-charges` | estimasi tagihan > `billing_alarm_threshold_usd` (us-east-1) |
+| `siipb-production-rds-cpu-high` / `-free-storage-low` / `-freeable-memory-low` | beban & kapasitas RDS |
+| `siipb-production-billing-estimated-charges` (us-east-1) | estimasi tagihan > `BILLING_THRESHOLD_USD` |
 
-Log tersedia di CloudWatch Logs: `/siipb-production/app` (container + log deploy) dan `/siipb-production/nginx`.
+- Konfigurasi agent tersimpan di SSM Parameter `AmazonCloudWatch-siipb-production`.
+- Metrik ada di **CloudWatch → Metrics → CWAgent → InstanceId**.
+- Log: `/siipb-production/app` (container, deploy, bootstrap) dan `/siipb-production/nginx`.
 
-Verifikasi agent di EC2:
+Cek status agent di EC2:
 
 ```bash
 sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a status
 ```
-
-Metrik muncul di **CloudWatch → Metrics → CWAgent → InstanceId**.
 
 Uji alarm CPU (opsional, ±10 menit):
 
@@ -250,49 +295,80 @@ Uji alarm CPU (opsional, ±10 menit):
 sudo apt-get install -y stress-ng && stress-ng --cpu 2 --timeout 660s
 ```
 
-## Tahap 10 — Backup & simulasi restore
+Email "ALARM" akan datang, disusul "OK" setelah beban turun.
 
-Lapisan backup yang aktif:
+## Tahap 9 — Backup & simulasi restore
 
-- **RDS Automated Backups**: snapshot harian pada `db_backup_window` (17:00–17:30 UTC = 00:00 WIB), retensi 7 hari, dan point-in-time restore.
-  Cek dengan:
+Lapisan backup:
+
+- **RDS Automated Backups**: snapshot harian 17:00–17:30 UTC (00:00 WIB), retensi 7 hari, plus point-in-time restore. Cek dengan:
   ```bash
   aws rds describe-db-instances --db-instance-identifier siipb-production-mariadb --query "DBInstances[0].[BackupRetentionPeriod,PreferredBackupWindow,LatestRestorableTime]"
   ```
-- **Dump aplikasi**: Celery Beat menjalankan `mariadb-dump` pukul 01.00 WIB ke `/opt/siipb/backups`, lalu cron menyinkronkannya ke `s3://<bucket>/backups/` pukul 02.30 dengan retensi 90 hari.
+  Daftar snapshot harian:
+  ```bash
+  aws rds describe-db-snapshots --db-instance-identifier siipb-production-mariadb --snapshot-type automated
+  ```
+- **Dump aplikasi**: Celery Beat menjalankan `mariadb-dump` pukul 01.00 WIB, lalu hasilnya disinkronkan ke `s3://<bucket>/backups/` pukul 02.30 dengan retensi 90 hari.
 - **Foto/berkas barang**: disinkronkan ke `s3://<bucket>/uploads/` tiap 15 menit (bucket memakai versioning).
 
-**Simulasi restore** (wajib sekali sebelum UAT). Jalankan dari laptop admin setelah ada minimal satu backup harian:
+**Simulasi restore** (wajib sekali sebelum UAT, setelah minimal 1 hari berjalan). Jalankan dari root repo:
 
 ```bash
 ./infrastructure/scripts/rds_restore_test.sh
 ```
 
-Skrip ini me-restore RDS ke instans baru (point-in-time terakhir), membandingkan jumlah baris `users`, `assets`, `borrowings`, `audit_logs`, dan versi Alembic
-antara produksi dan hasil restore, lalu menghapus instans uji. Simpan output skrip sebagai bukti untuk laporan UAT.
+Skrip ini:
+
+1. me-restore RDS ke **instans baru** (point-in-time terakhir);
+2. membandingkan jumlah baris `users`, `assets`, `borrowings`, `audit_logs`, dan versi Alembic antara produksi dan hasil restore;
+3. menghapus instans uji (`KEEP=1` untuk menyimpannya).
+
+Simpan output skrip sebagai bukti uji restore pada laporan UAT.
 
 ## Operasional harian
 
-| Kebutuhan | Perintah |
+| Kebutuhan | Cara |
 |---|---|
-| Deploy ulang versi tertentu | `ssh ubuntu@EC2 /opt/siipb/scripts/deploy.sh <commit-sha>` |
-| Rollback cepat | sama seperti di atas dengan SHA sebelumnya (lihat tag di ECR) |
-| Ubah secret (SMTP, dll.) | ubah variabel lalu `terraform apply`, kemudian `ssh ubuntu@EC2 '/opt/siipb/scripts/deploy.sh $(cat /opt/siipb/.deployed_tag)'` |
+| Deploy ulang / rollback ke versi tertentu | `ssh ubuntu@EC2 /opt/siipb/scripts/deploy.sh <commit-sha>` |
+| Ubah SMTP / parameter lain | ubah `params.env` (password lewat `export`) → `./deploy-stacks.sh data` → deploy ulang aplikasi |
+| IP admin berubah | ubah `ADMIN_CIDR` → `./deploy-stacks.sh network` |
 | Lihat container | `ssh ubuntu@EC2 'cd /opt/siipb && docker compose -f docker-compose.prod.yml ps'` |
-| Akses darurat tanpa SSH | `aws ssm start-session --target <ec2_instance_id>` |
-| IP admin berubah | ubah `admin_cidrs` lalu `terraform apply` |
+| Akses darurat tanpa SSH | `aws ssm start-session --target <InstanceId>` |
+| Cek perubahan di luar CloudFormation | Console → stack → *Stack actions → Detect drift* |
 
-**Menghapus seluruh infrastruktur.** Set `db_deletion_protection = false` dan `s3_force_destroy = true`, jalankan `terraform apply`, lalu `terraform destroy`.
-RDS tetap membuat final snapshot kecuali `db_skip_final_snapshot = true`.
+Untuk deploy ulang aplikasi tanpa ganti versi:
+
+```bash
+ssh ubuntu@EC2 '/opt/siipb/scripts/deploy.sh $(cat /opt/siipb/.deployed_tag)'
+```
+
+**Menghapus infrastruktur** (urutan terbalik):
+
+1. Set `DB_DELETION_PROTECTION=false` lalu jalankan `./deploy-stacks.sh data`.
+2. Hapus stack satu per satu dengan urutan ini, menunggu tiap stack selesai sebelum lanjut:
+   ```bash
+   aws cloudformation delete-stack --region us-east-1 --stack-name siipb-production-billing
+   ```
+   ```bash
+   aws cloudformation delete-stack --stack-name siipb-production-app
+   ```
+   ```bash
+   aws cloudformation delete-stack --stack-name siipb-production-data
+   ```
+   ```bash
+   aws cloudformation delete-stack --stack-name siipb-production-network
+   ```
+
+RDS meninggalkan snapshot akhir, dan bucket S3 tetap disimpan (`DeletionPolicy`) supaya data tidak hilang tidak sengaja. Hapus keduanya manual bila memang tidak diperlukan.
 
 ## Keamanan secrets (ringkasan)
 
-- Tidak ada kredensial di Git: `.env`, `terraform.tfvars`, `backend.hcl`, `*.tfstate`, dan `deploy/app.env` tercantum di `.gitignore`.
-- Password RDS, JWT, dan `SECRET_KEY` dibangkitkan Terraform lalu disimpan di **AWS Secrets Manager** (`siipb/production/app`).
-- EC2 membaca secret lewat IAM instance profile saat deploy (`app.env`, chmod 600) dan menyuntikkannya ke container sebagai `env_file`.
+- Tidak ada kredensial di Git: `.env`, `params.env`, dan `app.env` tercantum di `.gitignore`.
+- Password RDS, `SECRET_KEY`, dan `JWT_SECRET_KEY` dibangkitkan AWS Secrets Manager. Parameter rahasia CloudFormation memakai `NoEcho`.
+- EC2 membaca secret lewat IAM instance profile saat deploy, menulisnya ke `app.env` (chmod 600), dan menyuntikkannya ke container sebagai `env_file`.
 - GitHub hanya menyimpan ARN role OIDC dan kunci SSH deploy, tanpa AWS access key.
-- S3 diakses dengan instance profile (tanpa access key), dan bucket memblokir akses publik serta menolak koneksi non-TLS.
-- Terraform state terenkripsi di S3 dengan versioning dan lockfile.
+- S3 diakses lewat instance profile. Bucket memblokir akses publik dan menolak koneksi non-TLS.
 
 ## Estimasi biaya (ap-southeast-1, perkiraan)
 
@@ -301,14 +377,13 @@ RDS tetap membuat final snapshot kecuali `db_skip_final_snapshot = true`.
 | EC2 t3.small + EBS 30 GB gp3 | ±18 |
 | RDS db.t4g.micro + 20 GB gp3 + backup | ±16 |
 | Public IPv4 (Elastic IP) | ±3,6 |
-| Secrets Manager, CloudWatch, S3, ECR | ±3–5 |
-| **Total** | **±40–45** |
+| Secrets Manager (4 secret), CloudWatch, S3, ECR | ±4–6 |
+| **Total** | **±42–45** |
 
 ## Catatan
 
-- Aplikasi saat ini menyimpan unggahan di disk lokal (`storage_service.py`). Agar foto tidak hilang bila instans diganti,
-  disk disinkronkan ke S3 tiap 15 menit dan dipulihkan otomatis oleh user_data saat instans baru dibuat.
-  Penyimpanan langsung ke S3 memerlukan perubahan kode backend (`boto3` sudah ada di `requirements.txt`).
-- Port 25 keluar diblokir AWS secara default. Gunakan 587/465 (Gmail/SES), atau ajukan pembukaan port 25 ke AWS.
-- Deploy mengganti container secara berurutan dengan healthcheck, sehingga jeda layanan biasanya hanya beberapa detik.
+- Unggahan aplikasi saat ini disimpan di disk lokal (`storage_service.py`). Disk disinkronkan ke S3 tiap 15 menit
+  dan dipulihkan otomatis oleh user data bila instans diganti. Penyimpanan langsung ke S3 memerlukan perubahan kode backend.
+- AWS memblokir port 25 keluar secara default. Gunakan 587/465 (Gmail/SES).
+- Deploy mengganti container berurutan dengan healthcheck, jadi jeda layanan hanya beberapa detik.
   Migrasi database yang sudah berjalan tidak ikut di-rollback otomatis.

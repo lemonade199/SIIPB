@@ -1,0 +1,587 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  SIIPB 03 - Aplikasi: IAM (instance profile EC2 + role GitHub Actions OIDC), EC2 Ubuntu 24.04 + Elastic IP
+  (Docker, Nginx, Certbot, CloudWatch Agent), record DNS opsional, log group, SNS, dan CloudWatch Alarms.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: siipb
+  EnvironmentName:
+    Type: String
+    Default: production
+  NetworkStackName:
+    Type: String
+  DataStackName:
+    Type: String
+
+  # ---------------------------------------------------------------- EC2
+  InstanceType:
+    Type: String
+    Default: t3.small
+    AllowedValues: [t3.small, t3.medium, t3.large, t3a.small, t3a.medium, t3a.large, m6i.large]
+    Description: x86_64 (AMI amd64). Minimal t3.small.
+  RootVolumeSize:
+    Type: Number
+    Default: 30
+    MinValue: 20
+  SshPublicKey:
+    Type: String
+    Description: Isi public key SSH (ssh-ed25519 AAAA... / ssh-rsa AAAA...).
+  UbuntuAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
+    Description: AMI Ubuntu 24.04 LTS terbaru (parameter publik Canonical).
+
+  # ---------------------------------------------------------------- domain
+  DomainName:
+    Type: String
+    Default: siipb.averus.my.id
+  HostedZoneId:
+    Type: String
+    Default: ""
+    Description: Hosted zone Route 53. Kosong = DNS dikelola di luar AWS (buat record A manual).
+  LetsEncryptEmail:
+    Type: String
+
+  # ---------------------------------------------------------------- CI/CD
+  GitHubRepository:
+    Type: String
+    Default: lemonade199/SIIPB
+    Description: owner/name repository yang boleh deploy via OIDC.
+  GitHubBranch:
+    Type: String
+    Default: main
+  CreateGitHubOidcProvider:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: false bila OIDC provider token.actions.githubusercontent.com sudah ada di akun.
+
+  # ---------------------------------------------------------------- monitoring
+  AlarmEmail:
+    Type: String
+    Description: Penerima notifikasi CloudWatch Alarm (konfirmasi langganan lewat email).
+  CpuAlarmThreshold:
+    Type: Number
+    Default: 80
+  MemoryAlarmThreshold:
+    Type: Number
+    Default: 85
+  DiskAlarmThreshold:
+    Type: Number
+    Default: 85
+  LogRetentionDays:
+    Type: Number
+    Default: 30
+    AllowedValues: [7, 14, 30, 60, 90, 180, 365]
+
+Conditions:
+  CreateDnsRecord: !Not [!Equals [!Ref HostedZoneId, ""]]
+  CreateOidcProvider: !Equals [!Ref CreateGitHubOidcProvider, "true"]
+
+Resources:
+  # ================================================================== Logs & konfigurasi agent
+  AppLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/${ProjectName}-${EnvironmentName}/app"
+      RetentionInDays: !Ref LogRetentionDays
+
+  NginxLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/${ProjectName}-${EnvironmentName}/nginx"
+      RetentionInDays: !Ref LogRetentionDays
+
+  # Dibaca agent dengan: amazon-cloudwatch-agent-ctl -a fetch-config -c ssm:<nama>
+  # (CloudWatchAgentServerPolicy mengizinkan parameter berprefiks AmazonCloudWatch-)
+  CloudWatchAgentConfig:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "AmazonCloudWatch-${ProjectName}-${EnvironmentName}"
+      Type: String
+      Description: Konfigurasi CloudWatch Agent EC2 SIIPB (CPU, RAM, disk, log Nginx)
+      Value: !Sub |
+        {
+          "agent": { "metrics_collection_interval": 60, "run_as_user": "root" },
+          "metrics": {
+            "namespace": "CWAgent",
+            "append_dimensions": { "InstanceId": "${!aws:InstanceId}" },
+            "aggregation_dimensions": [["InstanceId"]],
+            "metrics_collected": {
+              "cpu": { "measurement": ["cpu_usage_idle", "cpu_usage_user", "cpu_usage_system", "cpu_usage_iowait"], "totalcpu": true },
+              "mem": { "measurement": ["mem_used_percent", "mem_available"] },
+              "swap": { "measurement": ["swap_used_percent"] },
+              "disk": { "measurement": ["used_percent", "inodes_used"], "resources": ["/"], "drop_device": true }
+            }
+          },
+          "logs": {
+            "logs_collected": {
+              "files": {
+                "collect_list": [
+                  { "file_path": "/var/log/nginx/access.log", "log_group_name": "${NginxLogGroup}", "log_stream_name": "{instance_id}/access" },
+                  { "file_path": "/var/log/nginx/error.log", "log_group_name": "${NginxLogGroup}", "log_stream_name": "{instance_id}/error" },
+                  { "file_path": "/var/log/siipb-deploy.log", "log_group_name": "${AppLogGroup}", "log_stream_name": "{instance_id}/deploy" },
+                  { "file_path": "/var/log/siipb-bootstrap.log", "log_group_name": "${AppLogGroup}", "log_stream_name": "{instance_id}/bootstrap" }
+                ]
+              }
+            }
+          }
+        }
+
+  # ================================================================== IAM EC2
+  Ec2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-${EnvironmentName}-ec2-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/CloudWatchAgentServerPolicy"
+      Policies:
+        - PolicyName: siipb-app
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: EcrAuth
+                Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: "*"
+              - Sid: EcrPull
+                Effect: Allow
+                Action: [ecr:BatchGetImage, ecr:GetDownloadUrlForLayer, ecr:BatchCheckLayerAvailability, ecr:DescribeImages]
+                Resource:
+                  - Fn::ImportValue: !Sub "${DataStackName}-BackendRepositoryArn"
+                  - Fn::ImportValue: !Sub "${DataStackName}-WorkerRepositoryArn"
+                  - Fn::ImportValue: !Sub "${DataStackName}-FrontendRepositoryArn"
+              - Sid: ReadAppSecrets
+                Effect: Allow
+                Action: [secretsmanager:GetSecretValue, secretsmanager:DescribeSecret]
+                Resource:
+                  - Fn::ImportValue: !Sub "${DataStackName}-DbSecretArn"
+                  - Fn::ImportValue: !Sub "${DataStackName}-SecretKeySecretArn"
+                  - Fn::ImportValue: !Sub "${DataStackName}-JwtSecretArn"
+                  - Fn::ImportValue: !Sub "${DataStackName}-AppConfigSecretArn"
+              - Sid: S3List
+                Effect: Allow
+                Action: [s3:ListBucket, s3:GetBucketLocation]
+                Resource:
+                  Fn::ImportValue: !Sub "${DataStackName}-FilesBucketArn"
+              - Sid: S3Objects
+                Effect: Allow
+                Action: [s3:GetObject, s3:PutObject, s3:DeleteObject]
+                Resource: !Sub
+                  - "${BucketArn}/*"
+                  - BucketArn:
+                      Fn::ImportValue: !Sub "${DataStackName}-FilesBucketArn"
+              - Sid: SignalBootstrap
+                Effect: Allow
+                Action: cloudformation:SignalResource
+                Resource: !Ref AWS::StackId
+
+  Ec2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub "${ProjectName}-${EnvironmentName}-ec2-profile"
+      Roles: [!Ref Ec2Role]
+
+  KeyPair:
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyName: !Sub "${ProjectName}-${EnvironmentName}-key"
+      PublicKeyMaterial: !Ref SshPublicKey
+
+  # ================================================================== EC2
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub "${ProjectName}-${EnvironmentName}-app"
+      LaunchTemplateData:
+        MetadataOptions:
+          HttpTokens: required # IMDSv2
+          HttpEndpoint: enabled
+          HttpPutResponseHopLimit: 2
+        BlockDeviceMappings:
+          - DeviceName: /dev/sda1
+            Ebs:
+              VolumeType: gp3
+              VolumeSize: !Ref RootVolumeSize
+              Encrypted: true
+              DeleteOnTermination: true
+        CreditSpecification:
+          CpuCredits: standard
+
+  AppInstance:
+    Type: AWS::EC2::Instance
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT25M # stack gagal bila bootstrap user_data tidak selesai
+    Properties:
+      ImageId: !Ref UbuntuAmiId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyPair
+      IamInstanceProfile: !Ref Ec2InstanceProfile
+      SubnetId:
+        Fn::ImportValue: !Sub "${NetworkStackName}-PublicSubnet1Id"
+      SecurityGroupIds:
+        - Fn::ImportValue: !Sub "${NetworkStackName}-Ec2SecurityGroupId"
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      Tags:
+        - { Key: Name, Value: !Sub "${ProjectName}-${EnvironmentName}-app" }
+      UserData:
+        Fn::Base64: !Sub
+          - |
+            #!/bin/bash
+            # Bootstrap EC2 SIIPB (cloud-init, sekali saat instans pertama menyala). Log: /var/log/siipb-bootstrap.log
+            set -euxo pipefail
+            exec > >(tee -a /var/log/siipb-bootstrap.log) 2>&1
+            export DEBIAN_FRONTEND=noninteractive
+
+            signal() {
+              /usr/local/bin/aws cloudformation signal-resource --region ${AWS::Region} \
+                --stack-name ${AWS::StackName} --logical-resource-id AppInstance \
+                --unique-id "$(hostname)" --status "$1" || true
+            }
+            trap 'signal FAILURE' ERR
+
+            # ------------------------------------------------ paket dasar
+            apt-get update -y
+            apt-get install -y ca-certificates curl unzip jq cron nginx certbot docker.io docker-compose-v2 mariadb-client
+            timedatectl set-timezone Asia/Jakarta
+
+            curl -fsSL https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o /tmp/awscliv2.zip
+            unzip -q -o /tmp/awscliv2.zip -d /tmp
+            /tmp/aws/install --update
+            rm -rf /tmp/aws /tmp/awscliv2.zip
+
+            # swap 2 GiB sebagai cadangan RAM
+            if [ ! -f /swapfile ]; then
+              fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+              echo '/swapfile none swap sw 0 0' >> /etc/fstab
+            fi
+
+            systemctl enable --now docker
+            usermod -aG docker ubuntu
+
+            # ------------------------------------------------ konfigurasi SIIPB
+            mkdir -p /etc/siipb /opt/siipb/scripts /opt/siipb/nginx/snippets /opt/siipb/backups \
+                     /opt/siipb/uploads/assets /opt/siipb/uploads/evidence /opt/siipb/uploads/documents /var/www/certbot
+            cat > /etc/siipb/siipb.conf <<'EOF'
+            AWS_REGION=${AWS::Region}
+            AWS_DEFAULT_REGION=${AWS::Region}
+            APP_DOMAIN=${DomainName}
+            LETSENCRYPT_EMAIL=${LetsEncryptEmail}
+            SECRET_PREFIX=${SecretPrefix}
+            ECR_REGISTRY=${EcrRegistry}
+            S3_BUCKET=${FilesBucket}
+            LOG_GROUP=${AppLogGroup}
+            APP_DIR=/opt/siipb
+            EOF
+            chmod 644 /etc/siipb/siipb.conf
+
+            # pulihkan foto/berkas dari S3 bila instans diganti
+            /usr/local/bin/aws s3 sync s3://${FilesBucket}/uploads/ /opt/siipb/uploads/ --only-show-errors || true
+            chown -R 10001:10001 /opt/siipb/uploads /opt/siipb/backups   # uid user siipb di container
+            chown -R ubuntu:ubuntu /opt/siipb/scripts /opt/siipb/nginx
+            chown ubuntu:ubuntu /opt/siipb
+            touch /var/log/siipb-deploy.log && chown ubuntu:ubuntu /var/log/siipb-deploy.log
+
+            # ------------------------------------------------ Nginx awal (HTTP)
+            # Konfigurasi lengkap (deploy/nginx) dipasang oleh deploy.sh pada deploy pertama;
+            # HTTPS diaktifkan dengan /opt/siipb/scripts/setup-ssl.sh setelah DNS mengarah ke Elastic IP.
+            cat > /etc/nginx/sites-available/siipb.conf <<'EOF'
+            server {
+                listen 80 default_server;
+                listen [::]:80 default_server;
+                server_name _;
+                client_max_body_size 30M;
+                location /.well-known/acme-challenge/ { root /var/www/certbot; }
+                location /api/ { proxy_pass http://127.0.0.1:5000; proxy_set_header Host $host; proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; proxy_set_header X-Forwarded-Proto $scheme; }
+                location /uploads/ { alias /opt/siipb/uploads/; }
+                location / { proxy_pass http://127.0.0.1:3000; proxy_set_header Host $host; proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; proxy_set_header X-Forwarded-Proto $scheme; }
+            }
+            EOF
+            ln -sf /etc/nginx/sites-available/siipb.conf /etc/nginx/sites-enabled/siipb.conf
+            rm -f /etc/nginx/sites-enabled/default
+            sed -i 's/# server_tokens off;/server_tokens off;/' /etc/nginx/nginx.conf
+            nginx -t
+            systemctl enable nginx
+            systemctl reload nginx
+
+            # Certbot: reload Nginx setelah perpanjangan otomatis (certbot.timer bawaan paket)
+            mkdir -p /etc/letsencrypt/renewal-hooks/deploy
+            printf '#!/bin/sh\nsystemctl reload nginx\n' > /etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh
+            chmod +x /etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh
+
+            # ------------------------------------------------ CloudWatch Agent (konfigurasi dari SSM Parameter)
+            curl -fsSL https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb -o /tmp/cwagent.deb
+            dpkg -i -E /tmp/cwagent.deb
+            rm -f /tmp/cwagent.deb
+            /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c ssm:${CloudWatchAgentConfig}
+            systemctl enable amazon-cloudwatch-agent
+
+            # ------------------------------------------------ sinkronisasi S3
+            cat > /etc/cron.d/siipb-s3-sync <<'EOF'
+            SHELL=/bin/bash
+            */15 * * * * root /usr/local/bin/aws s3 sync /opt/siipb/uploads s3://${FilesBucket}/uploads/ --only-show-errors >> /var/log/siipb-s3-sync.log 2>&1
+            30 2 * * * root /usr/local/bin/aws s3 sync /opt/siipb/backups s3://${FilesBucket}/backups/ --only-show-errors >> /var/log/siipb-s3-sync.log 2>&1
+            EOF
+            chmod 644 /etc/cron.d/siipb-s3-sync
+
+            echo "SIIPB bootstrap selesai $(date -Is)" > /opt/siipb/.bootstrap-done
+            signal SUCCESS
+          - SecretPrefix:
+              Fn::ImportValue: !Sub "${DataStackName}-SecretPrefix"
+            EcrRegistry:
+              Fn::ImportValue: !Sub "${DataStackName}-EcrRegistry"
+            FilesBucket:
+              Fn::ImportValue: !Sub "${DataStackName}-FilesBucketName"
+
+  ElasticIp:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      InstanceId: !Ref AppInstance
+      Tags:
+        - { Key: Name, Value: !Sub "${ProjectName}-${EnvironmentName}-eip" }
+
+  DnsRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: CreateDnsRecord
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Sub "${DomainName}."
+      Type: A
+      TTL: "300"
+      ResourceRecords: [!Ref ElasticIp]
+
+  # ================================================================== GitHub Actions (OIDC)
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: CreateOidcProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList: [sts.amazonaws.com]
+      ThumbprintList:
+        - 6938fd4d98bab03faadb97b34396831e3780aea1
+        - 1c58a3a8518e8759bf075b76b750d4f2df264fcd
+
+  GitHubActionsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-${EnvironmentName}-github-actions"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !If
+                - CreateOidcProvider
+                - !Ref GitHubOidcProvider
+                - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub:
+                  - !Sub "repo:${GitHubRepository}:ref:refs/heads/${GitHubBranch}"
+                  - !Sub "repo:${GitHubRepository}:environment:production"
+      Policies:
+        - PolicyName: siipb-github-deploy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: EcrAuth
+                Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: "*"
+              - Sid: EcrPush
+                Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:BatchGetImage
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:InitiateLayerUpload
+                  - ecr:UploadLayerPart
+                  - ecr:CompleteLayerUpload
+                  - ecr:PutImage
+                  - ecr:DescribeImages
+                  - ecr:DescribeRepositories
+                Resource:
+                  - Fn::ImportValue: !Sub "${DataStackName}-BackendRepositoryArn"
+                  - Fn::ImportValue: !Sub "${DataStackName}-WorkerRepositoryArn"
+                  - Fn::ImportValue: !Sub "${DataStackName}-FrontendRepositoryArn"
+              - Sid: TemporarySshIngress
+                Effect: Allow
+                Action: [ec2:AuthorizeSecurityGroupIngress, ec2:RevokeSecurityGroupIngress]
+                Resource: !Sub
+                  - "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:security-group/${SgId}"
+                  - SgId:
+                      Fn::ImportValue: !Sub "${NetworkStackName}-Ec2SecurityGroupId"
+              - Sid: DescribeSecurityGroups
+                Effect: Allow
+                Action: [ec2:DescribeSecurityGroups, ec2:DescribeSecurityGroupRules]
+                Resource: "*"
+
+  # ================================================================== SNS & CloudWatch Alarms
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "${ProjectName}-${EnvironmentName}-alarms"
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref AlarmEmail
+
+  Ec2CpuAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-${EnvironmentName}-ec2-cpu-high"
+      AlarmDescription: !Sub "CPU EC2 SIIPB > ${CpuAlarmThreshold}% selama 10 menit"
+      Namespace: AWS/EC2
+      MetricName: CPUUtilization
+      Dimensions: [{ Name: InstanceId, Value: !Ref AppInstance }]
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: !Ref CpuAlarmThreshold
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
+  Ec2MemoryAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-${EnvironmentName}-ec2-memory-high"
+      AlarmDescription: !Sub "RAM EC2 SIIPB > ${MemoryAlarmThreshold}% (CloudWatch Agent)"
+      Namespace: CWAgent
+      MetricName: mem_used_percent
+      Dimensions: [{ Name: InstanceId, Value: !Ref AppInstance }]
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: !Ref MemoryAlarmThreshold
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: breaching
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
+  Ec2DiskAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-${EnvironmentName}-ec2-disk-high"
+      AlarmDescription: !Sub "Disk root EC2 SIIPB > ${DiskAlarmThreshold}% (CloudWatch Agent)"
+      Namespace: CWAgent
+      MetricName: disk_used_percent
+      Dimensions: [{ Name: InstanceId, Value: !Ref AppInstance }]
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: !Ref DiskAlarmThreshold
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: breaching
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
+  Ec2StatusAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-${EnvironmentName}-ec2-status-check"
+      AlarmDescription: Status check EC2 SIIPB gagal
+      Namespace: AWS/EC2
+      MetricName: StatusCheckFailed
+      Dimensions: [{ Name: InstanceId, Value: !Ref AppInstance }]
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 3
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
+  RdsCpuAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-${EnvironmentName}-rds-cpu-high"
+      AlarmDescription: !Sub "CPU RDS MariaDB > ${CpuAlarmThreshold}%"
+      Namespace: AWS/RDS
+      MetricName: CPUUtilization
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value:
+            Fn::ImportValue: !Sub "${DataStackName}-DbInstanceIdentifier"
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: !Ref CpuAlarmThreshold
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
+  RdsStorageAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-${EnvironmentName}-rds-free-storage-low"
+      AlarmDescription: Sisa storage RDS < 2 GiB
+      Namespace: AWS/RDS
+      MetricName: FreeStorageSpace
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value:
+            Fn::ImportValue: !Sub "${DataStackName}-DbInstanceIdentifier"
+      Statistic: Minimum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 2147483648
+      ComparisonOperator: LessThanThreshold
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
+  RdsMemoryAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-${EnvironmentName}-rds-freeable-memory-low"
+      AlarmDescription: Freeable memory RDS < 64 MiB
+      Namespace: AWS/RDS
+      MetricName: FreeableMemory
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value:
+            Fn::ImportValue: !Sub "${DataStackName}-DbInstanceIdentifier"
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 3
+      Threshold: 67108864
+      ComparisonOperator: LessThanThreshold
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
+Outputs:
+  PublicIp:
+    Description: Elastic IP EC2 - arahkan record A domain ke IP ini (EC2_HOST di GitHub).
+    Value: !Ref ElasticIp
+  InstanceId:
+    Value: !Ref AppInstance
+  SshCommand:
+    Value: !Sub "ssh -i ~/.ssh/siipb_deploy ubuntu@${ElasticIp}"
+  AppUrl:
+    Value: !Sub "https://${DomainName}"
+  DnsRecord:
+    Value: !If
+      - CreateDnsRecord
+      - !Sub "Route 53 (otomatis): ${DomainName} A ${ElasticIp}"
+      - !Sub "BUAT MANUAL di pengelola DNS: ${DomainName}  A  ${ElasticIp}  TTL 300"
+  GitHubActionsRoleArn:
+    Description: Isi ke GitHub secret AWS_DEPLOY_ROLE_ARN.
+    Value: !GetAtt GitHubActionsRole.Arn
+  AlarmTopicArn:
+    Value: !Ref AlarmTopic

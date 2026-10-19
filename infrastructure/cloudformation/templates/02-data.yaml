@@ -1,0 +1,368 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::LanguageExtensions # Fn::ToJsonString -> JSON secret selalu valid apa pun isinya
+Description: >-
+  SIIPB 02 - Data: RDS MariaDB privat (automated backup harian), bucket S3 berkas/foto,
+  Amazon ECR (backend, worker, frontend), dan AWS Secrets Manager.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: siipb
+  EnvironmentName:
+    Type: String
+    Default: production
+  NetworkStackName:
+    Type: String
+    Description: Nama stack 01-network (sumber subnet privat & SG RDS).
+
+  # ---------------------------------------------------------------- RDS
+  DbName:
+    Type: String
+    Default: siipb
+    AllowedPattern: "^[a-zA-Z][a-zA-Z0-9_]{0,63}$"
+  DbUsername:
+    Type: String
+    Default: siipb
+    AllowedPattern: "^[a-zA-Z][a-zA-Z0-9_]{0,15}$"
+  DbEngineVersion:
+    Type: String
+    Default: "11.4"
+    AllowedPattern: "^\\d+\\.\\d+$"
+    Description: major.minor MariaDB (minor patch dipilih & di-upgrade otomatis oleh AWS).
+  DbInstanceClass:
+    Type: String
+    Default: db.t4g.micro
+  DbAllocatedStorage:
+    Type: Number
+    Default: 20
+    MinValue: 20
+  DbMaxAllocatedStorage:
+    Type: Number
+    Default: 100
+    Description: Batas autoscaling storage (GiB).
+  DbMultiAz:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+  DbBackupRetentionDays:
+    Type: Number
+    Default: 7
+    MinValue: 1
+    MaxValue: 35
+    Description: Retensi Automated Backups harian (hari).
+  DbBackupWindow:
+    Type: String
+    Default: "17:00-17:30"
+    Description: Jendela backup harian UTC (17:00-17:30 UTC = 00:00-00:30 WIB).
+  DbMaintenanceWindow:
+    Type: String
+    Default: "sun:18:00-sun:19:00"
+    Description: Jendela maintenance mingguan UTC (tidak boleh bentrok dengan backup window).
+  DbDeletionProtection:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+
+  # ---------------------------------------------------------------- S3
+  S3BackupRetentionDays:
+    Type: Number
+    Default: 90
+
+  # ---------------------------------------------------------------- konfigurasi aplikasi (secret)
+  SeedAdminPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 8
+    Description: Kata sandi awal akun admin (WAJIB diganti setelah login pertama).
+  SmtpHost:
+    Type: String
+    Default: smtp.gmail.com
+  SmtpPort:
+    Type: String
+    Default: "587"
+  SmtpUsername:
+    Type: String
+    Default: ""
+  SmtpPassword:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: Kosongkan untuk mode simulasi (email tidak benar-benar dikirim).
+  SmtpSenderEmail:
+    Type: String
+    Default: no-reply@averus.my.id
+  SmtpSenderName:
+    Type: String
+    Default: SIIPB Sarpras IT
+  GoogleClientId:
+    Type: String
+    Default: ""
+  GoogleClientSecret:
+    Type: String
+    Default: ""
+    NoEcho: true
+
+Resources:
+  # ================================================================== S3
+  FilesBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-old-backups
+            Status: Enabled
+            Prefix: backups/
+            ExpirationInDays: !Ref S3BackupRetentionDays
+            NoncurrentVersionExpiration: { NoncurrentDays: 7 }
+          - Id: uploads-noncurrent
+            Status: Enabled
+            Prefix: uploads/
+            NoncurrentVersionExpiration: { NoncurrentDays: 30 }
+          - Id: abort-multipart
+            Status: Enabled
+            AbortIncompleteMultipartUpload: { DaysAfterInitiation: 7 }
+      Tags:
+        - { Key: Name, Value: !Sub "${ProjectName}-${EnvironmentName}-files" }
+
+  FilesBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FilesBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !GetAtt FilesBucket.Arn
+              - !Sub "${FilesBucket.Arn}/*"
+            Condition:
+              Bool: { "aws:SecureTransport": "false" }
+
+  # ================================================================== ECR
+  BackendRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${ProjectName}-backend"
+      ImageTagMutability: MUTABLE
+      EmptyOnDelete: true
+      ImageScanningConfiguration: { ScanOnPush: true }
+      EncryptionConfiguration: { EncryptionType: AES256 }
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {"rules":[
+            {"rulePriority":1,"description":"Hapus image tanpa tag setelah 7 hari","selection":{"tagStatus":"untagged","countType":"sinceImagePushed","countUnit":"days","countNumber":7},"action":{"type":"expire"}},
+            {"rulePriority":2,"description":"Simpan 15 image terakhir","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":15},"action":{"type":"expire"}}
+          ]}
+
+  WorkerRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${ProjectName}-worker"
+      ImageTagMutability: MUTABLE
+      EmptyOnDelete: true
+      ImageScanningConfiguration: { ScanOnPush: true }
+      EncryptionConfiguration: { EncryptionType: AES256 }
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {"rules":[
+            {"rulePriority":1,"description":"Hapus image tanpa tag setelah 7 hari","selection":{"tagStatus":"untagged","countType":"sinceImagePushed","countUnit":"days","countNumber":7},"action":{"type":"expire"}},
+            {"rulePriority":2,"description":"Simpan 15 image terakhir","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":15},"action":{"type":"expire"}}
+          ]}
+
+  FrontendRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${ProjectName}-frontend"
+      ImageTagMutability: MUTABLE
+      EmptyOnDelete: true
+      ImageScanningConfiguration: { ScanOnPush: true }
+      EncryptionConfiguration: { EncryptionType: AES256 }
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {"rules":[
+            {"rulePriority":1,"description":"Hapus image tanpa tag setelah 7 hari","selection":{"tagStatus":"untagged","countType":"sinceImagePushed","countUnit":"days","countNumber":7},"action":{"type":"expire"}},
+            {"rulePriority":2,"description":"Simpan 15 image terakhir","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":15},"action":{"type":"expire"}}
+          ]}
+
+  # ================================================================== Secrets Manager
+  # Kredensial RDS dibangkitkan AWS (tidak pernah ditulis di template/repo).
+  # SecretTargetAttachment menambahkan host/port/engine ke secret setelah RDS jadi.
+  DbSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${ProjectName}/${EnvironmentName}/db"
+      Description: Kredensial master RDS MariaDB SIIPB
+      GenerateSecretString:
+        SecretStringTemplate: !Sub '{"username":"${DbUsername}","dbname":"${DbName}"}'
+        GenerateStringKey: password
+        PasswordLength: 32
+        ExcludePunctuation: true # aman dipakai di DATABASE_URL
+
+  SecretKeySecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${ProjectName}/${EnvironmentName}/secret-key"
+      Description: Flask SECRET_KEY (juga kunci enkripsi kata sandi SMTP di database)
+      GenerateSecretString:
+        PasswordLength: 64
+        ExcludePunctuation: true
+
+  JwtSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${ProjectName}/${EnvironmentName}/jwt"
+      Description: JWT_SECRET_KEY SIIPB
+      GenerateSecretString:
+        PasswordLength: 64
+        ExcludePunctuation: true
+
+  AppConfigSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${ProjectName}/${EnvironmentName}/app-config"
+      Description: SMTP, SSO, dan kata sandi admin awal SIIPB
+      SecretString:
+        Fn::ToJsonString:
+          SEED_ADMIN_PASSWORD: !Ref SeedAdminPassword
+          SMTP_HOST: !Ref SmtpHost
+          SMTP_PORT: !Ref SmtpPort
+          SMTP_USE_TLS: "true"
+          SMTP_USERNAME: !Ref SmtpUsername
+          SMTP_PASSWORD: !Ref SmtpPassword
+          SMTP_SENDER_EMAIL: !Ref SmtpSenderEmail
+          SMTP_SENDER_NAME: !Ref SmtpSenderName
+          GOOGLE_CLIENT_ID: !Ref GoogleClientId
+          GOOGLE_CLIENT_SECRET: !Ref GoogleClientSecret
+          JWT_ACCESS_TTL_MINUTES: "30"
+          JWT_REFRESH_TTL_DAYS: "7"
+
+  # ================================================================== RDS MariaDB
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupName: !Sub "${ProjectName}-${EnvironmentName}-db-subnets"
+      DBSubnetGroupDescription: Private subnet SIIPB RDS
+      SubnetIds:
+        - Fn::ImportValue: !Sub "${NetworkStackName}-PrivateSubnet1Id"
+        - Fn::ImportValue: !Sub "${NetworkStackName}-PrivateSubnet2Id"
+
+  DbParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Family: !Sub "mariadb${DbEngineVersion}"
+      Description: SIIPB MariaDB (utf8mb4, WIB)
+      Parameters:
+        character_set_server: utf8mb4
+        collation_server: utf8mb4_unicode_ci
+        time_zone: Asia/Jakarta
+        slow_query_log: "1"
+        long_query_time: "2"
+
+  DbInstance:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: !Sub "${ProjectName}-${EnvironmentName}-mariadb"
+      Engine: mariadb
+      EngineVersion: !Ref DbEngineVersion
+      DBInstanceClass: !Ref DbInstanceClass
+      DBName: !Ref DbName
+      MasterUsername: !Sub "{{resolve:secretsmanager:${DbSecret}:SecretString:username}}"
+      MasterUserPassword: !Sub "{{resolve:secretsmanager:${DbSecret}:SecretString:password}}"
+      Port: "3306"
+      AllocatedStorage: !Ref DbAllocatedStorage
+      MaxAllocatedStorage: !Ref DbMaxAllocatedStorage
+      StorageType: gp3
+      StorageEncrypted: true
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      VPCSecurityGroups:
+        - Fn::ImportValue: !Sub "${NetworkStackName}-RdsSecurityGroupId"
+      DBParameterGroupName: !Ref DbParameterGroup
+      PubliclyAccessible: false
+      MultiAZ: !Ref DbMultiAz
+      # ---- Automated Backups (harian) + point-in-time restore ----
+      BackupRetentionPeriod: !Ref DbBackupRetentionDays
+      PreferredBackupWindow: !Ref DbBackupWindow
+      PreferredMaintenanceWindow: !Ref DbMaintenanceWindow
+      CopyTagsToSnapshot: true
+      DeleteAutomatedBackups: false
+      AutoMinorVersionUpgrade: true
+      EnableCloudwatchLogsExports: [error, slowquery]
+      DeletionProtection: !Ref DbDeletionProtection
+      Tags:
+        - { Key: Name, Value: !Sub "${ProjectName}-${EnvironmentName}-mariadb" }
+
+  DbSecretAttachment:
+    Type: AWS::SecretsManager::SecretTargetAttachment
+    Properties:
+      SecretId: !Ref DbSecret
+      TargetId: !Ref DbInstance
+      TargetType: AWS::RDS::DBInstance
+
+Outputs:
+  FilesBucketName:
+    Value: !Ref FilesBucket
+    Export: { Name: !Sub "${AWS::StackName}-FilesBucketName" }
+  FilesBucketArn:
+    Value: !GetAtt FilesBucket.Arn
+    Export: { Name: !Sub "${AWS::StackName}-FilesBucketArn" }
+  EcrRegistry:
+    Value: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com"
+    Export: { Name: !Sub "${AWS::StackName}-EcrRegistry" }
+  BackendRepositoryArn:
+    Value: !GetAtt BackendRepository.Arn
+    Export: { Name: !Sub "${AWS::StackName}-BackendRepositoryArn" }
+  WorkerRepositoryArn:
+    Value: !GetAtt WorkerRepository.Arn
+    Export: { Name: !Sub "${AWS::StackName}-WorkerRepositoryArn" }
+  FrontendRepositoryArn:
+    Value: !GetAtt FrontendRepository.Arn
+    Export: { Name: !Sub "${AWS::StackName}-FrontendRepositoryArn" }
+  BackendRepositoryUri:
+    Value: !GetAtt BackendRepository.RepositoryUri
+  WorkerRepositoryUri:
+    Value: !GetAtt WorkerRepository.RepositoryUri
+  FrontendRepositoryUri:
+    Value: !GetAtt FrontendRepository.RepositoryUri
+  SecretPrefix:
+    Description: Prefix secret di Secrets Manager (db, secret-key, jwt, app-config).
+    Value: !Sub "${ProjectName}/${EnvironmentName}"
+    Export: { Name: !Sub "${AWS::StackName}-SecretPrefix" }
+  DbSecretArn:
+    Value: !Ref DbSecret
+    Export: { Name: !Sub "${AWS::StackName}-DbSecretArn" }
+  SecretKeySecretArn:
+    Value: !Ref SecretKeySecret
+    Export: { Name: !Sub "${AWS::StackName}-SecretKeySecretArn" }
+  JwtSecretArn:
+    Value: !Ref JwtSecret
+    Export: { Name: !Sub "${AWS::StackName}-JwtSecretArn" }
+  AppConfigSecretArn:
+    Value: !Ref AppConfigSecret
+    Export: { Name: !Sub "${AWS::StackName}-AppConfigSecretArn" }
+  DbInstanceIdentifier:
+    Value: !Ref DbInstance
+    Export: { Name: !Sub "${AWS::StackName}-DbInstanceIdentifier" }
+  DbEndpoint:
+    Description: Endpoint RDS (hanya dapat diakses dari dalam VPC).
+    Value: !GetAtt DbInstance.Endpoint.Address

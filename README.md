@@ -179,7 +179,7 @@ Database uji dibuat ulang otomatis (`siipb_test`: DROP → `alembic upgrade head
 
 ## 9. Panduan Deployment & Operasional
 
-> **AWS production (Terraform + GitHub Actions + CloudWatch):** lihat [docs/DEVOPS-DEPLOYMENT.md](docs/DEVOPS-DEPLOYMENT.md).
+> **AWS production (CloudFormation + GitHub Actions + CloudWatch):** lihat [docs/DEVOPS-DEPLOYMENT.md](docs/DEVOPS-DEPLOYMENT.md).
 
 ### A. Docker Compose (production)
 ```bash

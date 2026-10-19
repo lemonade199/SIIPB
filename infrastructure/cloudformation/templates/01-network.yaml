@@ -1,0 +1,231 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  SIIPB 01 - Jaringan: VPC, 2 public subnet (EC2), 2 private subnet tanpa rute internet (RDS),
+  S3 gateway endpoint, dan security group EC2/RDS.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: siipb
+    AllowedPattern: "^[a-z][a-z0-9-]{1,20}$"
+  EnvironmentName:
+    Type: String
+    Default: production
+    AllowedPattern: "^[a-z][a-z0-9-]{1,20}$"
+  VpcCidr:
+    Type: String
+    Default: 10.20.0.0/16
+    AllowedPattern: "^(\\d{1,3}\\.){3}\\d{1,3}/16$"
+    Description: CIDR VPC (/16; subnet /24 dibuat otomatis).
+  AdminCidr:
+    Type: String
+    AllowedPattern: "^(\\d{1,3}\\.){3}\\d{1,3}/(3[0-2]|[12]?\\d)$"
+    Description: IP admin yang boleh SSH (port 22), mis. 203.0.113.10/32. Cek - curl https://checkip.amazonaws.com
+  WebIngressCidr:
+    Type: String
+    Default: 0.0.0.0/0
+    AllowedPattern: "^(\\d{1,3}\\.){3}\\d{1,3}/(3[0-2]|[12]?\\d)$"
+    Description: Sumber yang boleh HTTP/HTTPS (80/443). Let's Encrypt HTTP-01 butuh port 80 publik.
+
+Rules:
+  SshNotOpenToWorld:
+    Assertions:
+      - Assert: !Not [!Equals [!Ref AdminCidr, 0.0.0.0/0]]
+        AssertDescription: AdminCidr tidak boleh 0.0.0.0/0 - isi IP publik Anda /32.
+
+Resources:
+  # ------------------------------------------------------------------ VPC
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - { Key: Name, Value: !Sub "${ProjectName}-${EnvironmentName}-vpc" }
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - { Key: Name, Value: !Sub "${ProjectName}-${EnvironmentName}-igw" }
+
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock: !Select [0, !Cidr [!Ref VpcCidr, 32, 8]]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - { Key: Name, Value: !Sub "${ProjectName}-${EnvironmentName}-public-1" }
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock: !Select [1, !Cidr [!Ref VpcCidr, 32, 8]]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - { Key: Name, Value: !Sub "${ProjectName}-${EnvironmentName}-public-2" }
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock: !Select [10, !Cidr [!Ref VpcCidr, 32, 8]]
+      Tags:
+        - { Key: Name, Value: !Sub "${ProjectName}-${EnvironmentName}-private-1" }
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock: !Select [11, !Cidr [!Ref VpcCidr, 32, 8]]
+      Tags:
+        - { Key: Name, Value: !Sub "${ProjectName}-${EnvironmentName}-private-2" }
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - { Key: Name, Value: !Sub "${ProjectName}-${EnvironmentName}-public-rt" }
+
+  PublicDefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnet2RouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+  # private: tidak ada rute 0.0.0.0/0 (tanpa NAT) -> RDS terisolasi dari internet
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - { Key: Name, Value: !Sub "${ProjectName}-${EnvironmentName}-private-rt" }
+
+  PrivateSubnet1RouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnet2RouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRouteTable
+
+  # Gateway endpoint S3 (gratis): sinkronisasi uploads/backup tidak lewat internet
+  S3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      VpcEndpointType: Gateway
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+      RouteTableIds:
+        - !Ref PublicRouteTable
+        - !Ref PrivateRouteTable
+
+  # ------------------------------------------------------------------ Security groups
+  # EC2 inbound : 22 hanya dari AdminCidr; 80/443 dari WebIngressCidr
+  # EC2 outbound: 80/443 (apt, ECR, API AWS), SMTP 25/465/587, DNS, NTP, 3306 hanya ke SG RDS
+  Ec2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub "${ProjectName}-${EnvironmentName}-ec2-sg"
+      GroupDescription: SIIPB web server (Nginx + containers)
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: !Ref AdminCidr, Description: SSH admin }
+        - { IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: !Ref WebIngressCidr, Description: HTTP redirect + ACME }
+        - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: !Ref WebIngressCidr, Description: HTTPS }
+      SecurityGroupEgress:
+        - { IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0, Description: HTTP keluar (apt) }
+        - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0, Description: "HTTPS keluar (ECR, API AWS)" }
+        - { IpProtocol: tcp, FromPort: 25, ToPort: 25, CidrIp: 0.0.0.0/0, Description: SMTP }
+        - { IpProtocol: tcp, FromPort: 465, ToPort: 465, CidrIp: 0.0.0.0/0, Description: SMTPS }
+        - { IpProtocol: tcp, FromPort: 587, ToPort: 587, CidrIp: 0.0.0.0/0, Description: SMTP submission }
+        - { IpProtocol: udp, FromPort: 53, ToPort: 53, CidrIp: 0.0.0.0/0, Description: DNS }
+        - { IpProtocol: tcp, FromPort: 53, ToPort: 53, CidrIp: 0.0.0.0/0, Description: DNS TCP }
+        - { IpProtocol: udp, FromPort: 123, ToPort: 123, CidrIp: 0.0.0.0/0, Description: NTP }
+      Tags:
+        - { Key: Name, Value: !Sub "${ProjectName}-${EnvironmentName}-ec2-sg" }
+
+  RdsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub "${ProjectName}-${EnvironmentName}-rds-sg"
+      GroupDescription: SIIPB RDS MariaDB - hanya dari EC2
+      VpcId: !Ref Vpc
+      Tags:
+        - { Key: Name, Value: !Sub "${ProjectName}-${EnvironmentName}-rds-sg" }
+
+  RdsIngressFromEc2:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref RdsSecurityGroup
+      IpProtocol: tcp
+      FromPort: 3306
+      ToPort: 3306
+      SourceSecurityGroupId: !Ref Ec2SecurityGroup
+      Description: MariaDB dari EC2
+
+  Ec2EgressToRds:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref Ec2SecurityGroup
+      IpProtocol: tcp
+      FromPort: 3306
+      ToPort: 3306
+      DestinationSecurityGroupId: !Ref RdsSecurityGroup
+      Description: MariaDB ke RDS
+
+Outputs:
+  VpcId:
+    Value: !Ref Vpc
+    Export: { Name: !Sub "${AWS::StackName}-VpcId" }
+  PublicSubnet1Id:
+    Value: !Ref PublicSubnet1
+    Export: { Name: !Sub "${AWS::StackName}-PublicSubnet1Id" }
+  PublicSubnet2Id:
+    Value: !Ref PublicSubnet2
+    Export: { Name: !Sub "${AWS::StackName}-PublicSubnet2Id" }
+  PrivateSubnet1Id:
+    Value: !Ref PrivateSubnet1
+    Export: { Name: !Sub "${AWS::StackName}-PrivateSubnet1Id" }
+  PrivateSubnet2Id:
+    Value: !Ref PrivateSubnet2
+    Export: { Name: !Sub "${AWS::StackName}-PrivateSubnet2Id" }
+  Ec2SecurityGroupId:
+    Description: Isi ke GitHub variable EC2_SECURITY_GROUP_ID.
+    Value: !Ref Ec2SecurityGroup
+    Export: { Name: !Sub "${AWS::StackName}-Ec2SecurityGroupId" }
+  RdsSecurityGroupId:
+    Value: !Ref RdsSecurityGroup
+    Export: { Name: !Sub "${AWS::StackName}-RdsSecurityGroupId" }

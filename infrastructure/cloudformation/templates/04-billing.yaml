@@ -1,0 +1,52 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  SIIPB 04 - Billing alert. WAJIB di-deploy di region us-east-1 (metrik AWS/Billing hanya ada di sana).
+  Prasyarat: Billing preferences > "Receive CloudWatch billing alerts" sudah diaktifkan.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: siipb
+  EnvironmentName:
+    Type: String
+    Default: production
+  AlarmEmail:
+    Type: String
+  BillingThresholdUsd:
+    Type: Number
+    Default: 50
+    Description: Ambang estimasi tagihan bulanan (USD).
+
+Rules:
+  OnlyUsEast1:
+    Assertions:
+      - Assert: !Equals [!Ref AWS::Region, us-east-1]
+        AssertDescription: Stack billing harus di-deploy di us-east-1.
+
+Resources:
+  BillingTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "${ProjectName}-${EnvironmentName}-billing-alarms"
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref AlarmEmail
+
+  BillingAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-${EnvironmentName}-billing-estimated-charges"
+      AlarmDescription: !Sub "Estimasi tagihan AWS bulan ini > USD ${BillingThresholdUsd}"
+      Namespace: AWS/Billing
+      MetricName: EstimatedCharges
+      Dimensions: [{ Name: Currency, Value: USD }]
+      Statistic: Maximum
+      Period: 21600
+      EvaluationPeriods: 1
+      Threshold: !Ref BillingThresholdUsd
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions: [!Ref BillingTopic]
+
+Outputs:
+  BillingTopicArn:
+    Value: !Ref BillingTopic

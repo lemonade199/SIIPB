@@ -5,17 +5,24 @@
 #      satu-satunya host yang boleh mengakses RDS)
 #   3. hapus instans uji (KEEP=1 untuk menyimpannya)
 #
-# Dijalankan dari mesin admin (butuh: aws cli + kredensial admin, terraform, jq, ssh ke EC2):
+# Dijalankan dari mesin admin (butuh: aws cli + kredensial admin, jq, ssh ke EC2), setelah ada >= 1 backup harian:
 #   ./infrastructure/scripts/rds_restore_test.sh
+# Nama stack dibaca dari infrastructure/cloudformation/params.env (PROJECT, ENVIRONMENT, AWS_REGION).
 # Estimasi waktu 15-30 menit. Instans uji dikenai biaya selama hidup.
 set -euo pipefail
-cd "$(dirname "$0")/../terraform"
+cd "$(dirname "$0")/../cloudformation"
+[ -f params.env ] || { echo "infrastructure/cloudformation/params.env tidak ditemukan" >&2; exit 1; }
+set -a; . ./params.env; set +a
+export AWS_REGION
 
-SRC=$(terraform output -raw rds_identifier)
-EC2=$(terraform output -raw ec2_public_ip)
-REGION=${AWS_REGION:-$(terraform output -json github_settings | jq -r '."variable AWS_REGION"')}
+out() {
+  aws cloudformation describe-stacks --stack-name "$1" --query "Stacks[0].Outputs[?OutputKey=='$2'].OutputValue" --output text
+}
+SRC=$(out "$PROJECT-$ENVIRONMENT-data" DbInstanceIdentifier)
+EC2=$(out "$PROJECT-$ENVIRONMENT-app" PublicIp)
+SSH_KEY="${SSH_PUBLIC_KEY_FILE%.pub}"
+SSH_KEY="${SSH_KEY/#\~/$HOME}"
 TARGET="${SRC}-restore-test-$(date +%Y%m%d%H%M)"
-export AWS_REGION=$REGION
 
 info=$(aws rds describe-db-instances --db-instance-identifier "$SRC")
 db() { jq -r ".DBInstances[0].$1" <<<"$info"; }
@@ -52,7 +59,7 @@ aws rds wait db-instance-available --db-instance-identifier "$TARGET" \
 ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier "$TARGET" --query 'DBInstances[0].Endpoint.Address' --output text)
 echo "Restore siap: $ENDPOINT"
 
-ssh "ubuntu@$EC2" bash -s -- "$ENDPOINT" <<'REMOTE'
+ssh -i "$SSH_KEY" "ubuntu@$EC2" bash -s -- "$ENDPOINT" <<'REMOTE'
 set -euo pipefail
 set -a; . /opt/siipb/app.env; set +a
 Q="SELECT 'users' t, COUNT(*) n FROM users
