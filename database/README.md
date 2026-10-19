@@ -8,49 +8,43 @@ Direktori ini berisi berkas skema dan dump database untuk sistem SIIPB (MariaDB 
 
 ```text
 database/
-├── SIIPB.sql               # Skema terbaru hasil `alembic upgrade head` (29 tabel + alembic_version, revisi a7c3e91d2b40)
+├── SIIPB.sql               # Skema terbaru hasil `alembic upgrade head` (23 tabel aplikasi + alembic_version, revisi d4e8b1a5f920)
 └── README.md               # Dokumentasi database dan panduan impor
 ```
 
 ---
 
-## 🗄️ Daftar Tabel (29 Tabel)
+## 🗄️ Daftar Tabel (23 Tabel Aplikasi + alembic_version)
 
 > Sumber kebenaran skema adalah migrasi Alembic (`backend/alembic/versions`). Docker Compose menjalankannya otomatis; `SIIPB.sql` untuk referensi/impor manual (lanjutkan dengan `python backend/scripts/seed_data.py`).
 
 | Kategori | Nama Tabel | Keterangan |
 | :--- | :--- | :--- |
-| **RBAC & Pengguna** | `users` | Akun staf, admin, dan pimpinan |
-| | `roles` | Master peran dinamis (ADMIN, SARPRAS, PIMPINAN) |
-| | `permissions` | Master izin akses granular |
-| | `user_roles` | Relasi *many-to-many* pengguna ke peran |
-| | `role_permissions` | Relasi *many-to-many* peran ke izin akses |
+| **RBAC & Pengguna** | `users` | Akun staf, admin, dan pimpinan (termasuk `role_id`, data Google SSO) |
+| | `roles` | Master peran dinamis (ADMIN, SARPRAS, PIMPINAN, custom role) dengan daftar hak akses disimpan dalam kolom JSON `permissions` |
 | **Autentikasi** | `refresh_tokens` | Hash SHA-256 JWT refresh token |
-| | `external_identities` | Identitas OAuth / OIDC (`provider`, `provider_subject`) |
 | **Master Data** | `organizational_units` | Pohon hierarki unit / jurusan / sekolah |
 | | `borrowers` | Master data peminjam (**tanpa akun login**) |
 | | `categories` | Master kategori inventaris |
 | | `locations` | Hierarki lokasi fisik (Gedung > Lantai > Ruangan) |
 | **Inventaris** | `assets` | Data fisik aset dengan CHECK status & kondisi |
+| | `asset_photos` | Foto barang (item_photos), maks. 5, urutan 0 = foto utama |
 | | `asset_history` | Log perubahan status & lokasi aset (*append-only*) |
 | **Peminjaman** | `borrowings` | Header transaksi peminjaman (nomor transaksi, tenggat) |
 | | `borrowing_items` | Rincian barang dalam peminjaman aktif |
 | **Pengembalian** | `returns` | Header pengembalian (penerima & waktu kembali) |
 | | `return_items` | Rincian barang kembali (`BAIK`, `RUSAK`, `HILANG`) |
-| **Insiden & Perbaikan** | `damage_reports` | Laporan kerusakan, estimasi biaya & siklus perbaikan |
-| | `loss_reports` | Laporan kehilangan aset |
+| **Insiden & Perbaikan** | `asset_incident_reports` | Laporan kerusakan & kehilangan aset, estimasi biaya & siklus perbaikan |
 | **Notifikasi** | `notification_templates` | Template subjek dan isi email |
-| | `notification_reads` | Penanda notifikasi sudah dibaca per pengguna internal |
-| | `scheduler_runs` | Log setiap pemeriksaan jatuh tempo (Celery Beat / manual) |
-| **Inventaris (tambahan)** | `asset_photos` | Foto barang (item_photos), maks. 5, urutan 0 = foto utama |
 | | `notification_events` | Kunci idempotency: `UNIQUE(borrowing_id, event_code)` |
 | | `notifications` | Snapshot notifikasi email yang siap dikirim |
-| | `notification_logs` | Log siklus hidup pembuatan dan antrean notifikasi |
-| | `email_deliveries` | Rekam jejak percobaan pengiriman SMTP per attempt |
+| | `notification_deliveries` | Log siklus hidup dan percobaan pengiriman SMTP per attempt |
+| | `notification_reads` | Penanda notifikasi sudah dibaca per pengguna internal |
+| | `scheduler_runs` | Log setiap pemeriksaan jatuh tempo (Celery Beat / manual) |
 | **Konfigurasi & Audit** | `system_settings` | Konfigurasi sistem dinamis (*key-value*) |
 | | `audit_logs` | Jejak audit aktivitas pengguna & snapshot JSON |
 
-Kolom tambahan revisi `a7c3e91d2b40`: `assets.acquisition_source`, `users.phone`, `borrowings.checked_out_at/checked_out_by/cancelled_at/cancel_reason` (status `DRAF`), `borrowing_items.condition_out` (checked_out_at boleh NULL untuk draf), `return_items.asset_status_after`, `notifications.recipient_name/recipient_type/recipient_user_id`.
+Katalog 16 permission granular didefinisikan secara statis pada backend (`app/models/permission.py`) dan disimpan langsung per role pada kolom JSON `roles.permissions`. API `/api/v1/permissions` tetap menyajikan katalog lengkap ke frontend / Matriks Hak Akses.
 
 ---
 
