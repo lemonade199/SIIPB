@@ -27,11 +27,8 @@ from app.models import (  # noqa: E402
     Category,
     Location,
     OrganizationalUnit,
-    Permission,
     Role,
-    RolePermission,
     User,
-    UserRole,
 )
 from app.models import NotificationTemplate  # noqa: E402
 from app.services.default_templates import TEMPLATES  # noqa: E402
@@ -78,28 +75,34 @@ def get_or_create(session, _model, _where: dict, **defaults):
 
 
 def seed_rbac(session):
-    perms = {}
-    for code, name, module in PERMISSIONS:
-        perms[code], _ = get_or_create(session, Permission, {"code": code}, name=name, module=module)
     roles = {}
     for code, (name, desc, codes) in ROLES.items():
-        role, created = get_or_create(session, Role, {"code": code}, name=name, description=desc)
+        role, created = get_or_create(session, Role, {"code": code}, name=name, description=desc, permissions=sorted(codes))
         roles[code] = role
-        if created or not role.permission_links:
-            for c in codes:
-                get_or_create(session, RolePermission, {"role_id": role.id, "permission_id": perms[c].id})
+        if not role.permissions:
+            role.permissions = sorted(codes)
+            session.flush()
     return roles
 
 
 def seed_user(session, username, email, full_name, password, role, unit_id=None, phone=None):
     user = session.scalars(select(User).where(User.username == username)).first()
     if user:
+        if user.role_id != role.id:
+            user.role_id = role.id
+            session.flush()
         return user, False
-    user = User(username=username, email=email, full_name=full_name, phone=phone, unit_id=unit_id,
-                password_hash=hash_password(password))
+    user = User(
+        username=username,
+        email=email,
+        full_name=full_name,
+        phone=phone,
+        unit_id=unit_id,
+        password_hash=hash_password(password),
+        role_id=role.id,
+    )
     session.add(user)
     session.flush()
-    session.add(UserRole(user_id=user.id, role_id=role.id))
     return user, True
 
 

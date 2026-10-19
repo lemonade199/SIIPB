@@ -24,33 +24,26 @@ from app.models import (
     BorrowingItem,
     BorrowingStatus,
     Category,
-    DamageReport,
     DamageSeverity,
-    EmailDelivery,
-    EmailDeliveryStatus,
-    ExternalIdentity,
     Location,
-    LossReport,
     Notification,
     NotificationChannel,
+    NotificationDelivery,
     NotificationEvent,
     NotificationEventCode,
     NotificationEventStatus,
-    NotificationLog,
     NotificationStatus,
     NotificationTemplate,
     OrganizationalUnit,
-    Permission,
     RefreshToken,
     RepairStatus,
     Return,
     ReturnCondition,
     ReturnItem,
     Role,
-    RolePermission,
     SystemSetting,
     User,
-    UserRole,
+    AssetIncidentReport,
 )
 
 
@@ -79,23 +72,13 @@ def run_checks():
         )
         session.add(rpl)
 
-        p_view = Permission(code="asset.view", name="Lihat Aset", module="asset")
-        p_checkout = Permission(
-            code="borrowing.create", name="Peminjaman Aset", module="borrowing"
+        admin_role = Role(
+            code="ADMIN",
+            name="Administrator",
+            permissions=["asset.view", "borrowing.create"],
         )
-        session.add_all([p_view, p_checkout])
-        session.flush()
-
-        admin_role = Role(code="ADMIN", name="Administrator")
         session.add(admin_role)
         session.flush()
-
-        session.add_all(
-            [
-                RolePermission(role_id=admin_role.id, permission_id=p_view.id),
-                RolePermission(role_id=admin_role.id, permission_id=p_checkout.id),
-            ]
-        )
 
         petugas = User(
             username="petugas1",
@@ -104,13 +87,10 @@ def run_checks():
             full_name="Petugas Sarpras",
             unit_id=rpl.id,
             is_active=True,
+            role_id=admin_role.id,
         )
         session.add(petugas)
         session.flush()
-
-        session.add(
-            UserRole(user_id=petugas.id, role_id=admin_role.id, assigned_by=petugas.id)
-        )
 
         cat_laptop = Category(code="CAT-LAPTOP", name="Laptop & Notebook")
         session.add(cat_laptop)
@@ -291,24 +271,18 @@ def run_checks():
         session.add(notif)
         session.flush()
 
-        delivery1 = EmailDelivery(
+        delivery1 = NotificationDelivery(
             notification_id=notif.id,
             attempt_number=1,
+            channel="EMAIL",
             provider="smtp",
-            status=EmailDeliveryStatus.SENT.value,
+            status="SENT",
             attempted_at=now,
             delivered_at=now + timedelta(seconds=2),
         )
         session.add(delivery1)
-
-        log = NotificationLog(
-            notification_id=notif.id,
-            status=NotificationStatus.SENT.value,
-            message="Email sent successfully via SMTP",
-        )
-        session.add(log)
         session.commit()
-        print("[7] Notification & EmailDelivery attempt recorded.")
+        print("[7] Notification & NotificationDelivery attempt recorded.")
 
     # 8. Return & Damage Report
     with SessionLocal() as session:
@@ -348,9 +322,10 @@ def run_checks():
             )
         )
 
-        damage = DamageReport(
+        damage = AssetIncidentReport(
             return_item_id=ret_item.id,
             reported_by=1,
+            incident_type="KERUSAKAN",
             severity=DamageSeverity.SEDANG.value,
             description="LCD retak bagian pojok",
             repair_status=RepairStatus.DILAPORKAN.value,
@@ -408,17 +383,14 @@ def run_checks():
         )
         session.add(token)
 
-        ext_id = ExternalIdentity(
-            user_id=1,
-            provider="google",
-            provider_subject="google-sub-98765",
-            email="petugas1@siipb.sch.id",
-        )
-        session.add(ext_id)
+        user1 = session.get(User, 1)
+        user1.google_subject = "google-sub-98765"
+        user1.google_email = "petugas1@siipb.sch.id"
+        user1.google_linked_at = now
         session.commit()
-        print("[11] SystemSetting, RefreshToken, and ExternalIdentity verified.")
+        print("[11] SystemSetting, RefreshToken, and Google SSO fields verified.")
 
-    # 12. Final verification of all 26 tables
+    # 12. Final verification of all 23 application domain tables
     with SessionLocal() as session:
         counts = {}
         for table in Base.metadata.sorted_tables:

@@ -5,11 +5,10 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     Asset,
+    AssetIncidentReport,
     AssetStatus,
     Borrowing,
     BorrowingStatus,
-    DamageReport,
-    LossReport,
     RepairStatus,
     Return,
 )
@@ -83,14 +82,19 @@ def get_dashboard_summary(session: Session) -> dict:
     ) or 0
 
     # 3. Incident reports
-    total_damage_reports = session.scalar(select(func.count(DamageReport.id))) or 0
+    total_damage_reports = session.scalar(
+        select(func.count(AssetIncidentReport.id)).where(AssetIncidentReport.incident_type == "KERUSAKAN")
+    ) or 0
     pending_repairs = session.scalar(
-        select(func.count(DamageReport.id)).where(
-            DamageReport.repair_status.in_([RepairStatus.DILAPORKAN.value, RepairStatus.DALAM_PERBAIKAN.value])
+        select(func.count(AssetIncidentReport.id)).where(
+            AssetIncidentReport.incident_type == "KERUSAKAN",
+            AssetIncidentReport.repair_status.in_([RepairStatus.DILAPORKAN.value, RepairStatus.DALAM_PERBAIKAN.value])
         )
     ) or 0
 
-    total_loss_reports = session.scalar(select(func.count(LossReport.id))) or 0
+    total_loss_reports = session.scalar(
+        select(func.count(AssetIncidentReport.id)).where(AssetIncidentReport.incident_type == "KEHILANGAN")
+    ) or 0
 
     # 4. Recent returns
     recent_returns_query = (
