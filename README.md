@@ -64,7 +64,9 @@ graph TD
     Redis --> CeleryWorker[Celery Async Worker]
     CeleryWorker -->|SMTP Protocol| EmailServer[SMTP Email Gateway]
     
-    CeleryBeat[Celery Beat Scheduler] -->|Periodic Trigger 08:00 WIB| Redis
+    CeleryBeat[Celery Beat Scheduler] -->|Tiap 15m: Cek Jatuh Tempo| Redis
+    CeleryBeat -->|Harian 01.00 WIB: Backup Basis Data| Redis
+    CeleryBeat -->|Tiap 5m: Antrean Notifikasi Email| Redis
     CeleryWorker --> DB
 ```
 
@@ -83,14 +85,19 @@ graph TD
 - **Dukungan Pengembalian Parsial:** Peminjam dapat mengembalikan sebagian barang terlebih dahulu dari transaksi gabungan tanpa merusak integritas data transaksi.
 
 ### C. Sistem Peringatan Dini & Eskalasi Terjadwal (*Idempotent Notifications*)
-- **Jadwal Pengingat Terukur:**
-  - `H-3`: Notifikasi persiapan pengembalian.
-  - `H-1`: Notifikasi pengingat H-1 batas waktu.
+- **Jadwal Pengingat Terukur (Celery Beat):**
+  - Evaluasi berkala setiap 15 menit terhadap jam operasional yang ditentukan di Pengaturan (bawaan 08.00 WIB) tanpa perlu restart server.
+  - `H-3`: Notifikasi email persiapan pengembalian.
+  - `H-1`: Notifikasi email pengingat H-1 batas waktu.
   - `H-0`: Notifikasi batas pengembalian hari ini.
   - `H+1` s/d `H+7`: Penandaan otomatis status `TERLAMBAT` dan eskalasi bertingkat ke Pimpinan Unit & Kasubag Sarpras.
-- **Jaminan Idempoten:** Mencegah pengiriman email berulang kali (*anti-spam*) untuk satu kejadian yang sama.
+- **Jaminan Idempoten & Antrean Otomatis:** Mencegah pengiriman email berulang kali (*anti-spam*) untuk kejadian yang sama, serta pemrosesan antrean pengiriman email background setiap 5 menit.
 
-### D. Keamanan Tingkat Enterprise (*Enterprise Security & RBAC*)
+### D. Identifikasi Cepat & Labeling Fisik (QR Code & Barcode)
+- **Generasi Label Ganda:** Mendukung pencetakan label QR Code dinamis (resolusi tinggi via Python `qrcode`) serta Barcode standar industri (Code128).
+- **Pemindai Terintegrasi:** Pemindai QR interaktif langsung dari peramban (*webcam / kamera smartphone*) serta kompatibilitas penuh dengan pemindai barcode optik (USB/Bluetooth) untuk percepatan verifikasi sirkulasi barang.
+
+### E. Keamanan Tingkat Enterprise (*Enterprise Security & RBAC*)
 - **Hierarki Peran (RBAC):** Administrator, Petugas Sarpras/IT, dan Pimpinan dengan izin per-modul (`asset.create`, `borrowing.checkout`, `damage.manage`, `audit.read`).
 - **Tokenisasi JWT & Keamanan Refresh:** JWT Access Token berumur pendek dengan Refresh Token yang disimpan dalam bentuk hash SHA-256 (bukan plaintext).
 - **Single Sign-On (SSO):** Integrasi Google Workspace / OAuth 2.0 / OIDC melalui Authlib.
@@ -152,9 +159,9 @@ SIIPB/
 | Database & ORM | MariaDB 11.x + SQLAlchemy 2.x, migrasi Alembic | ✅ |
 | Autentikasi & SSO | JWT (access + refresh, rotasi saat ganti sandi), OAuth 2.0/OIDC (Authlib, state/nonce) | ✅ |
 | Otorisasi | RBAC 16 permission, role dapat diatur dari UI | ✅ |
-| Queue / Worker / Scheduler | Redis + Celery + Celery Beat | ✅ |
+| Queue / Worker / Scheduler | Redis + Celery + Celery Beat (Pemeriksaan jatuh tempo berkala 15m, backup harian 01.00 WIB, antrean email 5m) | ✅ `backend/celery_app.py` |
 | Email | SMTP (STARTTLS/SSL), kata sandi tersimpan terenkripsi | ✅ |
-| QR Code | Python `qrcode` (`/assets/{id}/qr`) + pemindai di UI | ✅ |
+| QR Code & Barcode | Python `qrcode` (`/assets/{id}/qr`) + Barcode Code128 + Pemindai Kamera di UI | ✅ `frontend/components/ui/` |
 | PDF / Excel | WeasyPrint / openpyxl (`/reports/{jenis}?format=pdf|xlsx`) | ✅ |
 | Pengujian | pytest, Vitest, Playwright | ✅ |
 | Web server & container | Nginx + Docker Compose | ✅ |
@@ -190,20 +197,48 @@ docker compose up -d --build
 - Backup: otomatis tiap hari 01.00 (Celery Beat, volume `backups_data`), manual dari **Pengaturan → Backup**, atau `infrastructure/scripts/backup_db.sh`. Pemulihan: `infrastructure/scripts/restore_db.sh <berkas>`.
 - Rollback: `docker compose down` → checkout tag sebelumnya → `alembic downgrade <revisi>` bila perlu → `docker compose up -d --build`.
 
-### B. Pengembangan lokal
-```bash
-# Backend (MariaDB & Redis berjalan lokal)
-cd backend && python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-alembic upgrade head && python scripts/seed_data.py               # admin/admin123, petugas/petugas123, pimpinan/pimpinan123
-python run.py                                                     # http://localhost:5000/api/docs
-celery -A celery_app.celery worker --loglevel=info                # opsional (tanpa worker: NOTIFICATION_DISPATCH=sync)
-celery -A celery_app.celery beat --loglevel=info
+### B. Pengembangan lokal (Local Development)
 
-# Frontend
-cd frontend && npm install
+> [!NOTE]
+> Monorepo ini memiliki dua lingkungan dependensi terpisah: Python (`backend/`) dan Node.js (`frontend/`). Pastikan masuk ke direktori masing-masing sebelum memasang dependensi atau menjalankan server.
+
+#### 1. Backend, Basis Data, & Worker
+```bash
+cd backend
+
+# Buat & aktifkan virtual environment
+python -m venv .venv
+# Windows (PowerShell): .\.venv\Scripts\Activate.ps1
+# Windows (CMD):        .venv\Scripts\activate.bat
+# Linux / macOS:        source .venv/bin/activate
+
+# Pasang dependensi Python
+pip install -r requirements.txt
+
+# Migrasi basis data & inisialisasi akun/role awal
+alembic upgrade head
+python scripts/seed_data.py               # admin/admin123, petugas/petugas123, pimpinan/pimpinan123
+
+# Jalankan server REST API Flask
+python run.py                             # http://localhost:5000 (Swagger: /api/docs)
+
+# Jalankan Celery Worker & Beat (opsional jika NOTIFICATION_DISPATCH=sync)
+celery -A celery_app.celery worker --loglevel=info
+celery -A celery_app.celery beat --loglevel=info
+```
+
+#### 2. Frontend (Next.js)
+```bash
+cd frontend
+
+# Pasang dependensi Node.js (pastikan di folder frontend)
+npm install
+
+# Konfigurasi environment lokal
 cp .env.example .env    # NEXT_PUBLIC_DATA_SOURCE=api, NEXT_PUBLIC_API_BASE_URL=http://localhost:5000/api/v1
-npm run dev             # http://localhost:3000  (tanpa backend: NEXT_PUBLIC_DATA_SOURCE=mock)
+
+# Jalankan server pengembang Next.js
+npm run dev             # http://localhost:3000 (Mode Mock: NEXT_PUBLIC_DATA_SOURCE=mock)
 ```
 
 ---
