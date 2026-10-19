@@ -111,3 +111,4 @@ def create_app(config_class=Config) -> Flask:
         return error_response("Terjadi kesalahan internal pada server", error_code="INTERNAL_SERVER_ERROR", status_code=500)
 
     return app
+    

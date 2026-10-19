@@ -21,8 +21,9 @@
 6. [Struktur Repositori (Monorepo Governance)](#6-struktur-repositori-monorepo-governance)
 7. [Matriks Kesesuaian Teknologi](#7-matriks-kesesuaian-teknologi)
 8. [Kesiapan Pengujian & Jaminan Mutu (QA)](#8-kesiapan-pengujian--jaminan-mutu-qa)
-9. [Panduan Deployment & Operasional](#9-panduan-deployment--operasional)
-10. [Dokumentasi API & Kontak](#10-dokumentasi-api--kontak)
+ 9. [Panduan Deployment & Operasional](#9-panduan-deployment--operasional)
+10. [Kredensial & Akun Bawaan (Default Accounts)](#10-kredensial--akun-bawaan-default-accounts)
+11. [Dokumentasi API & Kontak](#11-dokumentasi-api--kontak)
 
 ---
 
@@ -207,7 +208,24 @@ npm run dev             # http://localhost:3000  (tanpa backend: NEXT_PUBLIC_DAT
 
 ---
 
-## 10. Dokumentasi API & Kontak
+## 10. Kredensial & Akun Bawaan (Default Accounts)
+
+Setelah menjalankan `python scripts/seed_data.py` (pada mode API/Database) atau saat menjalankan frontend pada mode Mock (`NEXT_PUBLIC_DATA_SOURCE=mock`), akun-akun bawaan berikut siap digunakan untuk login:
+
+| Peran (Role) | Username | Email | Password Default | Hak Akses Utama |
+| :--- | :--- | :--- | :--- | :--- |
+| **Administrator** | `admin` | `admin@siipb.local` | `admin123` | Akses penuh sistem, manajemen pengguna, role & permission, pengaturan SMTP/sistem, audit log, dan backup. |
+| **Petugas Sarpras / IT** | `petugas` | `petugas@siipb.local` | `petugas123` | Manajemen aset/inventaris, pencatatan transaksi peminjaman & pengembalian, monitoring keterlambatan, cetak label QR, dan ekspor laporan. |
+| **Pimpinan** | `pimpinan` | `pimpinan@siipb.local` | `pimpinan123` | Monitoring dashboard eksekutif, rekapitulasi keterlambatan/eskalasi, dan melihat/ekspor laporan aset & sirkulasi. |
+
+> [!IMPORTANT]
+> **Catatan Keamanan Production:**
+> - Kata sandi default di atas dapat disesuaikan sebelum inisialisasi melalui environment variable `SEED_ADMIN_PASSWORD`, `SEED_PETUGAS_PASSWORD`, dan `SEED_PIMPINAN_PASSWORD`.
+> - Untuk lingkungan *production*, sangat disarankan untuk segera mengganti kata sandi bawaan melalui menu **Pengaturan Pengguna** setelah login pertama kali.
+
+---
+
+## 11. Dokumentasi API & Kontak
 
 - **Spesifikasi Lengkap REST API:** Kunjungi endpoint `/api/docs` saat server aktif untuk melihat antarmuka Swagger UI interaktif yang memuat seluruh parameter, model payload, dan skema respons.
 - **Daftar endpoint:** [`docs/api_specification.md`](docs/api_specification.md).
