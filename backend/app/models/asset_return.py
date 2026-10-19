@@ -15,9 +15,8 @@ from app.models.enums import ReturnCondition, check_in
 
 if TYPE_CHECKING:
     from app.models.asset import Asset
+    from app.models.asset_incident_report import AssetIncidentReport
     from app.models.borrowing import Borrowing, BorrowingItem
-    from app.models.damage_report import DamageReport
-    from app.models.loss_report import LossReport
     from app.models.user import User
 
 
@@ -65,7 +64,12 @@ class ReturnItem(IdMixin, CreatedAtMixin, Base):
     return_: Mapped[Return] = relationship(back_populates="items")
     borrowing_item: Mapped[BorrowingItem] = relationship(back_populates="return_items")
     asset: Mapped[Asset] = relationship()
-    damage_reports: Mapped[list[DamageReport]] = relationship(back_populates="return_item")
-    loss_report: Mapped[LossReport | None] = relationship(
-        back_populates="return_item", uselist=False
-    )
+    incident_reports: Mapped[list[AssetIncidentReport]] = relationship(back_populates="return_item")
+
+    @property
+    def damage_reports(self) -> list[AssetIncidentReport]:
+        return [r for r in self.incident_reports if r.incident_type == "KERUSAKAN"]
+
+    @property
+    def loss_report(self) -> AssetIncidentReport | None:
+        return next((r for r in self.incident_reports if r.incident_type == "KEHILANGAN"), None)

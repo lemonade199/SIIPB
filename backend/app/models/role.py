@@ -1,26 +1,21 @@
-"""roles and role_permissions (roles <-> permissions)."""
+"""roles — master roles with JSON-stored permissions."""
 from __future__ import annotations
 
-from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, ForeignKey, String, Text
+from sqlalchemy import Boolean, JSON, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import (
-    CURRENT_TS6,
     TRUE,
     Base,
-    BigIntU,
-    DateTime6,
     IdMixin,
     TimestampMixin,
     table_args,
 )
 
 if TYPE_CHECKING:
-    from app.models.permission import Permission
-    from app.models.user import UserRole
+    from app.models.user import User
 
 
 class Role(IdMixin, TimestampMixin, Base):
@@ -33,33 +28,23 @@ class Role(IdMixin, TimestampMixin, Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean, default=True, server_default=TRUE, index=True
     )
-
-    user_links: Mapped[list[UserRole]] = relationship(back_populates="role")
-    permission_links: Mapped[list[RolePermission]] = relationship(
-        back_populates="role", cascade="all, delete-orphan"
+    permissions: Mapped[list[str]] = mapped_column(
+        JSON, default=list, server_default=text("'[]'")
     )
-    permissions: Mapped[list[Permission]] = relationship(
-        secondary="role_permissions", viewonly=True
+
+    users: Mapped[list[User]] = relationship(
+        back_populates="role", foreign_keys="User.role_id", passive_deletes=True
     )
 
     def __repr__(self) -> str:
         return f"<Role {self.code}>"
 
 
-class RolePermission(Base):
-    __tablename__ = "role_permissions"
-    __table_args__ = table_args()
+# Backward-compatible mock
+class RolePermission:
+    def __init__(self, role_id: int = 0, permission_id: int = 0):
+        self.role_id = role_id
+        self.permission_id = permission_id
 
-    role_id: Mapped[int] = mapped_column(
-        BigIntU, ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True
-    )
-    permission_id: Mapped[int] = mapped_column(
-        BigIntU,
-        ForeignKey("permissions.id", ondelete="CASCADE"),
-        primary_key=True,
-        index=True,
-    )
-    created_at: Mapped[datetime] = mapped_column(DateTime6, server_default=CURRENT_TS6)
 
-    role: Mapped[Role] = relationship(back_populates="permission_links")
-    permission: Mapped[Permission] = relationship(back_populates="role_links")
+__all__ = ["Role", "RolePermission"]

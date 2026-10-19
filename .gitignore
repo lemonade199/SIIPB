@@ -55,3 +55,6 @@ deploy/.app.env.*
 
 # Celery beat lokal
 backend/celerybeat-schedule*
+
+# Temporary Office Lock Files
+~$*

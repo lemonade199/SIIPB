@@ -205,6 +205,24 @@ def roles_index():
         return success_response(data=[serialize_role(session, r) for r in roles])
 
 
+@user_bp.get("/roles/<int:role_id>")
+@permission_required("users.manage")
+def roles_show(role_id: int):
+    """Detail role berdasarkan ID.
+    ---
+    tags: [Users]
+    security: [{Bearer: []}]
+    responses:
+      200: {description: Detail role}
+      404: {description: Role tidak ditemukan}
+    """
+    with SessionLocal() as session:
+        r = session.get(Role, role_id)
+        if not r:
+            return error_response("Role tidak ditemukan", error_code="NOT_FOUND", status_code=404)
+        return success_response(data=serialize_role(session, r))
+
+
 @user_bp.post("/roles")
 @permission_required("users.manage")
 def roles_create():

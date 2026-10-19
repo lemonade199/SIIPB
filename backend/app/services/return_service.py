@@ -1,19 +1,18 @@
 """Return Processing Service with Condition Evaluation and Incident Reporting."""
 from datetime import datetime
 from typing import Any
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import (
     Asset,
     AssetCondition,
     AssetHistory,
+    AssetIncidentReport,
     AssetStatus,
     Borrowing,
     BorrowingItem,
     BorrowingStatus,
-    DamageReport,
-    LossReport,
     NotificationEventCode,
     RepairStatus,
     Return,
@@ -28,7 +27,7 @@ def get_returns(session: Session, borrowing_id: int | None = None, page: int = 1
     if borrowing_id:
         query = query.where(Return.borrowing_id == borrowing_id)
 
-    total = len(session.scalars(query).all())
+    total = session.scalar(select(func.count()).select_from(query.subquery())) or 0
     items = list(
         session.scalars(
             query.order_by(Return.id.desc())
@@ -149,9 +148,10 @@ def process_return(
             reason = f"Dikembalikan dalam kondisi rusak (TX: {borrowing.transaction_number})"
 
             # Create Damage Report
-            damage_report = DamageReport(
+            damage_report = AssetIncidentReport(
                 return_item_id=ret_item.id,
                 reported_by=received_by,
+                incident_type="KERUSAKAN",
                 severity=severity,
                 description=dmg_data.get("description", "Kerusakan saat peminjaman"),
                 evidence_path=dmg_data.get("evidence_path"),
@@ -171,9 +171,10 @@ def process_return(
 
             # Create Loss Report
             loss_data = item_input.get("loss") or {}
-            loss_report = LossReport(
+            loss_report = AssetIncidentReport(
                 return_item_id=ret_item.id,
                 reported_by=received_by,
+                incident_type="KEHILANGAN",
                 description=loss_data.get("description", "Barang hilang saat peminjaman"),
                 evidence_path=loss_data.get("evidence_path"),
                 action_taken=loss_data.get("action_taken"),

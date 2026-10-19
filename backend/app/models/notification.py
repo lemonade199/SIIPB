@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import CheckConstraint, ForeignKey, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -12,9 +12,8 @@ from app.models.enums import NotificationChannel, NotificationStatus, RecipientT
 
 if TYPE_CHECKING:
     from app.models.borrower import Borrower
-    from app.models.email_delivery import EmailDelivery
+    from app.models.notification_delivery import NotificationDelivery
     from app.models.notification_event import NotificationEvent
-    from app.models.notification_log import NotificationLog
     from app.models.notification_template import NotificationTemplate
 
 
@@ -63,15 +62,30 @@ class Notification(IdMixin, CreatedAtMixin, Base):
     event: Mapped[NotificationEvent] = relationship(back_populates="notifications")
     borrower: Mapped[Borrower] = relationship(back_populates="notifications")
     template: Mapped[NotificationTemplate] = relationship(back_populates="notifications")
-    logs: Mapped[list[NotificationLog]] = relationship(
-        back_populates="notification", order_by="NotificationLog.created_at"
-    )
-    deliveries: Mapped[list[EmailDelivery]] = relationship(
-        back_populates="notification", order_by="EmailDelivery.attempt_number"
+    deliveries: Mapped[list[NotificationDelivery]] = relationship(
+        back_populates="notification", order_by="NotificationDelivery.attempt_number",
+        cascade="all, delete-orphan",
     )
     reads: Mapped[list[NotificationRead]] = relationship(
         back_populates="notification", cascade="all, delete-orphan"
     )
+
+    @property
+    def logs(self) -> list[Any]:
+        """Backward-compatible property for notification logs derived from deliveries."""
+        class _LogMock:
+            def __init__(self, d):
+                self.status = d.status
+                if d.status == "SENT":
+                    detail = "250 OK"
+                elif d.error_message:
+                    detail = f"Gagal ({d.error_message})"
+                else:
+                    detail = "Gagal"
+                self.message = f"Percobaan ke-{d.attempt_number}: {detail}"
+                self.created_at = d.attempted_at
+
+        return [_LogMock(d) for d in self.deliveries]
 
 
 class NotificationRead(Base):

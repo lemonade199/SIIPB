@@ -23,20 +23,18 @@ from sqlalchemy.orm import Session
 from app.config import Config
 from app.models import (
     Borrowing,
-    EmailDelivery,
     EmailDeliveryStatus,
     Notification,
     NotificationChannel,
+    NotificationDelivery,
     NotificationEvent,
     NotificationEventCode,
     NotificationEventStatus,
-    NotificationLog,
     NotificationStatus,
     NotificationTemplate,
     RecipientType,
     Role,
     User,
-    UserRole,
 )
 
 logger = logging.getLogger(__name__)
@@ -79,11 +77,10 @@ def render(text: str, ctx: dict[str, Any]) -> str:
 def _users_with_role(session: Session, role_code: str) -> list[User]:
     q = (
         select(User)
-        .join(UserRole, UserRole.user_id == User.id)
-        .join(Role, Role.id == UserRole.role_id)
+        .join(Role, Role.id == User.role_id)
         .where(Role.code == role_code, Role.is_active.is_(True), User.is_active.is_(True), User.deleted_at.is_(None))
     )
-    return list(session.scalars(q).unique().all())
+    return list(session.scalars(q).all())
 
 
 def resolve_recipients(session: Session, borrowing: Borrowing, kinds: Iterable[str], settings: dict) -> list[dict]:
@@ -214,8 +211,6 @@ def create_event_notifications(
         )
         session.add(n)
         session.flush()
-        session.add(NotificationLog(notification_id=n.id, status=NotificationStatus.QUEUED.value,
-                                    message=f"Masuk antrean ({r['type'].lower()})"))
         created.append(n)
     event.status = NotificationEventStatus.PROCESSED.value
     event.processed_at = datetime.now()
@@ -234,10 +229,10 @@ def record_delivery_attempt(
     provider: str = "smtp",
     message_id: str | None = None,
     final: bool = True,
-) -> EmailDelivery:
-    """Catat satu percobaan SMTP ke email_deliveries & notification_logs."""
+) -> NotificationDelivery:
+    """Catat satu percobaan pengiriman ke notification_deliveries."""
     now = datetime.now()
-    delivery = EmailDelivery(
+    delivery = NotificationDelivery(
         notification_id=notification_id,
         attempt_number=attempt_number,
         provider=provider,
@@ -255,11 +250,6 @@ def record_delivery_attempt(
             notif.sent_at = now
         else:
             notif.status = NotificationStatus.FAILED.value if final else NotificationStatus.RETRYING.value
-        session.add(NotificationLog(
-            notification_id=notification_id,
-            status=notif.status,
-            message=f"Percobaan ke-{attempt_number}: " + ("250 OK" if success else f"Gagal ({error_message})"),
-        ))
     session.commit()
     return delivery
 
