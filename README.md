@@ -179,6 +179,8 @@ Database uji dibuat ulang otomatis (`siipb_test`: DROP → `alembic upgrade head
 
 ## 9. Panduan Deployment & Operasional
 
+> **AWS production (Terraform + GitHub Actions + CloudWatch):** lihat [docs/DEVOPS-DEPLOYMENT.md](docs/DEVOPS-DEPLOYMENT.md).
+
 ### A. Docker Compose (production)
 ```bash
 cp .env.example .env        # ganti semua nilai "ganti-…" (DB, SECRET_KEY, JWT_SECRET_KEY, SEED_ADMIN_PASSWORD)

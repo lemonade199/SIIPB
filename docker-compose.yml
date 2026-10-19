@@ -2,6 +2,7 @@
 # SIIPB — arsitektur production (dokumen Plan §9 & §23)
 # Pengguna → Nginx → Next.js (frontend) / Flask REST API → MariaDB
 # Flask ↔ Redis; Celery Worker (email SMTP) & Celery Beat (jatuh tempo, backup)
+# Image: backend/Dockerfile (API), backend/Dockerfile.worker (worker & beat), frontend/Dockerfile
 #
 #   cp .env.example .env    # isi rahasia (WAJIB diganti)
 #   docker compose up -d --build
@@ -96,7 +97,8 @@ services:
     networks: [siipb_net]
 
   celery_worker:
-    image: siipb-backend:latest
+    build: { context: ./backend, dockerfile: Dockerfile.worker }
+    image: siipb-worker:latest
     container_name: siipb_celery_worker
     restart: unless-stopped
     command: ["celery", "-A", "celery_app.celery", "worker", "--loglevel=info", "--concurrency=4"]
@@ -109,13 +111,14 @@ services:
     networks: [siipb_net]
 
   celery_beat:
-    image: siipb-backend:latest
+    image: siipb-worker:latest
     container_name: siipb_celery_beat
     restart: unless-stopped
     command: ["celery", "-A", "celery_app.celery", "beat", "--loglevel=info", "--schedule=/tmp/celerybeat-schedule"]
     environment: *backend-env
     depends_on:
       backend: { condition: service_healthy }
+      celery_worker: { condition: service_started }
     networks: [siipb_net]
 
   frontend:

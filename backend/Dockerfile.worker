@@ -1,0 +1,35 @@
+# ========================================================
+# SIIPB Worker — Celery worker & beat (email SMTP, jatuh tempo, backup)
+# Basis sama dengan API (kode & dependensi identik), tetapi tanpa Gunicorn/port 5000
+# dan dengan healthcheck yang memeriksa proses Celery, bukan HTTP.
+#   worker: CMD bawaan
+#   beat  : command: ["celery", "-A", "celery_app.celery", "beat", "--loglevel=info", "--schedule=/tmp/celerybeat-schedule"]
+# ========================================================
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    APP_ENV=production \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential libmariadb-dev mariadb-client procps \
+        libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libharfbuzz-subset0 fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --upgrade pip && pip install -r requirements.txt
+
+COPY . .
+RUN mkdir -p /app/uploads/assets /app/uploads/evidence /app/backups \
+    && useradd --create-home --uid 10001 siipb \
+    && chown -R siipb:siipb /app/uploads /app/backups
+USER siipb
+
+# Sehat bila proses celery (worker atau beat) masih hidup.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD pgrep -f "celery -A celery_app.celery" >/dev/null || exit 1
+
+CMD ["celery", "-A", "celery_app.celery", "worker", "--loglevel=info", "--concurrency=4"]

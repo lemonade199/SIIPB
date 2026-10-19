@@ -1,0 +1,91 @@
+# ==========================================================================
+# SIIPB — container production di EC2 (dikelola deploy/scripts/deploy.sh)
+#   - image dari Amazon ECR: ${ECR_REGISTRY}/siipb-{backend,worker,frontend}:${IMAGE_TAG}
+#   - database: AWS RDS MariaDB (DATABASE_URL dari Secrets Manager -> app.env)
+#   - Nginx berjalan di host (bukan container) dan meneruskan ke 127.0.0.1:3000 / :5000
+#   - log container dikirim ke CloudWatch Logs (driver awslogs)
+# Variabel ECR_REGISTRY, IMAGE_TAG, AWS_REGION, LOG_GROUP diekspor deploy.sh dari /etc/siipb/siipb.conf.
+# ==========================================================================
+name: siipb
+
+x-logging: &logging
+  driver: awslogs
+  options:
+    awslogs-region: "${AWS_REGION}"
+    awslogs-group: "${LOG_GROUP}"
+    tag: "{{.Name}}"
+
+# Nilai non-rahasia khusus runtime container (rahasia ada di app.env).
+x-runtime-env: &runtime-env
+  REDIS_URL: redis://redis:6379/0
+  CELERY_BROKER_URL: redis://redis:6379/0
+  CELERY_RESULT_BACKEND: redis://redis:6379/1
+  CELERY_TIMEZONE: Asia/Jakarta
+  NOTIFICATION_DISPATCH: celery
+  UPLOAD_FOLDER: /app/uploads
+  BACKUP_FOLDER: /app/backups
+  MAX_UPLOAD_MB: "5"
+  TRUST_PROXY: "1"
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    logging: *logging
+
+  backend:
+    image: "${ECR_REGISTRY}/siipb-backend:${IMAGE_TAG:-latest}"
+    restart: unless-stopped
+    env_file: [app.env]
+    environment:
+      <<: *runtime-env
+      RUN_MIGRATIONS: "1"   # alembic upgrade head + seed minimal (idempoten)
+      SEED_DEMO_DATA: "0"
+    ports:
+      - "127.0.0.1:5000:5000"
+    volumes:
+      - /opt/siipb/uploads:/app/uploads
+      - /opt/siipb/backups:/app/backups
+    depends_on:
+      redis: { condition: service_healthy }
+    logging: *logging
+
+  celery_worker:
+    image: "${ECR_REGISTRY}/siipb-worker:${IMAGE_TAG:-latest}"
+    restart: unless-stopped
+    env_file: [app.env]
+    environment: *runtime-env
+    volumes:
+      - /opt/siipb/uploads:/app/uploads
+      - /opt/siipb/backups:/app/backups
+    depends_on:
+      redis: { condition: service_healthy }
+    logging: *logging
+
+  celery_beat:
+    image: "${ECR_REGISTRY}/siipb-worker:${IMAGE_TAG:-latest}"
+    restart: unless-stopped
+    command: ["celery", "-A", "celery_app.celery", "beat", "--loglevel=info", "--schedule=/tmp/celerybeat-schedule"]
+    env_file: [app.env]
+    environment: *runtime-env
+    depends_on:
+      redis: { condition: service_healthy }
+    logging: *logging
+
+  frontend:
+    image: "${ECR_REGISTRY}/siipb-frontend:${IMAGE_TAG:-latest}"
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    logging: *logging
+
+volumes:
+  redis_data:

@@ -1,0 +1,7 @@
+# Salin menjadi backend.hcl (di-ignore git) lalu: terraform init -backend-config=backend.hcl
+# Nilai bucket diambil dari output stack bootstrap/ (terraform output backend_hcl).
+bucket       = "siipb-tfstate-xxxxxxxx"
+key          = "siipb/production/terraform.tfstate"
+region       = "ap-southeast-1"
+encrypt      = true
+use_lockfile = true

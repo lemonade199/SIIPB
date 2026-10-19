@@ -45,3 +45,22 @@ frontend/.next/
 frontend/test-results/
 frontend/playwright-report/
 dump.rdb
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+crash.log
+terraform.tfvars
+*.auto.tfvars
+backend.hcl
+# .terraform.lock.hcl SENGAJA di-commit (kunci versi provider)
+
+# Deploy (dibuat di EC2 dari Secrets Manager)
+deploy/app.env
+deploy/.app.env.*
+
+# Celery beat lokal
+backend/celerybeat-schedule*
