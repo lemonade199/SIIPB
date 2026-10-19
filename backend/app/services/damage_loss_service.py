@@ -1,10 +1,10 @@
 """Damage and Loss Incident Reports Service."""
 from datetime import datetime
 from typing import Any
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Asset, AssetHistory, AssetStatus, DamageReport, LossReport, RepairStatus
+from app.models import Asset, AssetHistory, AssetIncidentReport, AssetStatus, RepairStatus
 from app.services.audit_service import record_audit
 
 
@@ -14,17 +14,17 @@ def get_damage_reports(
     severity: str | None = None,
     page: int = 1,
     per_page: int = 20,
-) -> tuple[list[DamageReport], int]:
-    query = select(DamageReport)
+) -> tuple[list[AssetIncidentReport], int]:
+    query = select(AssetIncidentReport).where(AssetIncidentReport.incident_type == "KERUSAKAN")
     if repair_status:
-        query = query.where(DamageReport.repair_status == repair_status.upper())
+        query = query.where(AssetIncidentReport.repair_status == repair_status.upper())
     if severity:
-        query = query.where(DamageReport.severity == severity.upper())
+        query = query.where(AssetIncidentReport.severity == severity.upper())
 
-    total = len(session.scalars(query).all())
+    total = session.scalar(select(func.count()).select_from(query.subquery())) or 0
     items = list(
         session.scalars(
-            query.order_by(DamageReport.id.desc())
+            query.order_by(AssetIncidentReport.id.desc())
             .offset((page - 1) * per_page)
             .limit(per_page)
         ).all()
@@ -39,10 +39,10 @@ def update_damage_repair_status(
     action_taken: str | None = None,
     repair_cost: Any = None,
     user_id: int | None = None,
-) -> DamageReport:
+) -> AssetIncidentReport:
     """Progress damage report through its repair lifecycle."""
-    report = session.get(DamageReport, report_id)
-    if not report:
+    report = session.get(AssetIncidentReport, report_id)
+    if not report or report.incident_type != "KERUSAKAN":
         raise ValueError("Laporan kerusakan tidak ditemukan")
 
     old_status = report.repair_status
@@ -89,19 +89,22 @@ def update_damage_repair_status(
         entity_id=report.id,
         user_id=user_id,
         old_data={"repair_status": old_status},
-        new_data={"repair_status": report.repair_status, "repair_cost": str(report.repair_cost)},
+        new_data={
+            "repair_status": report.repair_status,
+            "repair_cost": str(report.repair_cost) if report.repair_cost is not None else None,
+        },
     )
 
     session.commit()
     return report
 
 
-def get_loss_reports(session: Session, page: int = 1, per_page: int = 20) -> tuple[list[LossReport], int]:
-    query = select(LossReport)
-    total = len(session.scalars(query).all())
+def get_loss_reports(session: Session, page: int = 1, per_page: int = 20) -> tuple[list[AssetIncidentReport], int]:
+    query = select(AssetIncidentReport).where(AssetIncidentReport.incident_type == "KEHILANGAN")
+    total = session.scalar(select(func.count()).select_from(query.subquery())) or 0
     items = list(
         session.scalars(
-            query.order_by(LossReport.id.desc())
+            query.order_by(AssetIncidentReport.id.desc())
             .offset((page - 1) * per_page)
             .limit(per_page)
         ).all()
