@@ -16,14 +16,15 @@
 1. [Ringkasan Eksekutif (Executive Summary)](#1-ringkasan-eksekutif-executive-summary)
 2. [Tujuan Strategis & Nilai Bisnis](#2-tujuan-strategis--nilai-bisnis)
 3. [Arsitektur Sistem Terintegrasi](#3-arsitektur-sistem-terintegrasi)
-4. [Fitur Unggulan & Kapabilitas Utama](#4-fitur-unggulan--kapabilitas-utama)
-5. [Prinsip Tata Kelola & Integritas Data](#5-prinsip-tata-kelola--integritas-data)
-6. [Struktur Repositori (Monorepo Governance)](#6-struktur-repositori-monorepo-governance)
-7. [Matriks Kesesuaian Teknologi](#7-matriks-kesesuaian-teknologi)
-8. [Kesiapan Pengujian & Jaminan Mutu (QA)](#8-kesiapan-pengujian--jaminan-mutu-qa)
- 9. [Panduan Deployment & Operasional](#9-panduan-deployment--operasional)
-10. [Kredensial & Akun Bawaan (Default Accounts)](#10-kredensial--akun-bawaan-default-accounts)
-11. [Dokumentasi API & Kontak](#11-dokumentasi-api--kontak)
+4. [Diagram Relasi Basis Data (ERD)](#4-diagram-relasi-basis-data-erd)
+5. [Fitur Unggulan & Kapabilitas Utama](#5-fitur-unggulan--kapabilitas-utama)
+6. [Prinsip Tata Kelola & Integritas Data](#6-prinsip-tata-kelola--integritas-data)
+7. [Struktur Repositori (Monorepo Governance)](#7-struktur-repositori-monorepo-governance)
+8. [Matriks Kesesuaian Teknologi](#8-matriks-kesesuaian-teknologi)
+9. [Kesiapan Pengujian & Jaminan Mutu (QA)](#9-kesiapan-pengujian--jaminan-mutu-qa)
+10. [Panduan Deployment & Operasional](#10-panduan-deployment--operasional)
+11. [Kredensial & Akun Bawaan (Default Accounts)](#11-kredensial--akun-bawaan-default-accounts)
+12. [Dokumentasi API & Kontak](#12-dokumentasi-api--kontak)
 
 ---
 
@@ -57,7 +58,7 @@ graph TD
     Nginx -->|Static Assets| Frontend[Frontend Next.js / Web SPA]
     Nginx -->|API Requests /api/v1| FlaskApp[Flask REST API Engine]
     
-    FlaskApp -->|ORM SQLAlchemy 2.x & Row Locking| DB[(MariaDB 11 - 29 Tabel)]
+    FlaskApp -->|ORM SQLAlchemy 2.x & Row Locking| DB[(MariaDB 11+ - 23 Tabel)]
     FlaskApp -->|Message Broker & Token Cache| Redis[(Redis In-Memory Cache)]
     FlaskApp -->|Foto barang & backup| Storage[(Volume uploads / backups)]
     
@@ -72,7 +73,26 @@ graph TD
 
 ---
 
-## 4. Fitur Unggulan & Kapabilitas Utama
+## 4. Diagram Relasi Basis Data (ERD)
+
+Basis data SIIPB menggunakan **MariaDB 11+ / MariaDB 13 (InnoDB Engine)** dengan **23 tabel produksi** aktif (Head Revision Alembic `d4e8b1a5f920`) yang saling terhubung dalam 8 domain fungsional:
+
+<div align="center">
+  <a href="database/ERD.png" target="_blank">
+    <img src="database/ERD.png" alt="Entity Relationship Diagram SIIPB (23 Tabel)" width="95%" />
+  </a>
+  <p><em>Diagram Relasi Entitas (ERD) Crow's Foot SIIPB — 23 Tabel Produksi Aktif</em></p>
+</div>
+
+- 🗄️ **Kamus Data & Panduan Basis Data:** [`database/README.md`](database/README.md)
+- 📑 **Dokumentasi ERD & Spesifikasi Relasional:** [`docs/database_erd.md`](docs/database_erd.md)
+- 🔍 **Penampil Diagram Interaktif (Pan/Zoom):** [`docs/SIIPB_ERD_diagram.html`](docs/SIIPB_ERD_diagram.html) *(Dapat dibuka langsung di peramban web)*
+- 📐 **Diagram Vektor Skalabel (Lossless SVG):** [`database/ERD.svg`](database/ERD.svg)
+- 💾 **DDL Skema SQL Terkini:** [`database/SIIPB.sql`](database/SIIPB.sql)
+
+---
+
+## 5. Fitur Unggulan & Kapabilitas Utama
 
 ### A. Siklus Hidup Aset Terpadu (*Asset Lifecycle Management*)
 - **Pencatatan Komprehensif:** Kode inventaris unik, nomor seri pabrikan, kategori, lokasi gedung/ruangan, unit pemilik, serta foto fisik aset.
@@ -104,7 +124,7 @@ graph TD
 
 ---
 
-## 5. Prinsip Tata Kelola & Integritas Data
+## 6. Prinsip Tata Kelola & Integritas Data
 
 1. **Non-Destructive History:** Tidak ada riwayat transaksi peminjaman atau pengembalian yang dihapus (`ON DELETE RESTRICT`). Integritas pembukuan organisasi terjaga seumur hidup sistem.
 2. **Strict State Transitions:** Status ketersediaan barang diikat dengan *CHECK Constraint* basis data untuk mencegah inkonsistensi data.
@@ -112,20 +132,20 @@ graph TD
 
 ---
 
-## 6. Struktur Repositori (Monorepo Governance)
+## 7. Struktur Repositori (Monorepo Governance)
 
 ```text
 SIIPB/
 ├── backend/                      # 🐍 Flask REST API, aturan bisnis, Celery worker & beat
 │   ├── app/
 │   │   ├── middleware/           # JWT + RBAC (izin dibaca ulang dari DB setiap permintaan)
-│   │   ├── models/               # 29 tabel (SQLAlchemy 2.x)
+│   │   ├── models/               # 23 tabel produksi (SQLAlchemy 2.x)
 │   │   ├── routes/               # Blueprint /api/v1/... (Swagger di /api/docs)
 │   │   ├── schemas/              # Validasi payload (Marshmallow)
 │   │   ├── services/             # Aturan bisnis, row locking, notifikasi, laporan, backup
 │   │   ├── tasks/                # Celery: email SMTP (retry), pemeriksaan jatuh tempo, backup
 │   │   └── utils/                # Keamanan (scrypt, JWT) & format respons
-│   ├── alembic/versions/         # Migrasi skema (f627… awal, a7c3… fitur Plan)
+│   ├── alembic/versions/         # Migrasi skema (f627… awal s/d d4e8… roles JSON)
 │   ├── scripts/seed_data.py      # Seed idempoten (role, permission, template, akun awal)
 │   ├── tests/                    # pytest — database uji terpisah (siipb_test)
 │   ├── Dockerfile                # Gunicorn + WeasyPrint + mariadb-client
@@ -136,12 +156,19 @@ SIIPB/
 │   ├── tests/                    # Vitest (unit) & Playwright (UI mock + integrasi API)
 │   └── Dockerfile                # build standalone
 │
-├── database/SIIPB.sql            # Referensi skema terbaru (hasil alembic upgrade head)
+├── database/                     # 🗄️ Skema & Dokumentasi Basis Data
+│   ├── ERD.png                   # Diagram visual relasi tabel (Crow's Foot style)
+│   ├── ERD.svg                   # Diagram vektor murni resolusi tinggi
+│   ├── README.md                 # Kamus data komprehensif & panduan skema (23 tabel)
+│   └── SIIPB.sql                 # DDL skema terbaru (hasil migrasi Alembic head)
 ├── infrastructure/
 │   ├── nginx/nginx.conf          # / → Next.js, /api → Flask, /uploads → volume, rate limit login
 │   ├── nginx/nginx.https.conf    # Varian HTTPS (HSTS, TLS 1.2/1.3)
 │   └── scripts/                  # backup_db.sh & restore_db.sh
-├── docs/                         # Spesifikasi API & arsitektur
+├── docs/                         # 📑 Dokumentasi teknis, ERD, arsitektur, & spesifikasi API
+│   ├── database_erd.md           # Dokumentasi komprehensif 23 tabel & relasi
+│   ├── SIIPB_ERD_diagram.html    # Penampil diagram interaktif pan & zoom
+│   └── api_specification.md      # Spesifikasi REST API
 ├── .github/workflows/ci.yml      # CI: pytest, lint/typecheck/vitest/build, Playwright, docker build
 ├── docker-compose.yml            # Nginx, Next.js, Flask, MariaDB, Redis, Celery worker & beat
 └── .env.example                  # Contoh konfigurasi (rahasia tidak di-commit)
@@ -149,7 +176,7 @@ SIIPB/
 
 ---
 
-## 7. Matriks Kesesuaian Teknologi (dokumen Plan §8)
+## 8. Matriks Kesesuaian Teknologi (dokumen Plan §8)
 
 | Komponen | Teknologi | Status |
 | :--- | :--- | :--- |
@@ -170,7 +197,7 @@ SIIPB/
 
 ---
 
-## 8. Kesiapan Pengujian & Jaminan Mutu (QA)
+## 9. Kesiapan Pengujian & Jaminan Mutu (QA)
 
 | Jenis (Plan §22) | Cakupan | Perintah |
 | :--- | :--- | :--- |
@@ -184,7 +211,7 @@ Database uji dibuat ulang otomatis (`siipb_test`: DROP → `alembic upgrade head
 
 ---
 
-## 9. Panduan Deployment & Operasional
+## 10. Panduan Deployment & Operasional
 
 > **AWS production (CloudFormation + GitHub Actions + CloudWatch):** lihat [docs/DEVOPS-DEPLOYMENT.md](docs/DEVOPS-DEPLOYMENT.md).
 
@@ -245,7 +272,7 @@ npm run dev             # http://localhost:3000 (Mode Mock: NEXT_PUBLIC_DATA_SOU
 
 ---
 
-## 10. Kredensial & Akun Bawaan (Default Accounts)
+## 11. Kredensial & Akun Bawaan (Default Accounts)
 
 Setelah menjalankan `python scripts/seed_data.py` (pada mode API/Database) atau saat menjalankan frontend pada mode Mock (`NEXT_PUBLIC_DATA_SOURCE=mock`), akun-akun bawaan berikut siap digunakan untuk login:
 
@@ -262,10 +289,12 @@ Setelah menjalankan `python scripts/seed_data.py` (pada mode API/Database) atau 
 
 ---
 
-## 11. Dokumentasi API & Kontak
+## 12. Dokumentasi API & Kontak
 
 - **Spesifikasi Lengkap REST API:** Kunjungi endpoint `/api/docs` saat server aktif untuk melihat antarmuka Swagger UI interaktif yang memuat seluruh parameter, model payload, dan skema respons.
-- **Daftar endpoint:** [`docs/api_specification.md`](docs/api_specification.md).
+- **Daftar Endpoint API:** [`docs/api_specification.md`](docs/api_specification.md).
+- **Dokumentasi Basis Data & ERD:** [`docs/database_erd.md`](docs/database_erd.md) dan [`database/README.md`](database/README.md).
+- **Penampil Visual ERD Interaktif:** [`docs/SIIPB_ERD_diagram.html`](docs/SIIPB_ERD_diagram.html).
 - **Repository Git:** [GitHub lemonade199/SIIPB](https://github.com/lemonade199/SIIPB.git).
 
 ---

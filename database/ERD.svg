@@ -1,0 +1,300 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1350 980" width="100%" height="100%" style="background-color: #F8F9FB; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+
+  <defs>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.04" />
+    </filter>
+    <style>
+      .entity-box { fill: #E1EEFC; stroke: #5C9CE6; stroke-width: 1.4; rx: 3px; ry: 3px; }
+      .entity-box:hover { fill: #D3E6FA; stroke: #2563EB; cursor: pointer; }
+      .entity-text { font-size: 10.5px; font-weight: 700; fill: #1E3A8A; text-anchor: middle; dominant-baseline: central; letter-spacing: 0.3px; pointer-events: none; }
+      .rel-line { fill: none; stroke: #8FA2B4; stroke-width: 1.3; stroke-linecap: square; stroke-linejoin: miter; }
+      .pill { fill: #2563EB; rx: 2.5px; ry: 2.5px; }
+      .crow-foot { stroke: #8FA2B4; stroke-width: 1.3; fill: none; stroke-linecap: round; }
+      .cross-tick { stroke: #8FA2B4; stroke-width: 1.3; stroke-linecap: square; }
+      .circle-tick { stroke: #8FA2B4; stroke-width: 1.3; fill: #F8F9FB; }
+    </style>
+  </defs>
+
+  <!-- Connection Lines -->
+  <g id="lines"><path d="M 110 82 L 110 190" class="rel-line" />
+    <path d="M 255 82 L 255 136 L 175 136 L 175 190" class="rel-line" />
+    <path d="M 225 52 L 190 52 L 190 72 L 225 72" class="rel-line" />
+    <path d="M 500 52 L 460 52 L 460 72 L 500 72" class="rel-line" />
+    <path d="M 530 82 L 530 110 L 205 110 L 205 190" class="rel-line" />
+    <path d="M 590 82 L 590 190" class="rel-line" />
+    <path d="M 650 82 L 650 110 L 960 110 L 960 82" class="rel-line" />
+    <path d="M 1195 82 L 1195 211 L 655 211" class="rel-line" />
+    <path d="M 110 232 L 110 290 L 85 290 L 85 370" class="rel-line" />
+    <path d="M 180 232 L 180 290 L 210 290 L 210 370" class="rel-line" />
+    <path d="M 90 211 L 15 211 L 15 571 L 90 571" class="rel-line" />
+    <path d="M 540 232 L 540 285 L 250 285 L 250 370" class="rel-line" />
+    <path d="M 555 232 L 555 300 L 380 300 L 380 370" class="rel-line" />
+    <path d="M 570 232 L 570 315 L 525 315 L 525 370" class="rel-line" />
+    <path d="M 610 232 L 610 315 L 675 315 L 675 370" class="rel-line" />
+    <path d="M 625 232 L 625 300 L 835 300 L 835 370" class="rel-line" />
+    <path d="M 640 232 L 640 285 L 990 285 L 990 370" class="rel-line" />
+    <path d="M 590 232 L 590 550" class="rel-line" />
+    <path d="M 940 82 L 940 345 L 960 345 L 960 370" class="rel-line" />
+    <path d="M 980 82 L 980 680 L 920 680 L 920 720" class="rel-line" />
+    <path d="M 940 412 L 940 480 L 200 480 L 200 550" class="rel-line" />
+    <path d="M 970 412 L 970 495 L 620 495 L 620 550" class="rel-line" />
+    <path d="M 1010 412 L 1010 550" class="rel-line" />
+    <path d="M 155 592 L 155 720" class="rel-line" />
+    <path d="M 560 592 L 560 665 L 190 665 L 190 720" class="rel-line" />
+    <path d="M 820 592 L 820 655 L 870 655 L 870 720" class="rel-line" />
+    <path d="M 1020 592 L 1020 655 L 940 655 L 940 720" class="rel-line" />
+    <path d="M 155 762 L 155 890" class="rel-line" />
+    <path d="M 865 762 L 865 825 L 825 825 L 825 890" class="rel-line" />
+    <path d="M 935 762 L 935 825 L 1020 825 L 1020 890" class="rel-line" />
+  </g>
+  <!-- Cardinality Markers -->
+  <g id="symbols"><line x1="105" y1="88" x2="115" y2="88" class="cross-tick" />
+    <line x1="105" y1="92" x2="115" y2="92" class="cross-tick" />
+    <circle cx="110" cy="178" r="3" class="circle-tick" />
+    <path d="M 110 180 L 104 190 M 110 180 L 116 190" class="crow-foot" />
+    <circle cx="255" cy="93" r="3" class="circle-tick" />
+    <line x1="250" y1="88" x2="260" y2="88" class="cross-tick" />
+    <circle cx="175" cy="178" r="3" class="circle-tick" />
+    <path d="M 175 180 L 169 190 M 175 180 L 181 190" class="crow-foot" />
+    <circle cx="214" cy="52" r="3" class="circle-tick" />
+    <line x1="219" y1="47" x2="219" y2="57" class="cross-tick" />
+    <circle cx="213" cy="72" r="3" class="circle-tick" />
+    <path d="M 215 72 L 225 66 M 215 72 L 225 78" class="crow-foot" />
+    <circle cx="489" cy="52" r="3" class="circle-tick" />
+    <line x1="494" y1="47" x2="494" y2="57" class="cross-tick" />
+    <circle cx="488" cy="72" r="3" class="circle-tick" />
+    <path d="M 490 72 L 500 66 M 490 72 L 500 78" class="crow-foot" />
+    <circle cx="530" cy="93" r="3" class="circle-tick" />
+    <line x1="525" y1="88" x2="535" y2="88" class="cross-tick" />
+    <circle cx="205" cy="178" r="3" class="circle-tick" />
+    <path d="M 205 180 L 199 190 M 205 180 L 211 190" class="crow-foot" />
+    <circle cx="590" cy="93" r="3" class="circle-tick" />
+    <line x1="585" y1="88" x2="595" y2="88" class="cross-tick" />
+    <circle cx="590" cy="178" r="3" class="circle-tick" />
+    <path d="M 590 180 L 584 190 M 590 180 L 596 190" class="crow-foot" />
+    <circle cx="650" cy="93" r="3" class="circle-tick" />
+    <line x1="645" y1="88" x2="655" y2="88" class="cross-tick" />
+    <circle cx="960" cy="94" r="3" class="circle-tick" />
+    <path d="M 960 92 L 954 82 M 960 92 L 966 82" class="crow-foot" />
+    <line x1="1190" y1="88" x2="1200" y2="88" class="cross-tick" />
+    <line x1="1190" y1="92" x2="1200" y2="92" class="cross-tick" />
+    <circle cx="667" cy="211" r="3" class="circle-tick" />
+    <path d="M 665 211 L 655 205 M 665 211 L 655 217" class="crow-foot" />
+    <line x1="105" y1="238" x2="115" y2="238" class="cross-tick" />
+    <line x1="105" y1="242" x2="115" y2="242" class="cross-tick" />
+    <circle cx="85" cy="358" r="3" class="circle-tick" />
+    <path d="M 85 360 L 79 370 M 85 360 L 91 370" class="crow-foot" />
+    <line x1="175" y1="238" x2="185" y2="238" class="cross-tick" />
+    <line x1="175" y1="242" x2="185" y2="242" class="cross-tick" />
+    <circle cx="210" cy="358" r="3" class="circle-tick" />
+    <path d="M 210 360 L 204 370 M 210 360 L 216 370" class="crow-foot" />
+    <line x1="84" y1="206" x2="84" y2="216" class="cross-tick" />
+    <line x1="80" y1="206" x2="80" y2="216" class="cross-tick" />
+    <circle cx="78" cy="571" r="3" class="circle-tick" />
+    <path d="M 80 571 L 90 565 M 80 571 L 90 577" class="crow-foot" />
+    <circle cx="540" cy="243" r="3" class="circle-tick" />
+    <line x1="535" y1="238" x2="545" y2="238" class="cross-tick" />
+    <circle cx="250" cy="358" r="3" class="circle-tick" />
+    <path d="M 250 360 L 244 370 M 250 360 L 256 370" class="crow-foot" />
+    <line x1="550" y1="238" x2="560" y2="238" class="cross-tick" />
+    <line x1="550" y1="242" x2="560" y2="242" class="cross-tick" />
+    <circle cx="380" cy="358" r="3" class="circle-tick" />
+    <path d="M 380 360 L 374 370 M 380 360 L 386 370" class="crow-foot" />
+    <circle cx="570" cy="243" r="3" class="circle-tick" />
+    <line x1="565" y1="238" x2="575" y2="238" class="cross-tick" />
+    <circle cx="525" cy="358" r="3" class="circle-tick" />
+    <path d="M 525 360 L 519 370 M 525 360 L 531 370" class="crow-foot" />
+    <circle cx="610" cy="243" r="3" class="circle-tick" />
+    <line x1="605" y1="238" x2="615" y2="238" class="cross-tick" />
+    <circle cx="675" cy="358" r="3" class="circle-tick" />
+    <path d="M 675 360 L 669 370 M 675 360 L 681 370" class="crow-foot" />
+    <circle cx="625" cy="243" r="3" class="circle-tick" />
+    <line x1="620" y1="238" x2="630" y2="238" class="cross-tick" />
+    <circle cx="835" cy="358" r="3" class="circle-tick" />
+    <path d="M 835 360 L 829 370 M 835 360 L 841 370" class="crow-foot" />
+    <line x1="635" y1="238" x2="645" y2="238" class="cross-tick" />
+    <line x1="635" y1="242" x2="645" y2="242" class="cross-tick" />
+    <circle cx="990" cy="358" r="3" class="circle-tick" />
+    <path d="M 990 360 L 984 370 M 990 360 L 996 370" class="crow-foot" />
+    <line x1="585" y1="238" x2="595" y2="238" class="cross-tick" />
+    <line x1="585" y1="242" x2="595" y2="242" class="cross-tick" />
+    <circle cx="590" cy="538" r="3" class="circle-tick" />
+    <path d="M 590 540 L 584 550 M 590 540 L 596 550" class="crow-foot" />
+    <line x1="935" y1="88" x2="945" y2="88" class="cross-tick" />
+    <line x1="935" y1="92" x2="945" y2="92" class="cross-tick" />
+    <circle cx="960" cy="358" r="3" class="circle-tick" />
+    <path d="M 960 360 L 954 370 M 960 360 L 966 370" class="crow-foot" />
+    <line x1="975" y1="88" x2="985" y2="88" class="cross-tick" />
+    <line x1="975" y1="92" x2="985" y2="92" class="cross-tick" />
+    <circle cx="920" cy="708" r="3" class="circle-tick" />
+    <path d="M 920 710 L 914 720 M 920 710 L 926 720" class="crow-foot" />
+    <line x1="935" y1="418" x2="945" y2="418" class="cross-tick" />
+    <line x1="935" y1="422" x2="945" y2="422" class="cross-tick" />
+    <line x1="195" y1="539" x2="205" y2="539" class="cross-tick" />
+    <path d="M 200 542 L 194 550 M 200 542 L 206 550" class="crow-foot" />
+    <line x1="965" y1="418" x2="975" y2="418" class="cross-tick" />
+    <line x1="965" y1="422" x2="975" y2="422" class="cross-tick" />
+    <circle cx="620" cy="538" r="3" class="circle-tick" />
+    <path d="M 620 540 L 614 550 M 620 540 L 626 550" class="crow-foot" />
+    <line x1="1005" y1="418" x2="1015" y2="418" class="cross-tick" />
+    <line x1="1005" y1="422" x2="1015" y2="422" class="cross-tick" />
+    <circle cx="1010" cy="538" r="3" class="circle-tick" />
+    <path d="M 1010 540 L 1004 550 M 1010 540 L 1016 550" class="crow-foot" />
+    <line x1="150" y1="598" x2="160" y2="598" class="cross-tick" />
+    <line x1="150" y1="602" x2="160" y2="602" class="cross-tick" />
+    <circle cx="155" cy="709" r="3" class="circle-tick" />
+    <line x1="150" y1="714" x2="160" y2="714" class="cross-tick" />
+    <line x1="555" y1="598" x2="565" y2="598" class="cross-tick" />
+    <line x1="555" y1="602" x2="565" y2="602" class="cross-tick" />
+    <line x1="185" y1="709" x2="195" y2="709" class="cross-tick" />
+    <path d="M 190 712 L 184 720 M 190 712 L 196 720" class="crow-foot" />
+    <line x1="815" y1="598" x2="825" y2="598" class="cross-tick" />
+    <line x1="815" y1="602" x2="825" y2="602" class="cross-tick" />
+    <circle cx="870" cy="708" r="3" class="circle-tick" />
+    <path d="M 870 710 L 864 720 M 870 710 L 876 720" class="crow-foot" />
+    <line x1="1015" y1="598" x2="1025" y2="598" class="cross-tick" />
+    <line x1="1015" y1="602" x2="1025" y2="602" class="cross-tick" />
+    <circle cx="940" cy="708" r="3" class="circle-tick" />
+    <path d="M 940 710 L 934 720 M 940 710 L 946 720" class="crow-foot" />
+    <line x1="150" y1="768" x2="160" y2="768" class="cross-tick" />
+    <line x1="150" y1="772" x2="160" y2="772" class="cross-tick" />
+    <circle cx="155" cy="878" r="3" class="circle-tick" />
+    <path d="M 155 880 L 149 890 M 155 880 L 161 890" class="crow-foot" />
+    <line x1="860" y1="768" x2="870" y2="768" class="cross-tick" />
+    <line x1="860" y1="772" x2="870" y2="772" class="cross-tick" />
+    <circle cx="825" cy="878" r="3" class="circle-tick" />
+    <path d="M 825 880 L 819 890 M 825 880 L 831 890" class="crow-foot" />
+    <line x1="930" y1="768" x2="940" y2="768" class="cross-tick" />
+    <line x1="930" y1="772" x2="940" y2="772" class="cross-tick" />
+    <circle cx="1020" cy="878" r="3" class="circle-tick" />
+    <path d="M 1020 880 L 1014 890 M 1020 880 L 1026 890" class="crow-foot" />
+  </g>
+  <!-- Relationship Pill Badges -->
+  <g id="badges"><rect x="97" y="130" width="26" height="12" class="pill" />
+    <rect x="202" y="130" width="26" height="12" class="pill" />
+    <rect x="177" y="56" width="26" height="12" class="pill" />
+    <rect x="447" y="56" width="26" height="12" class="pill" />
+    <rect x="352" y="104" width="26" height="12" class="pill" />
+    <rect x="577" y="130" width="26" height="12" class="pill" />
+    <rect x="792" y="104" width="26" height="12" class="pill" />
+    <rect x="1047" y="205" width="26" height="12" class="pill" />
+    <rect x="72" y="314" width="26" height="12" class="pill" />
+    <rect x="197" y="314" width="26" height="12" class="pill" />
+    <rect x="2" y="384" width="26" height="12" class="pill" />
+    <rect x="382" y="279" width="26" height="12" class="pill" />
+    <rect x="454" y="294" width="26" height="12" class="pill" />
+    <rect x="534" y="309" width="26" height="12" class="pill" />
+    <rect x="629" y="309" width="26" height="12" class="pill" />
+    <rect x="717" y="294" width="26" height="12" class="pill" />
+    <rect x="802" y="279" width="26" height="12" class="pill" />
+    <rect x="577" y="439" width="26" height="12" class="pill" />
+    <rect x="927" y="249" width="26" height="12" class="pill" />
+    <rect x="967" y="474" width="26" height="12" class="pill" />
+    <rect x="367" y="474" width="26" height="12" class="pill" />
+    <rect x="782" y="489" width="26" height="12" class="pill" />
+    <rect x="997" y="474" width="26" height="12" class="pill" />
+    <rect x="142" y="650" width="26" height="12" class="pill" />
+    <rect x="362" y="659" width="26" height="12" class="pill" />
+    <rect x="807" y="619" width="26" height="12" class="pill" />
+    <rect x="967" y="649" width="26" height="12" class="pill" />
+    <rect x="142" y="820" width="26" height="12" class="pill" />
+    <rect x="812" y="839" width="26" height="12" class="pill" />
+    <rect x="1007" y="839" width="26" height="12" class="pill" />
+  </g>
+  <!-- Entities (23 Tables) -->
+  <g id="entities">
+    <g id="entity_CATEGORIES" class="entity-group" transform="translate(45, 40)">
+      <rect width="125" height="42" class="entity-box" filter="url(#shadow)" />
+      <text x="62.5" y="21.0" class="entity-text">CATEGORIES</text>
+    </g>
+    <g id="entity_LOCATIONS" class="entity-group" transform="translate(225, 40)">
+      <rect width="125" height="42" class="entity-box" filter="url(#shadow)" />
+      <text x="62.5" y="21.0" class="entity-text">LOCATIONS</text>
+    </g>
+    <g id="entity_ORGANIZATIONAL_UNITS" class="entity-group" transform="translate(500, 40)">
+      <rect width="180" height="42" class="entity-box" filter="url(#shadow)" />
+      <text x="90.0" y="21.0" class="entity-text">ORGANIZATIONAL_UNITS</text>
+    </g>
+    <g id="entity_BORROWERS" class="entity-group" transform="translate(900, 40)">
+      <rect width="125" height="42" class="entity-box" filter="url(#shadow)" />
+      <text x="62.5" y="21.0" class="entity-text">BORROWERS</text>
+    </g>
+    <g id="entity_ROLES" class="entity-group" transform="translate(1135, 40)">
+      <rect width="125" height="42" class="entity-box" filter="url(#shadow)" />
+      <text x="62.5" y="21.0" class="entity-text">ROLES</text>
+    </g>
+    <g id="entity_ASSETS" class="entity-group" transform="translate(90, 190)">
+      <rect width="130" height="42" class="entity-box" filter="url(#shadow)" />
+      <text x="65.0" y="21.0" class="entity-text">ASSETS</text>
+    </g>
+    <g id="entity_USERS" class="entity-group" transform="translate(525, 190)">
+      <rect width="130" height="42" class="entity-box" filter="url(#shadow)" />
+      <text x="65.0" y="21.0" class="entity-text">USERS</text>
+    </g>
+    <g id="entity_ASSET_PHOTOS" class="entity-group" transform="translate(25, 370)">
+      <rect width="120" height="42" class="entity-box" filter="url(#shadow)" />
+      <text x="60.0" y="21.0" class="entity-text">ASSET_PHOTOS</text>
+    </g>
+    <g id="entity_ASSET_HISTORY" class="entity-group" transform="translate(165, 370)">
+      <rect width="125" height="42" class="entity-box" filter="url(#shadow)" />
+      <text x="62.5" y="21.0" class="entity-text">ASSET_HISTORY</text>
+    </g>
+    <g id="entity_REFRESH_TOKENS" class="entity-group" transform="translate(315, 370)">
+      <rect width="135" height="42" class="entity-box" filter="url(#shadow)" />
+      <text x="67.5" y="21.0" class="entity-text">REFRESH_TOKENS</text>
+    </g>
+    <g id="entity_AUDIT_LOGS" class="entity-group" transform="translate(470, 370)">
+      <rect width="115" height="42" class="entity-box" filter="url(#shadow)" />
+      <text x="57.5" y="21.0" class="entity-text">AUDIT_LOGS</text>
+    </g>
+    <g id="entity_SCHEDULER_RUNS" class="entity-group" transform="translate(605, 370)">
+      <rect width="140" height="42" class="entity-box" filter="url(#shadow)" />
+      <text x="70.0" y="21.0" class="entity-text">SCHEDULER_RUNS</text>
+    </g>
+    <g id="entity_SYSTEM_SETTINGS" class="entity-group" transform="translate(765, 370)">
+      <rect width="140" height="42" class="entity-box" filter="url(#shadow)" />
+      <text x="70.0" y="21.0" class="entity-text">SYSTEM_SETTINGS</text>
+    </g>
+    <g id="entity_BORROWINGS" class="entity-group" transform="translate(930, 370)">
+      <rect width="125" height="42" class="entity-box" filter="url(#shadow)" />
+      <text x="62.5" y="21.0" class="entity-text">BORROWINGS</text>
+    </g>
+    <g id="entity_BORROWING_ITEMS" class="entity-group" transform="translate(90, 550)">
+      <rect width="145" height="42" class="entity-box" filter="url(#shadow)" />
+      <text x="72.5" y="21.0" class="entity-text">BORROWING_ITEMS</text>
+    </g>
+    <g id="entity_RETURNS" class="entity-group" transform="translate(525, 550)">
+      <rect width="130" height="42" class="entity-box" filter="url(#shadow)" />
+      <text x="65.0" y="21.0" class="entity-text">RETURNS</text>
+    </g>
+    <g id="entity_NOTIFICATION_TEMPLATES" class="entity-group" transform="translate(735, 550)">
+      <rect width="175" height="42" class="entity-box" filter="url(#shadow)" />
+      <text x="87.5" y="21.0" class="entity-text">NOTIFICATION_TEMPLATES</text>
+    </g>
+    <g id="entity_NOTIFICATION_EVENTS" class="entity-group" transform="translate(940, 550)">
+      <rect width="160" height="42" class="entity-box" filter="url(#shadow)" />
+      <text x="80.0" y="21.0" class="entity-text">NOTIFICATION_EVENTS</text>
+    </g>
+    <g id="entity_RETURN_ITEMS" class="entity-group" transform="translate(90, 720)">
+      <rect width="135" height="42" class="entity-box" filter="url(#shadow)" />
+      <text x="67.5" y="21.0" class="entity-text">RETURN_ITEMS</text>
+    </g>
+    <g id="entity_NOTIFICATIONS" class="entity-group" transform="translate(835, 720)">
+      <rect width="135" height="42" class="entity-box" filter="url(#shadow)" />
+      <text x="67.5" y="21.0" class="entity-text">NOTIFICATIONS</text>
+    </g>
+    <g id="entity_ASSET_INCIDENT_REPORTS" class="entity-group" transform="translate(65, 890)">
+      <rect width="185" height="42" class="entity-box" filter="url(#shadow)" />
+      <text x="92.5" y="21.0" class="entity-text">ASSET_INCIDENT_REPORTS</text>
+    </g>
+    <g id="entity_NOTIFICATION_DELIVERIES" class="entity-group" transform="translate(735, 890)">
+      <rect width="180" height="42" class="entity-box" filter="url(#shadow)" />
+      <text x="90.0" y="21.0" class="entity-text">NOTIFICATION_DELIVERIES</text>
+    </g>
+    <g id="entity_NOTIFICATION_READS" class="entity-group" transform="translate(940, 890)">
+      <rect width="160" height="42" class="entity-box" filter="url(#shadow)" />
+      <text x="80.0" y="21.0" class="entity-text">NOTIFICATION_READS</text>
+    </g>
+  </g>
+</svg>
