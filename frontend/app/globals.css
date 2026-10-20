@@ -451,3 +451,39 @@
   .label-card { border: 1px dashed #777; }
   @page { margin: 14mm; }
 }
+
+/* =========================================================
+   Halaman masuk (login): panel navy besar di atas latar beige,
+   kartu beige di tengah. Sengaja di luar @layer agar menang
+   atas utilitas Tailwind pada kontrol form.
+   ========================================================= */
+.signin { box-sizing: border-box; min-height: 100vh; display: flex; background: var(--beige); padding: clamp(14px, 4.3vh, 33px) clamp(14px, 3vw, 41px) clamp(14px, 6.4vh, 49px); }
+.signin-panel { position: relative; flex: 1; display: grid; place-items: center; box-sizing: border-box; min-height: 600px; padding: 24px; background: var(--navy); border-radius: 20px; }
+.signin-brand { position: absolute; top: 19px; left: 39px; display: flex; align-items: center; gap: 11px; color: #fff; }
+.signin-brand .mark { width: 50px; height: 50px; border-radius: 12px; display: grid; place-items: center; background: var(--teal); color: var(--sky-soft); }
+.signin-brand b { font-size: 26px; font-weight: 700; letter-spacing: -.01em; line-height: 1; }
+.signin-card { box-sizing: border-box; width: 100%; max-width: 468px; display: flex; flex-direction: column; gap: 6px; padding: 32px 22px 52px; background: var(--beige); border-radius: 10px; color: var(--navy); transform: translateY(-10px); }
+.signin-card h1 { margin: 0; font-size: 28px; font-weight: 700; line-height: 1.15; color: #0e1620; }
+.signin-card p { margin: 2px 0 0; font-size: 13px; color: #0e1620; }
+.signin-form { display: flex; flex-direction: column; gap: 26px; margin-top: 38px; }
+.signin-card .field > label { font-size: 13px; font-weight: 700; color: var(--teal-dark); }
+.signin-card input { height: 40px; border: 1px solid #0e1620; border-radius: 10px; background: #fff; }
+.signin-card input:focus-visible { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(86, 124, 141, .25); }
+.signin-card button[type="submit"],
+.signin-card .or + button { height: 40px; border-radius: 10px; font-weight: 700; }
+.signin-card button[type="submit"] { margin-top: 22px; background: var(--navy); border: 1px solid #0e1620; color: #fff; }
+.signin-card button[type="submit"]:hover:not(:disabled) { background: var(--navy-dark); }
+.signin-card .or + button { background: #fff; border: 1px solid #0e1620; color: #0e1620; }
+.signin-card .or + button:hover { background: var(--sky-soft); }
+.signin-card .or { color: #0e1620; }
+.signin-card .or::before, .signin-card .or::after { background: #6f7a86; }
+.signin-card .pw-toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; display: grid; place-items: center; border: 0; background: transparent; border-radius: 8px; color: var(--muted-foreground); cursor: pointer; }
+.signin-card .pw-toggle:hover { color: var(--navy); background: var(--sky-soft); }
+@media (max-width: 640px) {
+  .signin { padding: 12px; }
+  .signin-panel { min-height: calc(100vh - 24px); padding: 108px 14px 28px; border-radius: 22px; align-items: start; }
+  .signin-brand { top: 22px; left: 20px; gap: 14px; }
+  .signin-brand b { font-size: 22px; }
+  .signin-card { padding: 24px 16px 40px; transform: none; }
+  .signin-form { margin-top: 28px; gap: 20px; }
+}

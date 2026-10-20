@@ -22,6 +22,8 @@ os.environ["NOTIFICATION_DISPATCH"] = "sync"
 os.environ["APP_ENV"] = "testing"
 os.environ.setdefault("SMTP_USERNAME", "")
 os.environ.setdefault("SMTP_PASSWORD", "")
+os.environ.setdefault("GOOGLE_CLIENT_ID", "")
+os.environ.setdefault("GOOGLE_CLIENT_SECRET", "")
 _tmp = tempfile.mkdtemp(prefix="siipb-test-")
 os.environ["UPLOAD_FOLDER"] = str(Path(_tmp) / "uploads")
 os.environ["BACKUP_FOLDER"] = str(Path(_tmp) / "backups")

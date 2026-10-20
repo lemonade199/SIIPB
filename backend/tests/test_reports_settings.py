@@ -79,3 +79,118 @@ def test_backup_endpoint(client, auth_headers):
     dl = client.get(f"/api/v1/backups/{name}", headers=auth_headers)
     assert dl.status_code == 200 and dl.data[:2] == b"\x1f\x8b"
     assert client.get("/api/v1/backups/..%2f..%2fetc%2fpasswd", headers=auth_headers).status_code == 404
+
+
+def test_sso_oidc_settings_secret_and_redirect(client, auth_headers, petugas_headers, db_session, monkeypatch):
+    from urllib.parse import parse_qs, urlparse
+
+    from authlib.integrations.flask_client import FlaskOAuth2App
+    from sqlalchemy import select
+
+    from app.models import SystemSetting
+    from app.services.settings_service import decrypt_secret
+
+    # Belum dikonfigurasi: tombol SSO nonaktif & /auth/sso menolak
+    assert client.get("/api/v1/settings/public").get_json()["data"]["oidc_enabled"] is False
+    assert client.get("/api/v1/auth/sso").status_code == 501
+
+    bad = client.put("/api/v1/settings", json={"security": {"oidc_issuer": "ftp://idp"}}, headers=auth_headers)
+    assert bad.status_code == 400 and "security.oidc_issuer" in bad.get_json()["errors"]
+
+    try:
+        res = client.put("/api/v1/settings", json={"security": {
+            "oidc_enabled": True, "oidc_issuer": " https://idp.contoh.id/realms/siipb/ ", "oidc_client_id": "siipb-web",
+            "oidc_client_secret": "rahasia-oidc", "oidc_ready": True, "oidc_redirect_uri": "https://palsu",
+        }}, headers=auth_headers)
+        assert res.status_code == 200, res.get_json()
+        sec = res.get_json()["data"]["security"]
+        assert sec["oidc_issuer"] == "https://idp.contoh.id/realms/siipb"
+        assert sec["oidc_client_secret_set"] is True and sec["oidc_ready"] is True
+        assert sec["oidc_redirect_uri"].endswith("/api/v1/auth/sso/callback")
+        assert "rahasia-oidc" not in res.get_data(as_text=True)
+        row = db_session.scalars(select(SystemSetting).where(SystemSetting.key == "oidc.client_secret")).first()
+        assert row.is_secret and decrypt_secret(row.value) == "rahasia-oidc"
+
+        assert client.get("/api/v1/settings/public").get_json()["data"]["oidc_enabled"] is True
+        assert client.get("/api/v1/settings", headers=petugas_headers).get_json()["data"]["security"] == {"oidc_enabled": True}
+
+        # Redirect ke endpoint otorisasi IdP (metadata discovery disimulasikan, tanpa jaringan)
+        monkeypatch.setattr(FlaskOAuth2App, "load_server_metadata", lambda self: {
+            "issuer": "https://idp.contoh.id/realms/siipb",
+            "authorization_endpoint": "https://idp.contoh.id/realms/siipb/protocol/openid-connect/auth",
+            "token_endpoint": "https://idp.contoh.id/realms/siipb/protocol/openid-connect/token",
+            "jwks_uri": "https://idp.contoh.id/realms/siipb/protocol/openid-connect/certs",
+        })
+        for path in ("/api/v1/auth/sso", "/api/v1/auth/google"):
+            r = client.get(path)
+            assert r.status_code == 302
+            loc = urlparse(r.headers["Location"])
+            q = parse_qs(loc.query)
+            assert loc.netloc == "idp.contoh.id" and q["client_id"] == ["siipb-web"]
+            assert q["redirect_uri"][0].endswith("/api/v1/auth/sso/callback") and q["state"] and q["nonce"]
+
+        # Callback tanpa state yang valid -> kembali ke frontend dengan pesan galat
+        cb = client.get("/api/v1/auth/sso/callback?code=x&state=palsu")
+        assert cb.status_code == 302 and "#sso_error=" in cb.headers["Location"]
+    finally:
+        client.put("/api/v1/settings", json={"security": {"oidc_enabled": False}}, headers=auth_headers)
+        row = db_session.scalars(select(SystemSetting).where(SystemSetting.key == "oidc.client_secret")).first()
+        if row:
+            db_session.delete(row)
+            db_session.commit()
+
+
+def test_smtp_test_sends_email(client, auth_headers, db_session, monkeypatch):
+    import smtplib
+
+    from sqlalchemy import select
+
+    from app.models import SystemSetting
+
+    # Tanpa kredensial: simulasi
+    sim = client.post("/api/v1/settings/smtp/test", headers=auth_headers).get_json()
+    assert sim["data"]["mode"] == "simulasi"
+
+    sent = []
+
+    class FakeSMTP:
+        def __init__(self, host, port, timeout=None):
+            self.host, self.port = host, port
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def starttls(self, context=None):
+            sent.append("starttls")
+
+        def login(self, user, password):
+            sent.append(("login", user, password))
+
+        def send_message(self, msg):
+            sent.append(msg)
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(smtplib, "SMTP", FakeSMTP)
+    try:
+        client.put("/api/v1/settings", json={"smtp": {"host": "smtp.gmail.com", "port": 587, "encryption": "STARTTLS",
+                                                      "username": "sarpras@contoh.id", "password": "app-password"}},
+                   headers=auth_headers)
+        res = client.post("/api/v1/settings/smtp/test", json={"to": "uji@contoh.id"}, headers=auth_headers)
+        assert res.status_code == 200, res.get_json()
+        assert res.get_json()["data"] == {"ok": True, "mode": "smtp", "to": "uji@contoh.id"}
+        assert ("login", "sarpras@contoh.id", "app-password") in sent and "starttls" in sent
+        msg = sent[-1]
+        assert msg["To"] == "uji@contoh.id" and "Uji SMTP" in msg["Subject"]
+        assert client.post("/api/v1/settings/smtp/test", json={"to": "bukan-email"}, headers=auth_headers).status_code == 400
+    finally:
+        # kembalikan ke mode simulasi agar tes lain tidak mengirim email
+        client.put("/api/v1/settings", json={"smtp": {"username": ""}}, headers=auth_headers)
+        row = db_session.scalars(select(SystemSetting).where(SystemSetting.key == "smtp.password")).first()
+        if row:
+            db_session.delete(row)
+            db_session.commit()

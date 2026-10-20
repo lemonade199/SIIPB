@@ -341,6 +341,10 @@ export interface Settings {
     oidc_enabled: boolean;
     oidc_issuer: string;
     oidc_client_id: string;
+    /** Hanya dari API (mode api): secret tersimpan terenkripsi, redirect URI untuk IdP, konfigurasi lengkap. */
+    oidc_client_secret_set?: boolean;
+    oidc_redirect_uri?: string;
+    oidc_ready?: boolean;
     upload_max_mb: number;
     upload_types: string;
   };

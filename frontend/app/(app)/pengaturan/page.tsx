@@ -19,7 +19,7 @@ import { Card } from '@/components/ui/card';
 import { Modal } from '@/components/ui/dialog';
 import { Field, SelectField, Switch, TextareaField, TextField } from '@/components/ui/form';
 import { Icon, type IconName } from '@/components/ui/icon';
-import { KV, PageHead } from '@/components/ui/misc';
+import { Alert, KV, PageHead } from '@/components/ui/misc';
 import { useConfirm, useToast } from '@/components/providers/feedback-provider';
 import { logout } from '@/services/auth';
 import { backupJSON, restoreJSON } from '@/services/backup';
@@ -151,7 +151,7 @@ function Smtp({ s }: { s: Settings }) {
           toast(r.ok ? 'Pengaturan SMTP disimpan.' : r.error, r.ok ? 'ok' : 'err');
         }}
       >
-        <TextField label="Host" mono value={v.host} onChange={(e) => setV({ ...v, host: e.target.value })} />
+        <TextField label="Host" mono value={v.host} hint="Gmail: smtp.gmail.com · port 587 · STARTTLS · kata sandi = App Password" onChange={(e) => setV({ ...v, host: e.target.value })} />
         <TextField label="Port" type="number" mono value={v.port} onChange={(e) => setV({ ...v, port: Number(e.target.value) })} />
         <TextField label="Username" mono value={v.username} onChange={(e) => setV({ ...v, username: e.target.value })} />
         <SelectField
@@ -186,7 +186,7 @@ function Smtp({ s }: { s: Settings }) {
               toast(isApiMode ? r.message : r.ok ? `Email uji terkirim ke ${user?.email} melalui ${s.smtp.host}:${s.smtp.port}.` : 'Email uji gagal: koneksi SMTP ditolak.', r.ok ? 'ok' : 'err');
             }}
           >
-            {isApiMode ? 'Uji koneksi SMTP' : 'Kirim email uji'}
+            {testing ? 'Mengirim…' : 'Kirim email uji'}
           </Button>
         </div>
       </form>
@@ -401,7 +401,9 @@ function Templates() {
 function Keamanan({ s }: { s: Settings }) {
   const toast = useToast();
   const [v, setV] = useState({ ...s.security });
+  const [secret, setSecret] = useState('');
   const num = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement>) => setV({ ...v, [k]: Number(e.target.value) });
+  const { oidc_client_secret_set: secretSet, oidc_redirect_uri: redirectUri, oidc_ready: ready, ...security } = v;
   return (
     <Card title="Keamanan, JWT & SSO">
       <form
@@ -409,7 +411,14 @@ function Keamanan({ s }: { s: Settings }) {
         noValidate
         onSubmit={async (e) => {
           e.preventDefault();
-          const r = await repo.saveSettings({ security: { ...v, oidc_issuer: v.oidc_issuer.trim(), oidc_client_id: v.oidc_client_id.trim() } }, 'keamanan');
+          const r = await repo.saveSettings(
+            { security: { ...security, oidc_issuer: v.oidc_issuer.trim(), oidc_client_id: v.oidc_client_id.trim() }, oidc_client_secret: secret.trim() || undefined },
+            'keamanan',
+          );
+          if (r.ok) {
+            setSecret('');
+            setV({ ...db.data.settings.security });
+          }
           toast(r.ok ? 'Pengaturan keamanan disimpan.' : r.error, r.ok ? 'ok' : 'err');
         }}
       >
@@ -420,13 +429,44 @@ function Keamanan({ s }: { s: Settings }) {
         <label className="check full">
           <Checkbox checked={v.oidc_enabled} onCheckedChange={(c) => setV({ ...v, oidc_enabled: c === true })} /> Aktifkan login SSO (OAuth 2.0 + OpenID Connect)
         </label>
-        <TextField label="Issuer / Identity Provider" mono full value={v.oidc_issuer} onChange={(e) => setV({ ...v, oidc_issuer: e.target.value })} />
+        <TextField
+          label="Issuer / Identity Provider"
+          mono
+          full
+          value={v.oidc_issuer}
+          hint="Google: https://accounts.google.com · Microsoft: https://login.microsoftonline.com/<tenant-id>/v2.0 · Keycloak: https://<host>/realms/<realm>"
+          onChange={(e) => setV({ ...v, oidc_issuer: e.target.value })}
+        />
         <TextField label="Client ID" mono value={v.oidc_client_id} onChange={(e) => setV({ ...v, oidc_client_id: e.target.value })} />
-        <Field label="Client secret">
-          <Input value="disimpan di secret manager" readOnly aria-label="Client secret" />
-        </Field>
-        <div className="full">
-        </div>
+        {isApiMode ? (
+          <TextField
+            label="Client secret"
+            type="password"
+            autoComplete="new-password"
+            mono
+            value={secret}
+            hint={secretSet ? 'Sudah tersimpan (terenkripsi). Kosongkan bila tidak diubah.' : 'Belum diisi.'}
+            onChange={(e) => setSecret(e.target.value)}
+          />
+        ) : (
+          <Field label="Client secret">
+            <Input value="disimpan di secret manager" readOnly aria-label="Client secret" />
+          </Field>
+        )}
+        {isApiMode && redirectUri && (
+          <Field label="Redirect URI (daftarkan di Identity Provider)" full htmlFor="oidc-redirect" hint="Salin ke Authorized redirect URIs pada Google Cloud Console / Entra ID / Keycloak.">
+            <Input id="oidc-redirect" className="font-mono" value={redirectUri} readOnly onFocus={(e) => e.currentTarget.select()} />
+          </Field>
+        )}
+        {isApiMode && (
+          <div className="full">
+            {ready ? (
+              <Alert type="ok">SSO siap: tombol &quot;Sign in with SSO&quot; aktif di halaman login.</Alert>
+            ) : (
+              <Alert type="warn">SSO belum aktif. Centang &quot;Aktifkan login SSO&quot; dan lengkapi Issuer, Client ID, serta Client secret.</Alert>
+            )}
+          </div>
+        )}
         <SaveBtn />
       </form>
     </Card>

@@ -432,8 +432,8 @@ export async function runScheduler(): Promise<Ok<{ result: schedSvc.SchedulerRes
 
 /* ================= Pengaturan ================= */
 /** Simpan bagian pengaturan. Mode api: dikirim ke PUT /settings (sebagian). */
-export async function saveSettings(patch: Partial<Settings> & { smtp_password?: string }, label: string): Promise<Ok<object> | Fail> {
-  const { smtp_password, ...rest } = patch;
+export async function saveSettings(patch: Partial<Settings> & { smtp_password?: string; oidc_client_secret?: string }, label: string): Promise<Ok<object> | Fail> {
+  const { smtp_password, oidc_client_secret, ...rest } = patch;
   if (!isApiMode) {
     settingsSvc.updateSettings((s) => Object.assign(s, structuredClone(rest)), label, { bagian: label });
     return { ok: true };
@@ -442,6 +442,7 @@ export async function saveSettings(patch: Partial<Settings> & { smtp_password?: 
     const body: Record<string, unknown> = { ...rest };
     if (rest.rules) body.rules = rest.rules.map((r) => ({ event: r.event, days: r.days, active: r.active, to: r.to, desc: r.desc }));
     if (smtp_password) body.smtp = { ...(rest.smtp || {}), password: smtp_password };
+    if (oidc_client_secret) body.security = { ...(rest.security || {}), oidc_client_secret };
     delete (body as { demo_offset_days?: number }).demo_offset_days;
     delete (body as { backup?: unknown }).backup;
     await settingsApi.update(body);

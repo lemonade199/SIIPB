@@ -28,6 +28,26 @@ export const userName = (id: ID | null | undefined) => (id === 0 ? 'Sistem (sche
 
 export const isBorrowable = (it: Item | null | undefined): boolean => !!it && it.active && it.item_status === 'TERSEDIA';
 export const borrowableItems = () => db.where('items', (i) => isBorrowable(i));
+
+/** Stok per kategori: dihitung dari status tiap unit aktif (pinjam → tersedia berkurang, kembali baik → bertambah). */
+export interface CategoryStock {
+  tersedia: number;
+  dipinjam: number;
+  perbaikan: number;
+  hilang: number;
+  total: number;
+}
+export const categoryStock = (categoryId: ID): CategoryStock => {
+  const s: CategoryStock = { tersedia: 0, dipinjam: 0, perbaikan: 0, hilang: 0, total: 0 };
+  db.where('items', (i) => i.category_id === categoryId && i.active).forEach((i) => {
+    s.total++;
+    if (i.item_status === 'TERSEDIA') s.tersedia++;
+    else if (i.item_status === 'DIPINJAM') s.dipinjam++;
+    else if (i.item_status === 'HILANG') s.hilang++;
+    else s.perbaikan++;
+  });
+  return s;
+};
 export const isActive = (b: Borrowing) => b.status === 'DIPINJAM' || b.status === 'TERLAMBAT';
 export const activeBorrowings = () => db.where('borrowings', isActive);
 export const activeBorrowingOfItem = (itemId: ID) =>

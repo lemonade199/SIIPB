@@ -17,7 +17,7 @@ import { SelectField, TextareaField, TextField, toOptions } from '@/components/u
 import { Icon, type IconName } from '@/components/ui/icon';
 import { Empty, PageHead, SearchInput } from '@/components/ui/misc';
 import { useConfirm, useToast } from '@/components/providers/feedback-provider';
-import { activeBorrowings, unit } from '@/services/lookup';
+import { activeBorrowings, categoryStock, unit } from '@/services/lookup';
 import { MASTER, type MasterForm, type MasterKey } from '@/services/master';
 import * as repo from '@/services/repo';
 import { CAPABILITIES } from '@/lib/config';
@@ -110,10 +110,11 @@ const VIEWS: Record<MasterKey, ViewDef> = {
     label: 'Kategori',
     icon: 'tag',
     desc: 'Kategori menentukan prefiks kode barang otomatis (INV-[KODE]-0001).',
-    cols: ['Kode', 'Nama kategori', 'Jumlah barang'],
+    cols: ['Kode', 'Nama kategori', 'Tersedia', 'Dipinjam', 'Jumlah barang'],
     row: (r) => {
       const c = r as Category;
-      return [<span key="c" className="mono strong">{c.code}</span>, c.name, String(db.where('items', (i) => i.category_id === c.id && i.active).length)];
+      const s = categoryStock(c.id);
+      return [<span key="c" className="mono strong">{c.code}</span>, c.name, String(s.tersedia), String(s.dipinjam), String(s.total)];
     },
     search: (r) => [(r as Category).code, r.name],
     blank: { code: '', name: '' },

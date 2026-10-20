@@ -326,7 +326,7 @@ export const authApi = {
     }
   },
   /** URL login SSO (OAuth/OIDC) yang ditangani backend. */
-  ssoUrl: () => `${API_BASE()}/auth/google`,
+  ssoUrl: () => `${API_BASE()}/auth/sso`,
 };
 
 /* ================= Pengguna & role ================= */

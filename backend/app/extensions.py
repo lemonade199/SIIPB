@@ -60,13 +60,5 @@ swagger_config = {
 
 swagger = Swagger(template=swagger_template, config=swagger_config)
 
-# OAuth instance
+# OAuth registry — klien SSO/OIDC didaftarkan dinamis dari pengaturan (app/services/oidc_service.py)
 oauth = OAuth()
-if Config.GOOGLE_CLIENT_ID and Config.GOOGLE_CLIENT_SECRET:
-    oauth.register(
-        name="google",
-        client_id=Config.GOOGLE_CLIENT_ID,
-        client_secret=Config.GOOGLE_CLIENT_SECRET,
-        server_metadata_url=Config.GOOGLE_DISCOVERY_URL,
-        client_kwargs={"scope": "openid email profile"},
-    )

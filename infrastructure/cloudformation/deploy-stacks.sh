@@ -7,7 +7,9 @@
 #   ./deploy-stacks.sh                      # semua stack
 #   ./deploy-stacks.sh network|data|app|billing|outputs   # satu stack / tampilkan output
 #
-# Stack: <project>-<env>-network -> -data -> -app (region utama) ; -billing (us-east-1)
+# Stack: <project>-<env>-network -> -data -> -app (region utama).
+# Billing alert (-billing, us-east-1) TIDAK termasuk "all" (tidak tersedia di AWS Academy);
+# jalankan terpisah dengan "./deploy-stacks.sh billing" pada akun AWS biasa.
 # Butuh: AWS CLI v2 dengan kredensial administrator. Aman dijalankan ulang (idempoten).
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -82,15 +84,22 @@ deploy_data() {
 deploy_app() {
   local key_file="${SSH_PUBLIC_KEY_FILE/#\~/$HOME}"
   [ -f "$key_file" ] || { echo "Public key tidak ditemukan: $key_file (ssh-keygen -t ed25519 -f ~/.ssh/siipb_deploy)" >&2; exit 1; }
-  echo "(EC2 menunggu sinyal bootstrap user_data, ±5-10 menit)"
-  deploy "$APP_STACK" templates/03-app.yaml "$AWS_REGION" --capabilities CAPABILITY_NAMED_IAM -- \
+  echo "(stack menunggu sinyal bootstrap user_data EC2, ±5-10 menit)"
+  # CAPABILITY_NAMED_IAM hanya bila template membuat IAM (tidak pada AWS Academy)
+  local caps=(--capabilities CAPABILITY_AUTO_EXPAND)
+  if [ -z "${EC2_INSTANCE_PROFILE:-}" ] || [ "${CREATE_GITHUB_DEPLOY_ROLE:-true}" = "true" ]; then
+    caps=(--capabilities CAPABILITY_NAMED_IAM)
+  fi
+  deploy "$APP_STACK" templates/03-app.yaml "$AWS_REGION" "${caps[@]}" -- \
     "ProjectName=$PROJECT" "EnvironmentName=$ENVIRONMENT" \
     "NetworkStackName=$NETWORK_STACK" "DataStackName=$DATA_STACK" \
     "InstanceType=$INSTANCE_TYPE" "RootVolumeSize=$ROOT_VOLUME_SIZE" \
     "SshPublicKey=$(tr -d '\r\n' < "$key_file")" \
     "DomainName=$DOMAIN_NAME" "HostedZoneId=${HOSTED_ZONE_ID:-}" "LetsEncryptEmail=$LETSENCRYPT_EMAIL" \
     "GitHubRepository=$GITHUB_REPOSITORY" "GitHubBranch=$GITHUB_BRANCH" \
-    "CreateGitHubOidcProvider=$CREATE_GITHUB_OIDC_PROVIDER" "AlarmEmail=$ALARM_EMAIL"
+    "Ec2InstanceProfileName=${EC2_INSTANCE_PROFILE:-}" \
+    "CreateGitHubDeployRole=${CREATE_GITHUB_DEPLOY_ROLE:-true}" \
+    "CreateGitHubOidcProvider=${CREATE_GITHUB_OIDC_PROVIDER:-true}" "AlarmEmail=$ALARM_EMAIL"
 }
 
 deploy_billing() {
@@ -106,7 +115,11 @@ show_outputs() {
   cat <<EOF
 
 ================ Isi di GitHub > Settings > Secrets and variables > Actions ================
-secret   AWS_DEPLOY_ROLE_ARN    = $(out "$APP_STACK" GitHubActionsRoleArn)
+$(if [ "${CREATE_GITHUB_DEPLOY_ROLE:-true}" = "true" ]; then
+  echo "secret   AWS_DEPLOY_ROLE_ARN    = $(out "$APP_STACK" GitHubActionsRoleArn)"
+else
+  echo "secret   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN = dari 'AWS Details' lab (perbarui tiap sesi)"
+fi)
 secret   EC2_SSH_PRIVATE_KEY    = <isi berkas private key ${SSH_PUBLIC_KEY_FILE%.pub}>
 variable AWS_REGION             = $AWS_REGION
 variable EC2_HOST               = $(out "$APP_STACK" PublicIp)
@@ -119,7 +132,7 @@ EOF
 }
 
 case "$STEP" in
-  all)     deploy_network; deploy_data; deploy_app; deploy_billing; show_outputs ;;
+  all)     deploy_network; deploy_data; deploy_app; show_outputs ;;
   network) deploy_network ;;
   data)    deploy_data ;;
   app)     deploy_app ;;

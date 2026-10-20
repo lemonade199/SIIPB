@@ -52,6 +52,19 @@ Parameters:
   GitHubBranch:
     Type: String
     Default: main
+  Ec2InstanceProfileName:
+    Type: String
+    Default: ""
+    Description: >-
+      Kosong = template membuat IAM role & instance profile sendiri. AWS Academy / Learner Lab
+      (tidak boleh membuat IAM) = isi LabInstanceProfile.
+  CreateGitHubDeployRole:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: >-
+      true = buat role GitHub Actions via OIDC. AWS Academy = false (GitHub memakai access key +
+      session token lab sebagai secret).
   CreateGitHubOidcProvider:
     Type: String
     Default: "true"
@@ -78,7 +91,11 @@ Parameters:
 
 Conditions:
   CreateDnsRecord: !Not [!Equals [!Ref HostedZoneId, ""]]
-  CreateOidcProvider: !Equals [!Ref CreateGitHubOidcProvider, "true"]
+  CreateEc2Role: !Equals [!Ref Ec2InstanceProfileName, ""]
+  CreateGitHubRole: !Equals [!Ref CreateGitHubDeployRole, "true"]
+  CreateOidcProvider: !And
+    - !Condition CreateGitHubRole
+    - !Equals [!Ref CreateGitHubOidcProvider, "true"]
 
 Resources:
   # ================================================================== Logs & konfigurasi agent
@@ -133,6 +150,7 @@ Resources:
   # ================================================================== IAM EC2
   Ec2Role:
     Type: AWS::IAM::Role
+    Condition: CreateEc2Role
     Properties:
       RoleName: !Sub "${ProjectName}-${EnvironmentName}-ec2-role"
       AssumeRolePolicyDocument:
@@ -180,13 +198,10 @@ Resources:
                   - "${BucketArn}/*"
                   - BucketArn:
                       Fn::ImportValue: !Sub "${DataStackName}-FilesBucketArn"
-              - Sid: SignalBootstrap
-                Effect: Allow
-                Action: cloudformation:SignalResource
-                Resource: !Ref AWS::StackId
 
   Ec2InstanceProfile:
     Type: AWS::IAM::InstanceProfile
+    Condition: CreateEc2Role
     Properties:
       InstanceProfileName: !Sub "${ProjectName}-${EnvironmentName}-ec2-profile"
       Roles: [!Ref Ec2Role]
@@ -219,15 +234,11 @@ Resources:
 
   AppInstance:
     Type: AWS::EC2::Instance
-    CreationPolicy:
-      ResourceSignal:
-        Count: 1
-        Timeout: PT25M # stack gagal bila bootstrap user_data tidak selesai
     Properties:
       ImageId: !Ref UbuntuAmiId
       InstanceType: !Ref InstanceType
       KeyName: !Ref KeyPair
-      IamInstanceProfile: !Ref Ec2InstanceProfile
+      IamInstanceProfile: !If [CreateEc2Role, !Ref Ec2InstanceProfile, !Ref Ec2InstanceProfileName]
       SubnetId:
         Fn::ImportValue: !Sub "${NetworkStackName}-PublicSubnet1Id"
       SecurityGroupIds:
@@ -246,10 +257,11 @@ Resources:
             exec > >(tee -a /var/log/siipb-bootstrap.log) 2>&1
             export DEBIAN_FRONTEND=noninteractive
 
+            # sinyal ke WaitCondition lewat URL presigned (tidak butuh izin IAM)
             signal() {
-              /usr/local/bin/aws cloudformation signal-resource --region ${AWS::Region} \
-                --stack-name ${AWS::StackName} --logical-resource-id AppInstance \
-                --unique-id "$(hostname)" --status "$1" || true
+              curl -fsS -X PUT -H 'Content-Type:' \
+                --data-binary "{\"Status\":\"$1\",\"Reason\":\"bootstrap $1\",\"UniqueId\":\"siipb-bootstrap\",\"Data\":\"$1\"}" \
+                '${BootstrapWaitHandle}' || true
             }
             trap 'signal FAILURE' ERR
 
@@ -346,6 +358,18 @@ Resources:
             FilesBucket:
               Fn::ImportValue: !Sub "${DataStackName}-FilesBucketName"
 
+  # Stack menunggu bootstrap user_data selesai; gagal bila tidak ada sinyal dalam 25 menit.
+  BootstrapWaitHandle:
+    Type: AWS::CloudFormation::WaitConditionHandle
+
+  BootstrapWaitCondition:
+    Type: AWS::CloudFormation::WaitCondition
+    DependsOn: AppInstance
+    Properties:
+      Handle: !Ref BootstrapWaitHandle
+      Timeout: "1500"
+      Count: 1
+
   ElasticIp:
     Type: AWS::EC2::EIP
     Properties:
@@ -377,6 +401,7 @@ Resources:
 
   GitHubActionsRole:
     Type: AWS::IAM::Role
+    Condition: CreateGitHubRole
     Properties:
       RoleName: !Sub "${ProjectName}-${EnvironmentName}-github-actions"
       AssumeRolePolicyDocument:
@@ -581,6 +606,7 @@ Outputs:
       - !Sub "Route 53 (otomatis): ${DomainName} A ${ElasticIp}"
       - !Sub "BUAT MANUAL di pengelola DNS: ${DomainName}  A  ${ElasticIp}  TTL 300"
   GitHubActionsRoleArn:
+    Condition: CreateGitHubRole
     Description: Isi ke GitHub secret AWS_DEPLOY_ROLE_ARN.
     Value: !GetAtt GitHubActionsRole.Arn
   AlarmTopicArn:

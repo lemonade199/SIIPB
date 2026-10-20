@@ -97,6 +97,20 @@ Verifikasi bahwa CLI sudah login:
 aws sts get-caller-identity
 ```
 
+### Khusus AWS Academy / Learner Lab
+
+Akun lab memiliki batasan, dan template sudah menyediakan mode khususnya:
+
+| Batasan lab | Penyesuaian |
+|---|---|
+| Hanya region **us-east-1** (atau us-west-2) | `AWS_REGION=us-east-1`; deploy semua stack di N. Virginia |
+| **Tidak boleh membuat IAM role / OIDC provider** | `Ec2InstanceProfileName = LabInstanceProfile` dan `CreateGitHubDeployRole = false` |
+| Tidak ada akses Billing | stack `04-billing` **tidak dipakai** (tidak termasuk `./deploy-stacks.sh`) |
+| Kredensial sementara (habis tiap sesi ±4 jam) | GitHub secret `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` diambil dari **AWS Details → AWS CLI** di halaman lab, dan **diperbarui tiap mulai sesi** sebelum push/deploy |
+| EC2 & RDS dihentikan saat sesi lab berakhir | otomatis menyala lagi saat lab di-*Start*. Container memakai `restart: unless-stopped`, Elastic IP tetap sama |
+
+Untuk AWS CLI di laptop, salin isi **AWS Details → AWS CLI: Show** ke `~/.aws/credentials` setiap sesi.
+
 ## Tahap 1 — Jalankan aplikasi secara lokal (tim developer)
 
 ```bash
@@ -169,17 +183,22 @@ chmod +x deploy-stacks.sh
 ./deploy-stacks.sh
 ```
 
-Skrip membuat 4 stack secara berurutan (total ±20–30 menit):
+Skrip membuat 3 stack secara berurutan (total ±20–30 menit):
 
 | Stack | Region | Isi | Waktu |
 |---|---|---|---|
 | `siipb-production-network` | ap-southeast-1 | VPC, subnet, SG | ±2 menit |
 | `siipb-production-data` | ap-southeast-1 | RDS, S3, ECR, Secrets Manager | ±10–15 menit |
 | `siipb-production-app` | ap-southeast-1 | IAM, EC2, EIP, DNS, alarm | ±5–10 menit |
-| `siipb-production-billing` | us-east-1 | billing alert | ±1 menit |
 
-Stack `app` memakai **CreationPolicy**: stack baru dinyatakan sukses setelah bootstrap EC2 (Docker, Nginx,
-Certbot, CloudWatch Agent) selesai dan mengirim sinyal. Bila bootstrap gagal, stack otomatis gagal dan di-rollback.
+Stack `app` memakai **WaitCondition**: stack baru dinyatakan sukses setelah bootstrap EC2 (Docker, Nginx,
+Certbot, CloudWatch Agent) selesai dan mengirim sinyal lewat URL presigned (tidak butuh izin IAM). Bila bootstrap gagal
+atau tidak selesai dalam 25 menit, stack otomatis gagal dan di-rollback.
+
+Billing alert (`04-billing.yaml`, region us-east-1) **tidak** ikut dibuat. Pada akun AWS biasa (bukan Academy), jalankan terpisah:
+```bash
+./deploy-stacks.sh billing
+```
 
 Di akhir, skrip menampilkan semua output beserta nilai yang perlu diisi ke GitHub. Untuk menampilkannya lagi:
 
@@ -189,7 +208,7 @@ Di akhir, skrip menampilkan semua output beserta nilai yang perlu diisi ke GitHu
 
 Lalu:
 
-1. **Konfirmasi dua email "AWS Notification - Subscription Confirmation"**, satu untuk alarm dan satu untuk billing. Alarm tidak terkirim sebelum dikonfirmasi.
+1. **Konfirmasi email "AWS Notification - Subscription Confirmation"** yang dikirim ke `ALARM_EMAIL`. Alarm tidak terkirim sebelum dikonfirmasi.
 2. Opsional: cek log bootstrap.
    ```bash
    ssh -i ~/.ssh/siipb_deploy ubuntu@<PublicIp> 'cat /opt/siipb/.bootstrap-done'
@@ -205,6 +224,34 @@ aws cloudformation delete-stack --stack-name <nama-stack>
 
 > Bila akun sudah punya OIDC provider GitHub (`token.actions.githubusercontent.com`), set `CREATE_GITHUB_OIDC_PROVIDER=false`.
 
+### Alternatif: upload manual lewat CloudFormation Console
+
+Buka **Create stack → With new resources → Upload a template file**, lalu buat stack berurutan di region yang sama.
+Tunggu tiap stack sampai `CREATE_COMPLETE` sebelum lanjut. Nama di kolom `NetworkStackName` dan `DataStackName`
+harus **persis sama** dengan nama stack yang dibuat sebelumnya, karena export dicari berdasarkan nama itu.
+Untuk memastikan, cek menu **Exports**.
+
+1. **01-network.yaml**, nama `siipb-production-network`. Isi `AdminCidr` = `<IP Anda>/32`, sisanya default.
+2. **02-data.yaml**, nama `siipb-production-data`:
+   - isi `NetworkStackName` dan `SeedAdminPassword`;
+   - SMTP/Google boleh kosong;
+   - centang **CAPABILITY_AUTO_EXPAND**.
+3. **03-app.yaml**, nama `siipb-production-app`:
+
+   | Parameter | Isi |
+   |---|---|
+   | NetworkStackName / DataStackName | nama stack 1 / stack 2 |
+   | SshPublicKey | isi `~/.ssh/siipb_deploy.pub` (satu baris) |
+   | DomainName | domain aplikasi, mis. `averus.my.id` |
+   | HostedZoneId | kosong (DNS di registrar) |
+   | LetsEncryptEmail / AlarmEmail | email aktif |
+   | **Ec2InstanceProfileName** | `LabInstanceProfile` (Academy) / kosong (akun biasa) |
+   | **CreateGitHubDeployRole** | `false` (Academy) / `true` (akun biasa) |
+   | CreateGitHubOidcProvider | diabaikan bila `CreateGitHubDeployRole=false` |
+   | lainnya | default |
+
+   Centang kotak IAM hanya bila muncul (akun biasa).
+
 ## Tahap 5 — DNS
 
 - **Route 53** (`HOSTED_ZONE_ID` diisi): record A dibuat otomatis.
@@ -212,7 +259,7 @@ aws cloudformation delete-stack --stack-name <nama-stack>
 
   | Host | Tipe | Nilai | TTL |
   |---|---|---|---|
-  | `siipb` | A | `<PublicIp>` | 300 |
+  | `siipb` (atau `@` bila `DOMAIN_NAME` = `averus.my.id`) | A | `<PublicIp>` | 300 |
 
 Cek propagasi:
 
@@ -229,9 +276,10 @@ Hasilnya harus menunjukkan Elastic IP.
 
    | Jenis | Nama | Nilai |
    |---|---|---|
-   | Secret | `AWS_DEPLOY_ROLE_ARN` | output `GitHubActionsRoleArn` |
+   | Secret | `AWS_DEPLOY_ROLE_ARN` | output `GitHubActionsRoleArn` (akun AWS biasa) |
+   | Secret | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` | **AWS Academy**: dari AWS Details lab, perbarui tiap sesi (kosongkan `AWS_DEPLOY_ROLE_ARN`) |
    | Secret | `EC2_SSH_PRIVATE_KEY` | seluruh isi `~/.ssh/siipb_deploy` (termasuk baris BEGIN/END) |
-   | Variable | `AWS_REGION` | `ap-southeast-1` |
+   | Variable | `AWS_REGION` | region stack, mis. `us-east-1` (Academy) |
    | Variable | `EC2_HOST` | output `PublicIp` |
    | Variable | `EC2_SECURITY_GROUP_ID` | output `Ec2SecurityGroupId` |
    | Variable | `APP_DOMAIN` | `siipb.averus.my.id` |
@@ -277,7 +325,7 @@ Buka **https://siipb.averus.my.id**, login sebagai `admin` dengan `SEED_ADMIN_PA
 | `siipb-production-ec2-disk-high` | Disk `/` > 85% (CloudWatch Agent) |
 | `siipb-production-ec2-status-check` | status check EC2 gagal |
 | `siipb-production-rds-cpu-high` / `-free-storage-low` / `-freeable-memory-low` | beban & kapasitas RDS |
-| `siipb-production-billing-estimated-charges` (us-east-1) | estimasi tagihan > `BILLING_THRESHOLD_USD` |
+| `siipb-production-billing-estimated-charges` (us-east-1, opsional, bukan Academy) | estimasi tagihan > `BILLING_THRESHOLD_USD` |
 
 - Konfigurasi agent tersimpan di SSM Parameter `AmazonCloudWatch-siipb-production`.
 - Metrik ada di **CloudWatch → Metrics → CWAgent → InstanceId**.

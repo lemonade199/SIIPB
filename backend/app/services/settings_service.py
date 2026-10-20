@@ -4,6 +4,7 @@ Disimpan pada tabel ``system_settings``:
 - ``app.settings`` (JSON) — pengaturan umum, SMTP (tanpa kata sandi), scheduler, aturan notifikasi,
   keamanan, backup, parameter status/kondisi.
 - ``smtp.password`` (secret) — dienkripsi dengan Fernet (kunci diturunkan dari SECRET_KEY).
+- ``oidc.client_secret`` (secret) — Client Secret Identity Provider SSO, dienkripsi dengan cara yang sama.
 """
 from __future__ import annotations
 
@@ -23,6 +24,8 @@ from app.services.audit_service import record_audit
 
 SETTINGS_KEY = "app.settings"
 SMTP_PASSWORD_KEY = "smtp.password"
+OIDC_SECRET_KEY = "oidc.client_secret"
+GOOGLE_ISSUER = "https://accounts.google.com"
 
 # Kode event aturan (frontend) <-> kode event/template backend.
 RULE_EVENTS = {
@@ -65,7 +68,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "jwt_refresh_days": Config.JWT_REFRESH_TTL_DAYS,
         "session_hours": 8,
         "oidc_enabled": bool(Config.GOOGLE_CLIENT_ID),
-        "oidc_issuer": "https://accounts.google.com",
+        "oidc_issuer": GOOGLE_ISSUER,
         "oidc_client_id": Config.GOOGLE_CLIENT_ID,
         "upload_max_mb": 5,
         "upload_types": "JPG, PNG, WEBP",
@@ -128,6 +131,8 @@ def get_settings(session: Session) -> dict[str, Any]:
     ]
     pw = _row(session, SMTP_PASSWORD_KEY)
     data["smtp"]["password_set"] = bool(pw and pw.value) or bool(Config.SMTP_PASSWORD)
+    secret = _row(session, OIDC_SECRET_KEY)
+    data["security"]["oidc_client_secret_set"] = bool(secret and secret.value) or bool(Config.GOOGLE_CLIENT_SECRET)
 
     # Dukungan kompatibilitas key individual legacy di system_settings jika belum dioverride di app.settings
     sec_stored = stored.get("security") if isinstance(stored, dict) and isinstance(stored.get("security"), dict) else {}
@@ -208,6 +213,10 @@ def _validate(patch: dict[str, Any]) -> dict[str, str]:
                     raise ValueError
             except (TypeError, ValueError):
                 errors["security.session_hours"] = "Sesi antarmuka harus berupa angka positif (jam)."
+    if sec.get("oidc_issuer"):
+        issuer = str(sec["oidc_issuer"]).strip()
+        if not issuer.startswith(("https://", "http://")):
+            errors["security.oidc_issuer"] = "Issuer harus berupa URL (https://…)."
     if "upload_max_mb" in sec:
         try:
             if not 1 <= int(sec["upload_max_mb"]) <= 50:
@@ -228,6 +237,15 @@ def update_settings(session: Session, patch: dict[str, Any], user_id: int) -> di
     smtp_patch.pop("password_set", None)
     if "smtp" in patch:
         patch["smtp"] = smtp_patch
+    sec_patch = dict(patch.get("security") or {})
+    oidc_secret = sec_patch.pop("oidc_client_secret", None)
+    for k in ("oidc_client_secret_set", "oidc_redirect_uri", "oidc_ready"):  # nilai turunan, tidak disimpan
+        sec_patch.pop(k, None)
+    for k in ("oidc_issuer", "oidc_client_id"):
+        if isinstance(sec_patch.get(k), str):
+            sec_patch[k] = sec_patch[k].strip().rstrip("/") if k == "oidc_issuer" else sec_patch[k].strip()
+    if "security" in patch:
+        patch["security"] = sec_patch
     if "rules" in patch:
         patch["rules"] = [
             {
@@ -251,21 +269,31 @@ def update_settings(session: Session, patch: dict[str, Any], user_id: int) -> di
     row.updated_by = user_id
 
     if password:
-        pw = _row(session, SMTP_PASSWORD_KEY)
-        if pw is None:
-            pw = SystemSetting(key=SMTP_PASSWORD_KEY, value_type="STRING", is_secret=True, description="Kata sandi SMTP (terenkripsi)")
-            session.add(pw)
-        pw.value = encrypt_secret(str(password))
-        pw.updated_by = user_id
+        _store_secret(session, SMTP_PASSWORD_KEY, str(password), "Kata sandi SMTP (terenkripsi)", user_id)
+    if oidc_secret:
+        _store_secret(session, OIDC_SECRET_KEY, str(oidc_secret).strip(), "Client Secret SSO/OIDC (terenkripsi)", user_id)
 
     changed = {k: patch[k] for k in patch if before.get(k) != patch[k]}
     record_audit(
         session, "UPDATE", "settings", "settings", None, user_id,
         old_data={k: before.get(k) for k in changed},
-        new_data={**changed, **({"smtp_password": "(diubah)"} if password else {})},
+        new_data={
+            **changed,
+            **({"smtp_password": "(diubah)"} if password else {}),
+            **({"oidc_client_secret": "(diubah)"} if oidc_secret else {}),
+        },
     )
     session.commit()
     return get_settings(session)
+
+
+def _store_secret(session: Session, key: str, value: str, description: str, user_id: int) -> None:
+    row = _row(session, key)
+    if row is None:
+        row = SystemSetting(key=key, value_type="STRING", is_secret=True, description=description)
+        session.add(row)
+    row.value = encrypt_secret(value)
+    row.updated_by = user_id
 
 
 def append_backup_history(session: Session, entry: dict[str, Any]) -> None:
@@ -305,6 +333,30 @@ def smtp_config(session: Session) -> dict[str, Any]:
         "from_name": s.get("from_name") or Config.SMTP_SENDER_NAME,
         "from_email": s.get("from_email") or Config.SMTP_SENDER_EMAIL,
         "simulate_failure": bool(s.get("simulate_failure")),
+    }
+
+
+def oidc_config(session: Session) -> dict[str, Any]:
+    """Konfigurasi SSO/OIDC efektif (pengaturan DB > environment Google).
+
+    ``ready`` bernilai True hanya jika SSO diaktifkan DAN issuer, client ID, serta client secret lengkap,
+    sehingga tombol "Sign in with SSO" tidak mengarah ke penyedia yang belum dikonfigurasi.
+    """
+    s = get_settings(session)["security"]
+    secret_row = _row(session, OIDC_SECRET_KEY)
+    client_id = (s.get("oidc_client_id") or "").strip() or Config.GOOGLE_CLIENT_ID
+    secret = decrypt_secret(secret_row.value) if secret_row else ""
+    if not secret and client_id == Config.GOOGLE_CLIENT_ID:
+        secret = Config.GOOGLE_CLIENT_SECRET
+    issuer = ((s.get("oidc_issuer") or "").strip() or GOOGLE_ISSUER).rstrip("/")
+    enabled = bool(s.get("oidc_enabled"))
+    return {
+        "enabled": enabled,
+        "ready": enabled and bool(issuer and client_id and secret),
+        "issuer": issuer,
+        "client_id": client_id,
+        "client_secret": secret,
+        "provider": "google" if issuer == GOOGLE_ISSUER else "oidc",
     }
 
 

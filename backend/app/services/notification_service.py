@@ -292,14 +292,7 @@ def deliver(session: Session, notification_id: int, attempt_number: int = 1, fin
         return True
 
     try:
-        if cfg["encryption"] == "SSL/TLS" or cfg["encryption"] == "SSL":
-            server: smtplib.SMTP = smtplib.SMTP_SSL(cfg["host"], cfg["port"], timeout=20, context=ssl.create_default_context())
-        else:
-            server = smtplib.SMTP(cfg["host"], cfg["port"], timeout=20)
-        with server:
-            if cfg["encryption"] == "STARTTLS":
-                server.starttls(context=ssl.create_default_context())
-            server.login(cfg["username"], cfg["password"])
+        with open_smtp(cfg) as server:
             server.send_message(msg)
         record_delivery_attempt(session, notification_id, attempt_number, True, provider="smtp", message_id=msg_id)
         return True
@@ -307,6 +300,41 @@ def deliver(session: Session, notification_id: int, attempt_number: int = 1, fin
         logger.warning("SMTP gagal untuk notifikasi #%s: %s", notification_id, exc)
         record_delivery_attempt(session, notification_id, attempt_number, False, str(exc)[:500], final=final)
         return False
+
+
+def open_smtp(cfg: dict[str, Any], timeout: int = 20) -> smtplib.SMTP:
+    """Buka koneksi SMTP yang sudah login (SSL/TLS, STARTTLS, atau tanpa enkripsi) sesuai pengaturan."""
+    if cfg["encryption"] in ("SSL/TLS", "SSL"):
+        server: smtplib.SMTP = smtplib.SMTP_SSL(cfg["host"], cfg["port"], timeout=timeout, context=ssl.create_default_context())
+    else:
+        server = smtplib.SMTP(cfg["host"], cfg["port"], timeout=timeout)
+    try:
+        if cfg["encryption"] == "STARTTLS":
+            server.starttls(context=ssl.create_default_context())
+        server.login(cfg["username"], cfg["password"])
+    except Exception:
+        server.close()
+        raise
+    return server
+
+
+def send_test_email(cfg: dict[str, Any], to: str, institution: str) -> str:
+    """Kirim email uji ke ``to`` dengan konfigurasi SMTP efektif; mengembalikan Message-ID."""
+    msg = MIMEText(
+        "Email ini dikirim dari halaman Pengaturan SIIPB untuk menguji konfigurasi SMTP.\n\n"
+        f"Server : {cfg['host']}:{cfg['port']} ({cfg['encryption']})\n"
+        f"Pengirim: {cfg['from_name']} <{cfg['from_email']}>\n\n"
+        "Jika email ini diterima, notifikasi peminjaman & pengingat jatuh tempo siap dikirim.",
+        "plain", "utf-8",
+    )
+    msg["Subject"] = f"[SIIPB] Uji SMTP — {institution}"
+    msg["From"] = formataddr((cfg["from_name"], cfg["from_email"]))
+    msg["To"] = to
+    msg_id = make_msgid(domain=(cfg["from_email"].split("@")[-1] or "siipb.local"))
+    msg["Message-ID"] = msg_id
+    with open_smtp(cfg, timeout=15) as server:
+        server.send_message(msg)
+    return msg_id
 
 
 def dispatch(notification_ids: Iterable[int], session: Session | None = None) -> None:

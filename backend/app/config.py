@@ -46,10 +46,9 @@ class Config:
     JWT_ACCESS_TTL_MINUTES: int = int(os.getenv("JWT_ACCESS_TTL_MINUTES", "60"))
     JWT_REFRESH_TTL_DAYS: int = int(os.getenv("JWT_REFRESH_TTL_DAYS", "7"))
 
-    # OAuth 2.0 / OIDC (Authlib)
+    # OAuth 2.0 / OIDC (Authlib) — fallback Google bila Issuer/Client ID belum diatur di halaman Pengaturan
     GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
     GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
-    GOOGLE_DISCOVERY_URL: str = "https://accounts.google.com/.well-known/openid-configuration"
 
     # SMTP (Email notification)
     SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")

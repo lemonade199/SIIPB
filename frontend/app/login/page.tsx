@@ -40,7 +40,6 @@ export default function LoginPage() {
   const settings = db.data.settings;
   const oidc = useMemo(() => ({ state: uid(), nonce: uid() }), []);
   const [pub, setPub] = useState<{ institution: string; oidc_enabled: boolean } | null>(null);
-  const institution = pub?.institution || settings.institution;
   const oidcEnabled = pub ? pub.oidc_enabled : settings.security.oidc_enabled;
 
   useEffect(() => {
@@ -101,100 +100,71 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="login" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '24px' }}>
-      <div style={{ display: 'flex', width: '100%', maxWidth: '960px', borderRadius: '24px', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)' }}>
-        
-        {/* Sisi Kiri: Panel Informasi */}
-        <div className="login-side" style={{ flex: 1, padding: '48px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '520px' }}>
-          <div className="brand" style={{ padding: 0 }}>
-            <span className="brand-logo" style={{ width: 44, height: 44 }}>
-              <Icon name="box" size={24} />
-            </span>
-            <div>
-              <div className="brand-name" style={{ fontSize: 20 }}>
-                SIIPB
-              </div>
-              <div className="brand-sub" style={{ fontSize: 13 }}>
-                {institution}
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gap: 12, margin: 'auto 0' }}>
-            <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.15em', opacity: 0.8, fontWeight: 600 }}>
-              Portal Akses
-            </div>
-            <h1 style={{ fontSize: 26, lineHeight: 1.3, fontWeight: 650 }}>
-              Manajemen Inventaris & Sirkulasi Barang
-            </h1>
-            <p style={{ color: '#c8d9e6', fontSize: 14, lineHeight: 1.6, maxWidth: 360 }}>
-              Kelola data aset, peminjaman, dan pemantauan pengembalian instansi secara terpusat.
-            </p>
-          </div>
-
+    <div className="signin">
+      <div className="signin-panel">
+        <div className="signin-brand">
+          <span className="mark">
+            <Icon name="box" size={26} />
+          </span>
+          <b>SIIPB</b>
         </div>
 
-        {/* Sisi Kanan: Panel Form Masuk */}
-        <div className="login-main" style={{ flex: 1, padding: '48px', display: 'flex', flexDirection: 'column', justifyContent: 'center', background: '#ffffff' }}>
-          <div className="login-card stack" style={{ width: '100%', boxShadow: 'none', padding: 0, margin: 0 }}>
-            <div>
-              <h2 style={{ fontSize: 24, fontWeight: 650, marginBottom: 4, color: '#111827' }}>Sign in</h2>
-              <p className="muted" style={{ fontSize: 13 }}>Silakan masukkan kredensial akun Anda.</p>
-            </div>
+        <div className="signin-card">
+          <div>
+            <h1>Sign in</h1>
+            <p>Silakan masukkan kredensial akun Anda.</p>
+          </div>
 
-            <form
-              className="stack"
-              style={{ gap: 14, marginTop: 16 }}
-              noValidate
-              onSubmit={(e) => {
-                e.preventDefault();
-                submit(form.username, form.password);
-              }}
-            >
-              {error && <Alert type="danger">{error}</Alert>}
-              <TextField
-                label="Username atau email"
-                required
-                autoComplete="username"
-                value={form.username}
-                error={errors.username}
-                onChange={(e) => setForm({ ...form, username: e.target.value })}
-              />
-              <Field label="Kata sandi" required error={errors.password} htmlFor="login-password">
-                <div style={{ position: 'relative' }}>
-                  <Input
-                    id="login-password"
-                    type={showPw ? 'text' : 'password'}
-                    autoComplete="current-password"
-                    value={form.password}
-                    aria-invalid={!!errors.password || undefined}
-                    style={{ paddingRight: 44 }}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPw((v) => !v)}
-                    aria-label={showPw ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
-                    aria-pressed={showPw}
-                    title={showPw ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
-                    style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', width: 36, height: 36, display: 'grid', placeItems: 'center', border: 0, background: 'transparent', color: 'var(--subtle)', borderRadius: 6 }}
-                  >
-                    <Icon name={showPw ? 'eyeOff' : 'eye'} size={18} />
-                  </button>
-                </div>
-              </Field>
-              <Button type="submit" variant="primary" icon="lock" block disabled={busy}>
-                {busy ? 'Memeriksa…' : 'Sign in'}
-              </Button>
-            </form>
-
-            <div className="or">atau</div>
-            <Button icon="key" block onClick={onSSO}>
-              Sign in with SSO
+          <form
+            className="signin-form"
+            noValidate
+            onSubmit={(e) => {
+              e.preventDefault();
+              submit(form.username, form.password);
+            }}
+          >
+            {error && <Alert type="danger">{error}</Alert>}
+            <TextField
+              label="Username atau email"
+              required
+              autoComplete="username"
+              value={form.username}
+              error={errors.username}
+              onChange={(e) => setForm({ ...form, username: e.target.value })}
+            />
+            <Field label="Password" required error={errors.password} htmlFor="login-password">
+              <div style={{ position: 'relative' }}>
+                <Input
+                  id="login-password"
+                  type={showPw ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  value={form.password}
+                  aria-invalid={!!errors.password || undefined}
+                  style={{ paddingRight: 46 }}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                />
+                <button
+                  type="button"
+                  className="pw-toggle"
+                  onClick={() => setShowPw((v) => !v)}
+                  aria-label={showPw ? 'Sembunyikan password' : 'Tampilkan password'}
+                  aria-pressed={showPw}
+                  title={showPw ? 'Sembunyikan password' : 'Tampilkan password'}
+                >
+                  <Icon name={showPw ? 'eyeOff' : 'eye'} size={20} />
+                </button>
+              </div>
+            </Field>
+            <Button type="submit" variant="primary" icon="lock" block disabled={busy}>
+              {busy ? 'Memeriksa…' : 'Sign in'}
             </Button>
-          </div>
-        </div>
+          </form>
 
+          <div className="or">atau</div>
+          <Button icon="key" block onClick={onSSO}>
+            Sign in with SSO
+          </Button>
+        </div>
       </div>
 
       <Modal open={ssoOpen} onClose={() => setSsoOpen(false)} title="SSO Organisasi (OpenID Connect)" desc="Simulasi halaman Identity Provider organisasi.">

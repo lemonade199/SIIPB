@@ -250,41 +250,68 @@ def logout():
     return success_response(message="Logout berhasil")
 
 
-@auth_bp.get("/google")
-def google_login():
-    """Initiate Google OAuth 2.0 / OIDC login redirect."""
-    from app.extensions import oauth
+def _sso_settings():
+    from app.services.settings_service import oidc_config
+
+    with SessionLocal() as session:
+        return oidc_config(session)
+
+
+@auth_bp.get("/sso")
+@auth_bp.get("/google", endpoint="google_login")
+def sso_login():
+    """Mulai login SSO (OAuth 2.0 / OpenID Connect) ke Identity Provider yang diatur di Pengaturan.
+    ---
+    tags:
+      - Authentication
+    responses:
+      302:
+        description: Redirect ke halaman login Identity Provider
+      501:
+        description: SSO belum diaktifkan / dikonfigurasi
+    """
     from flask import url_for
 
-    if not hasattr(oauth, "google"):
-        return error_response("Google OAuth belum dikonfigurasi di server", status_code=501)
+    from app.services.oidc_service import get_client
 
-    redirect_uri = url_for("auth.google_callback", _external=True)
-    return oauth.google.authorize_redirect(redirect_uri)
+    cfg = _sso_settings()
+    if not cfg["ready"]:
+        return error_response("SSO belum diaktifkan atau dikonfigurasi di server", error_code="SSO_NOT_CONFIGURED", status_code=501)
+    return get_client(cfg).authorize_redirect(url_for("auth.sso_callback", _external=True))
 
 
-@auth_bp.get("/google/callback")
-def google_callback():
-    """Google OAuth 2.0 / OIDC callback endpoint."""
-    from app.extensions import oauth
-    if not hasattr(oauth, "google"):
-        return error_response("Google OAuth belum dikonfigurasi", status_code=501)
-
+@auth_bp.get("/sso/callback")
+@auth_bp.get("/google/callback", endpoint="google_callback")
+def sso_callback():
+    """Callback Identity Provider: validasi state & nonce, cocokkan pengguna, lalu redirect ke frontend
+    dengan kode sekali pakai (#sso_code=…) yang ditukar lewat POST /auth/sso/exchange.
+    ---
+    tags:
+      - Authentication
+    responses:
+      302:
+        description: Redirect ke halaman login frontend
+    """
     from urllib.parse import quote
 
     from flask import redirect
 
     from app.config import Config
     from app.services.auth_service import issue_sso_code, resolve_oauth_user
+    from app.services.oidc_service import get_client
 
     target = Config.FRONTEND_URL.rstrip("/") + "/login"
     try:
-        token = oauth.google.authorize_access_token()  # memvalidasi state & nonce (Authlib)
-        userinfo = token.get("userinfo") or oauth.google.userinfo()
+        cfg = _sso_settings()
+        if not cfg["ready"]:
+            raise ValueError("SSO belum diaktifkan atau dikonfigurasi")
+        client = get_client(cfg)
+        token = client.authorize_access_token()  # memvalidasi state & nonce (Authlib)
+        userinfo = token.get("userinfo") or client.userinfo()
         if userinfo.get("email") and userinfo.get("email_verified") is False:
             raise ValueError("Email akun SSO belum terverifikasi")
         with SessionLocal() as session:
-            user = resolve_oauth_user(session, "google", str(userinfo["sub"]), userinfo.get("email"))
+            user = resolve_oauth_user(session, cfg["provider"], str(userinfo["sub"]), userinfo.get("email"))
             user.last_login_at = datetime.now()
             code = issue_sso_code(session, user)
         return redirect(f"{target}#sso_code={quote(code)}")

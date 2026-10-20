@@ -8,13 +8,23 @@ from app.database import SessionLocal
 from app.middleware.auth_middleware import jwt_required, permission_required, any_permission_required
 from app.models import SchedulerRun
 from app.services.audit_service import record_audit
-from app.services.settings_service import SettingsError, get_settings, update_settings
+from app.services.settings_service import SettingsError, get_settings, oidc_config, update_settings
 from app.utils.response import error_response, success_response
 
 settings_bp = Blueprint("settings", __name__, url_prefix="/api/v1")
 
 PUBLIC_KEYS = ("institution", "unit_sarpras", "staff_email", "staff_phone", "return_location", "parameters",
                "checkout_notify", "return_notify", "rules", "scheduler")
+
+
+def _with_sso_info(session, data: dict) -> dict:
+    """Tambahkan info SSO untuk administrator: redirect URI yang harus didaftarkan di Identity Provider
+    (Google Cloud Console, Entra ID, Keycloak) dan apakah konfigurasinya sudah lengkap."""
+    from flask import url_for
+
+    data["security"]["oidc_redirect_uri"] = url_for("auth.sso_callback", _external=True)
+    data["security"]["oidc_ready"] = oidc_config(session)["ready"]
+    return data
 
 
 @settings_bp.get("/settings")
@@ -33,8 +43,9 @@ def settings_show():
         data = get_settings(session)
         if not has_permission("settings.manage"):
             data = {k: data[k] for k in PUBLIC_KEYS if k in data}
-            data["security"] = {"oidc_enabled": get_settings(session)["security"].get("oidc_enabled", False)}
-        return success_response(data=data)
+            data["security"] = {"oidc_enabled": oidc_config(session)["ready"]}
+            return success_response(data=data)
+        return success_response(data=_with_sso_info(session, data))
 
 
 @settings_bp.get("/settings/public")
@@ -50,14 +61,15 @@ def settings_public():
         return success_response(data={
             "institution": s["institution"],
             "unit_sarpras": s["unit_sarpras"],
-            "oidc_enabled": bool(s["security"].get("oidc_enabled")),
+            "oidc_enabled": oidc_config(session)["ready"],
         })
 
 
 @settings_bp.put("/settings")
 @permission_required("settings.manage")
 def settings_update():
-    """Simpan pengaturan (sebagian). `smtp.password` disimpan terenkripsi dan tidak pernah dikembalikan.
+    """Simpan pengaturan (sebagian). `smtp.password` dan `security.oidc_client_secret` disimpan terenkripsi
+    dan tidak pernah dikembalikan.
     ---
     tags: [Settings]
     security: [{Bearer: []}]
@@ -69,41 +81,47 @@ def settings_update():
             data = update_settings(session, request.get_json(silent=True) or {}, g.current_user["id"])
         except SettingsError as e:
             return error_response(str(e), error_code="VALIDATION_ERROR", errors=e.errors)
-        return success_response(data=data, message="Pengaturan disimpan")
+        return success_response(data=_with_sso_info(session, data), message="Pengaturan disimpan")
 
 
 @settings_bp.post("/settings/smtp/test")
 @permission_required("settings.manage")
 def smtp_test():
-    """Uji koneksi & login SMTP dengan konfigurasi tersimpan.
+    """Kirim email uji dengan konfigurasi SMTP tersimpan ke alamat `to` (bawaan: email pengguna yang login).
     ---
     tags: [Settings]
     security: [{Bearer: []}]
+    parameters:
+      - in: body
+        name: body
+        schema:
+          type: object
+          properties:
+            to: {type: string, format: email}
     responses:
       200: {description: Hasil uji}
     """
-    import smtplib
-    import ssl
-
+    from app.models import User
+    from app.services.notification_service import send_test_email
     from app.services.settings_service import smtp_config
 
+    body = request.get_json(silent=True) or {}
     with SessionLocal() as session:
         cfg = smtp_config(session)
+        institution = get_settings(session)["institution"]
+        me = session.get(User, g.current_user["id"])
+        to = (body.get("to") or (me.email if me else "") or "").strip()
     if not cfg["username"] or not cfg["password"]:
         return success_response(data={"ok": True, "mode": "simulasi"},
                                 message="Kredensial SMTP belum diisi — email disimulasikan (mode pengembangan).")
+    if "@" not in to:
+        return error_response("Alamat email tujuan uji tidak valid", error_code="VALIDATION_ERROR", errors={"to": "Email tidak valid."})
     try:
-        if cfg["encryption"] in ("SSL", "SSL/TLS"):
-            server = smtplib.SMTP_SSL(cfg["host"], cfg["port"], timeout=15, context=ssl.create_default_context())
-        else:
-            server = smtplib.SMTP(cfg["host"], cfg["port"], timeout=15)
-        with server:
-            if cfg["encryption"] == "STARTTLS":
-                server.starttls(context=ssl.create_default_context())
-            server.login(cfg["username"], cfg["password"])
-        return success_response(data={"ok": True, "mode": "smtp"}, message=f"Terhubung ke {cfg['host']}:{cfg['port']}")
+        send_test_email(cfg, to, institution)
+        return success_response(data={"ok": True, "mode": "smtp", "to": to},
+                                message=f"Email uji terkirim ke {to} melalui {cfg['host']}:{cfg['port']}")
     except Exception as exc:  # noqa: BLE001
-        return error_response(f"Koneksi SMTP gagal: {exc}", error_code="SMTP_FAILED")
+        return error_response(f"Email uji gagal: {exc}", error_code="SMTP_FAILED")
 
 
 # ---------------------------------------------------------------- scheduler

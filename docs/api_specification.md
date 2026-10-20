@@ -30,7 +30,7 @@ Kode HTTP: `200/201` sukses, `400` validasi/aturan bisnis, `401` token tidak val
 | POST | `/auth/logout` | Cabut refresh token | login |
 | GET / PUT | `/auth/me` | Profil sendiri / ubah nama, email, telepon | login |
 | POST | `/auth/change-password` | Ganti kata sandi (min. 8, huruf & angka; sesi lain dicabut) | login |
-| GET | `/auth/google` → `/auth/google/callback` | Login SSO OAuth 2.0/OIDC (Authlib, state & nonce) → redirect `FRONTEND_URL/login#sso_code=…` | publik |
+| GET | `/auth/sso` → `/auth/sso/callback` (alias `/auth/google`, `/auth/google/callback`) | Login SSO OAuth 2.0/OIDC ke Identity Provider dari Pengaturan (Authlib, state & nonce) → redirect `FRONTEND_URL/login#sso_code=…` | publik |
 | POST | `/auth/sso/exchange` | Tukar kode SSO sekali pakai (60 detik) dengan token | publik |
 | GET / POST | `/users` | Kelola pengguna internal | users.manage |
 | GET / PUT / DELETE | `/users/{id}` | Detail / ubah (role, aktif, reset sandi) / hapus | users.manage |

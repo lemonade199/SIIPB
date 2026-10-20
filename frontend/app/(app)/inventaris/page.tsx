@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, toOptions } from '@/components/ui/form';
 import { Empty, PageHead, Pager, SearchInput, Thumb } from '@/components/ui/misc';
-import { cat, loc, conditionLabel } from '@/services/lookup';
+import { cat, categoryStock, loc, conditionLabel } from '@/services/lookup';
 import type { Condition, ID, ItemStatus } from '@/types';
 import { TableWrap } from '@/components/ui/table-wrap';
 
@@ -67,6 +67,11 @@ export default function InventarisPage() {
   activeItems.forEach((i) => {
     counts[i.item_status] = (counts[i.item_status] || 0) + 1;
   });
+  const stock = db
+    .all('categories')
+    .map((c) => ({ c, s: categoryStock(c.id) }))
+    .filter(({ s }) => s.total > 0)
+    .sort((a, b) => a.c.name.localeCompare(b.c.name));
   const chips: [ItemStatus | '', string, number][] = [['', 'Semua', activeItems.length], ...ITEM_STATUS.map((s): [ItemStatus, string, number] => [s, s, counts[s] || 0])];
 
   const toggle = (id: ID, on: boolean) =>
@@ -106,6 +111,52 @@ export default function InventarisPage() {
             </Button>
           ))}
         </div>
+        <section className="card">
+          <div className="card-header">
+            <div>
+              <div className="card-title">Stok per kategori</div>
+              <div className="small muted">Tersedia berkurang saat barang dipinjam dan bertambah saat dikembalikan dalam kondisi baik.</div>
+            </div>
+          </div>
+          <TableWrap>
+            <table className="table" style={{ marginTop: 12 }}>
+              <thead>
+                <tr>
+                  <th>Kategori</th>
+                  <th className="right">Tersedia</th>
+                  <th className="right">Dipinjam</th>
+                  <th className="right">Rusak / perbaikan</th>
+                  <th className="right">Hilang</th>
+                  <th className="right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stock.length ? (
+                  stock.map(({ c, s }) => (
+                    <tr key={c.id}>
+                      <td>
+                        <button type="button" className="link-btn" title={`Tampilkan barang kategori ${c.name}`} onClick={() => setF((p) => ({ ...p, category: String(c.id), inactive: false, page: 1 }))}>
+                          {c.name}
+                        </button>
+                      </td>
+                      <td className="right mono strong">{s.tersedia}</td>
+                      <td className="right mono">{s.dipinjam}</td>
+                      <td className="right mono">{s.perbaikan}</td>
+                      <td className="right mono">{s.hilang}</td>
+                      <td className="right mono strong">{s.total}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6}>
+                      <Empty icon="box">Belum ada barang.</Empty>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </TableWrap>
+        </section>
         <section className="card">
           <div className="toolbar">
             <SearchInput value={f.q} onChange={(v) => set('q', v)} placeholder="Cari kode, nama, merek, nomor seri…" label="Cari barang" />
