@@ -1,15 +1,31 @@
 """Authentication API endpoints."""
 from datetime import datetime
 
-from flask import Blueprint, g, request
+from flask import Blueprint, current_app, g, request
 
+from app.config import Config
 from app.database import SessionLocal
 from app.middleware.auth_middleware import jwt_required
 from app.schemas.auth_schema import LoginSchema, RefreshTokenSchema
 from app.services.auth_service import authenticate_user, refresh_access_token, revoke_refresh_token
+from app.services.captcha_service import captcha_service
 from app.utils.response import error_response, success_response
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/v1/auth")
+
+
+@auth_bp.get("/captcha")
+def get_captcha():
+    """Minta tantangan CAPTCHA gambar baru untuk formulir login.
+    ---
+    tags:
+      - Authentication
+    responses:
+      200:
+        description: Challenge CAPTCHA baru berisi ID dan gambar Base64 Data URI
+    """
+    challenge = captcha_service.create_challenge()
+    return success_response(data=challenge, message="Challenge CAPTCHA berhasil dibuat")
 
 
 @auth_bp.post("/login")
@@ -33,11 +49,17 @@ def login():
             password:
               type: string
               example: admin123
+            captcha_id:
+              type: string
+              description: ID challenge CAPTCHA
+            captcha_answer:
+              type: string
+              description: Jawaban 6 karakter kode CAPTCHA
     responses:
       200:
         description: Login berhasil dan mengembalikan access token serta refresh token
       400:
-        description: Validasi input gagal
+        description: Validasi input gagal atau CAPTCHA tidak valid
       401:
         description: Kredensial tidak valid
     """
@@ -46,6 +68,30 @@ def login():
     errors = schema.validate(data)
     if errors:
         return error_response("Data input tidak valid", error_code="VALIDATION_ERROR", errors=errors)
+
+    # Verifikasi CAPTCHA
+    is_testing = current_app.config.get("TESTING") or Config.APP_ENV == "testing"
+    captcha_id = data.get("captcha_id")
+    captcha_answer = data.get("captcha_answer")
+
+    # Dalam mode non-testing atau jika client mengirimkan parameter captcha, verifikasi wajib
+    if not is_testing or captcha_id or captcha_answer:
+        if not captcha_id or not captcha_answer:
+            return error_response(
+                "Kode CAPTCHA dan ID challenge wajib disertakan",
+                error_code="INVALID_CAPTCHA",
+                status_code=400,
+                errors={"captcha_answer": ["Kode CAPTCHA wajib diisi."]},
+            )
+
+        ok, reason = captcha_service.verify(captcha_id, captcha_answer)
+        if not ok:
+            return error_response(
+                reason,
+                error_code="INVALID_CAPTCHA",
+                status_code=400,
+                errors={"captcha_answer": [reason]},
+            )
 
     with SessionLocal() as session:
         try:

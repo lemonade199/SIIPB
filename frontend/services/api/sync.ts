@@ -584,8 +584,8 @@ export async function refreshMe() {
   startSession(u, tokenStore.get()?.access_token || '');
 }
 
-export async function apiLogin(username: string, password: string) {
-  const res: LoginResponse = await authApi.login(username, password);
+export async function apiLogin(username: string, password: string, captcha_id?: string, captcha_answer?: string) {
+  const res: LoginResponse = await authApi.login(username, password, captcha_id, captcha_answer);
   startSession(res.user, res.access_token);
   await pullAll();
   return me!.user;

@@ -5,6 +5,8 @@ from marshmallow import Schema, fields, validate
 class LoginSchema(Schema):
     username = fields.String(required=True, validate=validate.Length(min=3, max=100))
     password = fields.String(required=True, validate=validate.Length(min=4, max=100))
+    captcha_id = fields.String(required=False, allow_none=True)
+    captcha_answer = fields.String(required=False, allow_none=True)
 
 
 class RefreshTokenSchema(Schema):

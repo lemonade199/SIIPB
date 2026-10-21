@@ -27,7 +27,7 @@ function startSession(u: User, method: string) {
   db.save();
 }
 
-export function login(username: string, password: string): Result<{ user: User }> {
+export function login(username: string, password: string, _captcha_id?: string, _captcha_answer?: string): Result<{ user: User }> {
   const key = String(username || '').trim().toLowerCase();
   const u = db.find('users', (x) => x.username.toLowerCase() === key || x.email.toLowerCase() === key);
   if (!u || u.password !== password) return { ok: false, error: 'Username/email atau kata sandi salah.' };

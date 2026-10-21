@@ -32,6 +32,9 @@ export default function LoginPage() {
   const toast = useToast();
   const { user } = useAuth();
   const [form, setForm] = useState({ username: '', password: '' });
+  const [captcha, setCaptcha] = useState<{ id: string; image: string } | null>(null);
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
+  const [captchaLoading, setCaptchaLoading] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
@@ -41,6 +44,35 @@ export default function LoginPage() {
   const oidc = useMemo(() => ({ state: uid(), nonce: uid() }), []);
   const [pub, setPub] = useState<{ institution: string; oidc_enabled: boolean } | null>(null);
   const oidcEnabled = pub ? pub.oidc_enabled : settings.security.oidc_enabled;
+
+  const loadCaptcha = async () => {
+    try {
+      setCaptchaLoading(true);
+      if (isApiMode) {
+        const data = await authApi.getCaptcha();
+        setCaptcha({ id: data.captcha_id, image: data.image });
+      } else {
+        const mockChars = '2346789ABCDEFGHJKLMNPQRTUVWXY';
+        let code = '';
+        for (let i = 0; i < 6; i++) {
+          code += mockChars.charAt(Math.floor(Math.random() * mockChars.length));
+        }
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="180" height="48" viewBox="0 0 180 48"><rect width="180" height="48" fill="#eef2f6"/><text x="90" y="32" font-size="22" font-weight="bold" font-family="monospace" fill="#1e293b" text-anchor="middle" letter-spacing="4">${code}</text></svg>`;
+        setCaptcha({
+          id: 'mock-' + Date.now(),
+          image: `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`,
+        });
+      }
+    } catch (err) {
+      console.error('Gagal memuat CAPTCHA:', err);
+    } finally {
+      setCaptchaLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCaptcha();
+  }, []);
 
   useEffect(() => {
     if (user) router.replace(homeFor((p) => can(p, user)));
@@ -80,13 +112,22 @@ export default function LoginPage() {
     const errs: Record<string, string> = {};
     if (!username.trim()) errs.username = 'Wajib diisi.';
     if (!password) errs.password = 'Wajib diisi.';
+    if (!captchaAnswer.trim()) errs.captcha_answer = 'Kode CAPTCHA wajib diisi.';
     setErrors(errs);
     setError('');
     if (Object.keys(errs).length) return;
     setBusy(true);
-    const r = await repo.login(username, password);
+    const r = await repo.login(username, password, captcha?.id, captchaAnswer.trim());
     setBusy(false);
-    if (!r.ok) return setError(r.error);
+    if (!r.ok) {
+      // Reset captcha answer and reload captcha, while preserving password
+      setCaptchaAnswer('');
+      loadCaptcha();
+      if (r.errors?.captcha_answer) {
+        setErrors((prev) => ({ ...prev, captcha_answer: r.errors!.captcha_answer }));
+      }
+      return setError(r.error);
+    }
     afterLogin(r.user);
   };
 
@@ -155,6 +196,82 @@ export default function LoginPage() {
                 </button>
               </div>
             </Field>
+
+            <Field label="Kode CAPTCHA" required error={errors.captcha_answer} htmlFor="login-captcha">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div
+                    style={{
+                      height: 48,
+                      width: 180,
+                      borderRadius: 10,
+                      overflow: 'hidden',
+                      border: '1px solid #0e1620',
+                      background: '#fff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    {captchaLoading && !captcha ? (
+                      <span style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>Memuat…</span>
+                    ) : captcha?.image ? (
+                      <img
+                        src={captcha.image}
+                        alt="Kode CAPTCHA"
+                        style={{ height: '100%', width: '100%', objectFit: 'contain', display: 'block' }}
+                      />
+                    ) : (
+                      <span style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>Gagal memuat</span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={loadCaptcha}
+                    disabled={captchaLoading}
+                    aria-label="Muat ulang CAPTCHA"
+                    title="Muat ulang CAPTCHA"
+                    style={{
+                      height: 48,
+                      width: 48,
+                      display: 'grid',
+                      placeItems: 'center',
+                      border: '1px solid #0e1620',
+                      borderRadius: 10,
+                      background: '#fff',
+                      cursor: captchaLoading ? 'not-allowed' : 'pointer',
+                      color: 'var(--navy)',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Icon name="refresh" size={18} className={captchaLoading ? 'animate-spin' : undefined} />
+                  </button>
+                </div>
+                <Input
+                  id="login-captcha"
+                  type="text"
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="6 karakter"
+                  maxLength={6}
+                  value={captchaAnswer}
+                  aria-invalid={!!errors.captcha_answer || undefined}
+                  style={{ textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 600 }}
+                  onChange={(e) => {
+                    setCaptchaAnswer(e.target.value.toUpperCase());
+                    if (errors.captcha_answer) {
+                      setErrors((prev) => {
+                        const copy = { ...prev };
+                        delete copy.captcha_answer;
+                        return copy;
+                      });
+                    }
+                  }}
+                />
+              </div>
+            </Field>
+
             <Button type="submit" variant="primary" icon="lock" block disabled={busy}>
               {busy ? 'Memeriksa…' : 'Sign in'}
             </Button>

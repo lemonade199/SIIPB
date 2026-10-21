@@ -23,6 +23,11 @@ export interface LoginResponse {
   expires_in: number;
   user: ApiUser;
 }
+export interface CaptchaResponse {
+  captcha_id: string;
+  image: string;
+  expires_in: number;
+}
 export interface ApiUserRow {
   id: number;
   username: string;
@@ -300,8 +305,12 @@ export async function fetchAll<T>(path: string, query: object = {}, perPage = 10
 const API_BASE = () => (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api/v1').replace(/\/+$/, '');
 
 export const authApi = {
-  async login(username: string, password: string) {
-    const res = await request<LoginResponse>('/auth/login', { method: 'POST', body: { username, password }, anonymous: true });
+  getCaptcha: () => request<CaptchaResponse>('/auth/captcha', { method: 'GET', anonymous: true }).then((r) => r.data),
+  async login(username: string, password: string, captcha_id?: string, captcha_answer?: string) {
+    const body: Record<string, unknown> = { username, password };
+    if (captcha_id) body.captcha_id = captcha_id;
+    if (captcha_answer) body.captcha_answer = captcha_answer;
+    const res = await request<LoginResponse>('/auth/login', { method: 'POST', body, anonymous: true });
     tokenStore.set({ access_token: res.data.access_token, refresh_token: res.data.refresh_token });
     return res.data;
   },

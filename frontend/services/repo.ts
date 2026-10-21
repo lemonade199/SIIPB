@@ -90,9 +90,9 @@ const dataUrlToFile = async (url: string, name: string) => {
   return new File([blob], `${name}.${ext}`, { type: blob.type || 'image/jpeg' });
 };
 
-export async function login(username: string, password: string): Promise<Ok<{ user: User }> | Fail> {
-  if (!isApiMode) return authSvc.login(username, password);
-  return attempt(async () => ({ user: await apiLogin(username, password) }));
+export async function login(username: string, password: string, captcha_id?: string, captcha_answer?: string): Promise<Ok<{ user: User }> | Fail> {
+  if (!isApiMode) return authSvc.login(username, password, captcha_id, captcha_answer);
+  return attempt(async () => ({ user: await apiLogin(username, password, captcha_id, captcha_answer) }));
 }
 
 export async function loginSso(code: string): Promise<Ok<{ user: User }> | Fail> {

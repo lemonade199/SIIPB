@@ -335,3 +335,90 @@ def test_ttl_change_does_not_affect_already_issued_tokens(client, auth_headers, 
         json={"security": {"jwt_access_minutes": Config.JWT_ACCESS_TTL_MINUTES, "jwt_refresh_days": Config.JWT_REFRESH_TTL_DAYS}},
         headers=auth_headers,
     )
+
+
+# ==============================================================================
+# PENGUJIAN CAPTCHA (PB-CAPTCHA)
+# ==============================================================================
+def test_captcha_endpoint_generates_valid_challenge(client):
+    res = client.get("/api/v1/auth/captcha")
+    assert res.status_code == 200
+    body = res.get_json()
+    assert body["success"] is True
+    data = body["data"]
+    assert "captcha_id" in data and len(data["captcha_id"]) == 36  # UUID v4
+    assert data["image"].startswith("data:image/png;base64,")
+    assert data["expires_in"] == 300
+
+
+def test_login_with_valid_captcha(client):
+    from app.services.captcha_service import captcha_service, _hash_answer
+
+    cid = "test-cid-valid-1"
+    code = "7KX9M2"
+    captcha_service._in_memory_store.set(cid, _hash_answer(code), 300)
+
+    res = client.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "admin123", "captcha_id": cid, "captcha_answer": "7kx9m2"},
+    )
+    assert res.status_code == 200
+    assert res.get_json()["success"] is True
+    assert "access_token" in res.get_json()["data"]
+
+
+def test_login_with_invalid_captcha_fails(client):
+    from app.services.captcha_service import captcha_service, _hash_answer
+
+    cid = "test-cid-invalid-1"
+    captcha_service._in_memory_store.set(cid, _hash_answer("ABCDEF"), 300)
+
+    res = client.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "admin123", "captcha_id": cid, "captcha_answer": "WRONG1"},
+    )
+    assert res.status_code == 400
+    body = res.get_json()
+    assert body["success"] is False
+    assert body["error_code"] == "INVALID_CAPTCHA"
+
+
+def test_captcha_single_use_replay_fails(client):
+    from app.services.captcha_service import captcha_service, _hash_answer
+
+    cid = "test-cid-replay-1"
+    code = "4PQ7XY"
+    captcha_service._in_memory_store.set(cid, _hash_answer(code), 300)
+
+    # Penggunaan pertama: sukses
+    res1 = client.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "admin123", "captcha_id": cid, "captcha_answer": code},
+    )
+    assert res1.status_code == 200
+
+    # Penggunaan kedua (replay attack): harus ditolak
+    res2 = client.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "admin123", "captcha_id": cid, "captcha_answer": code},
+    )
+    assert res2.status_code == 400
+    assert res2.get_json()["error_code"] == "INVALID_CAPTCHA"
+
+
+def test_login_with_expired_captcha_fails(client):
+    from app.services.captcha_service import captcha_service, _hash_answer
+
+    cid = "test-cid-expired-1"
+    code = "234567"
+    # Set challenge dengan TTL negatif (sudah kedaluwarsa)
+    captcha_service._in_memory_store.set(cid, _hash_answer(code), -10)
+
+    res = client.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "admin123", "captcha_id": cid, "captcha_answer": code},
+    )
+    assert res.status_code == 400
+    body = res.get_json()
+    assert body["error_code"] == "INVALID_CAPTCHA"
+    assert "kedaluwarsa" in body["message"] or "tidak ditemukan" in body["message"]
