@@ -137,13 +137,7 @@ export function BorrowForm({ id }: { id?: ID }) {
   return (
     <>
       <PageHead
-        crumb={
-          <>
-            <Link href="/peminjaman">Peminjaman</Link> / {editing ? 'Ubah draf' : 'Baru'}
-          </>
-        }
         title={editing ? `Ubah draf ${editing.code}` : 'Catat Peminjaman'}
-        desc="Petugas memilih peminjam dan barang, menentukan tanggal, lalu menyerahkan barang. Peminjam tidak mengisi apa pun."
       />
       <section className="card" style={{ padding: '14px 18px', marginBottom: 18 }}>
         <ol className="steps">
@@ -286,13 +280,6 @@ export function BorrowForm({ id }: { id?: ID }) {
                 />
                 <Field label="Batas pengembalian" required error={errors.due_date} htmlFor="f-due" hint={dur === null ? undefined : dur < 0 ? 'Batas kembali sebelum tanggal pinjam.' : `Durasi ${dur} hari · jatuh pada ${fmtDate(due, true)}`}>
                   <Input id="f-due" type="date" className="w-full" aria-invalid={!!errors.due_date || undefined} value={form.due_date} onChange={(ev) => setForm({ ...form, due_date: ev.target.value })} />
-                  <div className="row" style={{ gap: 6 }}>
-                    {[1, 3, 7, 14].map((n) => (
-                      <Button key={n} size="sm" onClick={() => setForm({ ...form, due_date: addDays(form.borrow_date || today(), n) })}>
-                        +{n} hari
-                      </Button>
-                    ))}
-                  </div>
                 </Field>
                 <TextField
                   label="Tujuan peminjaman"
@@ -343,9 +330,6 @@ export function BorrowForm({ id }: { id?: ID }) {
                     {editing ? 'Simpan draf' : 'Simpan sebagai draf'}
                   </Button>
                 )}
-                <p className="small muted">
-                  Checkout memvalidasi ketersediaan, mengubah status barang menjadi <b>DIPINJAM</b>, mengirim email ke peminjam, dan mencatat audit log.
-                </p>
               </div>
             </Card>
             <Card title="Jadwal notifikasi ke peminjam">

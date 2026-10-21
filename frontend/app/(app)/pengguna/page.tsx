@@ -221,10 +221,10 @@ export default function PenggunaPage() {
             }}
           >
             <div className="form-grid">
-              <TextField label="Nama lengkap" required value={userForm.v.name} error={errors.name} onChange={(e) => setU('name', e.target.value)} />
-              <TextField label="Username" required mono value={userForm.v.username} error={errors.username} onChange={(e) => setU('username', e.target.value)} />
-              <TextField label="Email" type="email" required value={userForm.v.email} error={errors.email} onChange={(e) => setU('email', e.target.value)} />
-              <TextField label="Telepon / ext." value={userForm.v.phone} onChange={(e) => setU('phone', e.target.value)} />
+              <TextField placeholder="mis. Budi Santoso" label="Nama lengkap" required value={userForm.v.name} error={errors.name} onChange={(e) => setU('name', e.target.value)} />
+              <TextField placeholder="mis. budi.santoso" label="Username" required mono value={userForm.v.username} error={errors.username} onChange={(e) => setU('username', e.target.value)} />
+              <TextField placeholder="mis. budi@instansi.go.id" label="Email" type="email" required value={userForm.v.email} error={errors.email} onChange={(e) => setU('email', e.target.value)} />
+              <TextField placeholder="mis. 0812-3456-7890" label="Telepon / ext." value={userForm.v.phone} onChange={(e) => setU('phone', e.target.value)} />
               <SelectField label="Role" required value={userForm.v.role_id} onChange={(e) => setU('role_id', e.target.value)} options={roles.map((r) => ({ value: r.id, label: r.name }))} />
               <SelectField
                 label="Metode login"
@@ -233,7 +233,7 @@ export default function PenggunaPage() {
                 options={['LOKAL', 'SSO', 'LOKAL + SSO'].map((x) => ({ value: x, label: x }))}
               />
               {!userForm.existing && (
-                <TextField
+                <TextField placeholder="Minimal 8 karakter, huruf & angka"
                   label="Kata sandi awal"
                   type="password"
                   required
@@ -267,8 +267,8 @@ export default function PenggunaPage() {
       >
         {roleForm && (
           <div className="stack" style={{ gap: 12 }}>
-            <TextField label="Nama role" required value={roleForm.name} error={errors.name} onChange={(e) => setRoleForm({ ...roleForm, name: e.target.value })} />
-            <TextareaField label="Deskripsi" rows={2} value={roleForm.description} onChange={(e) => setRoleForm({ ...roleForm, description: e.target.value })} />
+            <TextField placeholder="mis. Staf Gudang" label="Nama role" required value={roleForm.name} error={errors.name} onChange={(e) => setRoleForm({ ...roleForm, name: e.target.value })} />
+            <TextareaField placeholder="mis. Mengelola stok barang di gudang" label="Deskripsi" rows={2} value={roleForm.description} onChange={(e) => setRoleForm({ ...roleForm, description: e.target.value })} />
           </div>
         )}
       </Modal>

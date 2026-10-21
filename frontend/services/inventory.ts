@@ -149,6 +149,19 @@ export function setItemActive(id: ID, active: boolean, reason = ''): Result {
   return { ok: true };
 }
 
+/** Hapus permanen barang yang belum pernah dipinjam; yang punya riwayat transaksi cukup dinonaktifkan. */
+export function deleteItem(id: ID): Result {
+  const it = item(id);
+  if (!it) return { ok: false, error: 'Barang tidak ditemukan.' };
+  if (db.where('borrowing_details', (d) => d.item_id === it.id).length)
+    return { ok: false, error: 'Barang sudah pernah dipinjam sehingga tidak dapat dihapus permanen. Nonaktifkan saja.' };
+  audit('item.delete', 'items', it.id, { kode: it.item_code, nama: it.item_name }, null);
+  db.data.item_movements = db.data.item_movements.filter((m) => m.item_id !== it.id);
+  db.remove('items', it.id);
+  db.save();
+  return { ok: true };
+}
+
 export const MAX_PHOTOS = 5;
 
 export const qrPayload = (it: Item) => `SIIPB:${it.item_code}`;

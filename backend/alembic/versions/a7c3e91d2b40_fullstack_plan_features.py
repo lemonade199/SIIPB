@@ -22,9 +22,7 @@ DT6 = mysql.DATETIME(fsp=6)
 TS6 = sa.text("CURRENT_TIMESTAMP(6)")
 OPTS = dict(mysql_charset="utf8mb4", mysql_collate="utf8mb4_unicode_ci", mysql_engine="InnoDB")
 
-# ---------------------------------------------------------------------------
 # RBAC: kode permission diseragamkan dengan antarmuka (frontend/lib/constants.ts)
-# ---------------------------------------------------------------------------
 PERMISSIONS = [
     ("dashboard.view", "Melihat dashboard & statistik", "dashboard"),
     ("inventory.view", "Melihat data inventaris", "inventory"),
@@ -107,7 +105,6 @@ TEMPLATES = [
 def _data_upgrade() -> None:
     conn = op.get_bind()
 
-    # --- permissions ---
     existing = {code: pid for pid, code in conn.execute(sa.text("SELECT id, code FROM permissions"))}
     for code, name, module in PERMISSIONS:
         if code in existing:
@@ -140,7 +137,7 @@ def _data_upgrade() -> None:
     for pid in legacy:
         conn.execute(sa.text("DELETE FROM permissions WHERE id=:p"), dict(p=pid))
 
-    # --- templates (upsert by code; keep custom edits only when already in new {{var}} style) ---
+    # templates (upsert by code; keep custom edits only when already in new {{var}} style)
     for code, name, subject, body in TEMPLATES:
         row = conn.execute(sa.text("SELECT id, body FROM notification_templates WHERE code=:c"), dict(c=code)).first()
         if row is None:
@@ -152,7 +149,7 @@ def _data_upgrade() -> None:
                 "UPDATE notification_templates SET name=:n, subject=:s, body=:b WHERE id=:i"
             ), dict(n=name, s=subject, b=body, i=row[0]))
 
-    # --- existing borrowings were checked out at creation ---
+    # existing borrowings were checked out at creation
     conn.execute(sa.text(
         "UPDATE borrowings SET checked_out_at = borrowed_at, checked_out_by = handled_by "
         "WHERE checked_out_at IS NULL AND status <> 'DRAF'"
@@ -165,7 +162,6 @@ def _data_upgrade() -> None:
 
 
 def upgrade() -> None:
-    # assets / item_photos
     op.add_column("assets", sa.Column("acquisition_source", sa.String(150), nullable=True))
     op.create_table(
         "asset_photos",
@@ -180,10 +176,9 @@ def upgrade() -> None:
     )
     op.create_index("ix_asset_photos_asset_id", "asset_photos", ["asset_id"])
 
-    # users
     op.add_column("users", sa.Column("phone", sa.String(30), nullable=True))
 
-    # borrowings: draft & checkout
+    # Borrowings: status DRAF & waktu checkout
     op.drop_constraint(op.f("ck_borrowings_status"), "borrowings", type_="check")
     op.create_check_constraint(
         op.f("ck_borrowings_status"), "borrowings",
@@ -198,10 +193,8 @@ def upgrade() -> None:
     op.alter_column("borrowing_items", "checked_out_at", existing_type=DT6, nullable=True)
     op.add_column("borrowing_items", sa.Column("condition_out", sa.String(20), nullable=True))
 
-    # return items
     op.add_column("return_items", sa.Column("asset_status_after", sa.String(30), nullable=True))
 
-    # notifications: recipients & reads
     op.add_column("notifications", sa.Column("recipient_name", sa.String(150), nullable=True))
     op.add_column("notifications", sa.Column("recipient_type", sa.String(20), server_default=sa.text("'PEMINJAM'"), nullable=False))
     op.add_column("notifications", sa.Column("recipient_user_id", BIGU, nullable=True))
@@ -223,7 +216,6 @@ def upgrade() -> None:
     )
     op.create_index("ix_notification_reads_user_id", "notification_reads", ["user_id"])
 
-    # scheduler runs
     op.create_table(
         "scheduler_runs",
         sa.Column("id", BIGU, autoincrement=True, nullable=False),

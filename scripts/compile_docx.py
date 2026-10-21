@@ -5,7 +5,6 @@ from pathlib import Path
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor
 
-# Add project root to sys.path
 root_dir = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(root_dir))
 
@@ -18,7 +17,6 @@ def generate_full_document(output_path: str):
     print(f"Creating Document: {output_path}...")
     doc = Document()
     
-    # Configure Page Margins (1 inch all sides)
     sections = doc.sections
     for section in sections:
         section.top_margin = Inches(1.0)
@@ -28,7 +26,6 @@ def generate_full_document(output_path: str):
         section.page_width = Inches(8.5)
         section.page_height = Inches(11.0)
 
-    # Base style settings
     normal_style = doc.styles['Normal']
     normal_style.font.name = 'Calibri'
     normal_style.font.size = Pt(10)

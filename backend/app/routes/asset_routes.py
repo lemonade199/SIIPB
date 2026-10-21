@@ -14,6 +14,7 @@ from app.services.asset_service import (
     change_status,
     create_asset,
     delete_asset,
+    delete_asset_permanently,
     get_asset_by_id,
     get_asset_history,
     get_assets,
@@ -247,15 +248,21 @@ def set_status(asset_id: int):
 @asset_bp.delete("/<int:asset_id>")
 @permission_required("inventory.manage")
 def remove_asset(asset_id: int):
-    """Nonaktifkan barang (riwayat tetap tersimpan).
+    """Nonaktifkan barang (riwayat tetap tersimpan). `permanent=1` menghapus permanen barang yang belum pernah dipinjam.
     ---
     tags: [Assets]
     security: [{Bearer: []}]
+    parameters:
+      - {in: query, name: permanent, type: boolean, description: "Hapus permanen (hanya barang tanpa riwayat peminjaman)"}
     responses:
-      200: {description: Aset dinonaktifkan}
+      200: {description: Aset dinonaktifkan / dihapus}
+      400: {description: Barang sudah pernah dipinjam}
     """
     with SessionLocal() as session:
         try:
+            if request.args.get("permanent") in ("1", "true"):
+                delete_asset_permanently(session, asset_id, user_id=g.current_user["id"])
+                return success_response(message="Barang berhasil dihapus permanen")
             delete_asset(session, asset_id, user_id=g.current_user["id"])
         except AssetError as e:
             return _err(e)

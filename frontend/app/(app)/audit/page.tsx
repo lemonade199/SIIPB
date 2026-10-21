@@ -70,14 +70,13 @@ interface Filter {
   q: string;
   user: string;
   group: string;
-  from: string;
-  to: string;
+  date: string;
   page: number;
 }
 
 export default function AuditPage() {
   useTitle('Audit Log');
-  const [f, setF] = usePersistentState<Filter>('au.filter', { q: '', user: '', group: '', from: '', to: '', page: 1 });
+  const [f, setF] = usePersistentState<Filter>('au.filter', { q: '', user: '', group: '', date: '', page: 1 });
   const set = patchFilter(setF);
 
   const rows = db
@@ -86,8 +85,7 @@ export default function AuditPage() {
       (a) =>
         (!f.user || String(a.user_id) === f.user) &&
         (!f.group || a.action.split('.')[0] === f.group) &&
-        (!f.from || localDate(a.at) >= f.from) &&
-        (!f.to || localDate(a.at) <= f.to) &&
+        (!f.date || localDate(a.at) === f.date) &&
         match(f.q, a.action, a.entity, userName(a.user_id), JSON.stringify(a.old_value), JSON.stringify(a.new_value)),
     )
     .sort((a, b) => b.at.localeCompare(a.at) || b.id - a.id);
@@ -144,8 +142,7 @@ export default function AuditPage() {
             onChange={(e) => set('group', e.target.value)}
             options={[{ value: '', label: 'Semua tindakan' }, ...used.map((g) => ({ value: g, label: GROUPS[g] || g }))]}
           />
-          <Input type="date" aria-label="Dari tanggal" value={f.from} onChange={(e) => set('from', e.target.value)} />
-          <Input type="date" aria-label="Sampai tanggal" value={f.to} onChange={(e) => set('to', e.target.value)} />
+          <Input type="date" aria-label="Tanggal" title="Tampilkan aktivitas pada tanggal ini" value={f.date || ''} onChange={(e) => set('date', e.target.value)} />
         </div>
         <TableWrap>
           <table className="table">

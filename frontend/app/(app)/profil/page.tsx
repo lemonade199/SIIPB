@@ -103,9 +103,9 @@ export default function ProfilPage() {
           )}
           <Card title="Ubah profil">
             <form className="stack" style={{ gap: 12 }} noValidate onSubmit={saveProfile}>
-              <TextField label="Nama lengkap" required value={p.name} error={profErr} onChange={(e) => setProf({ ...p, name: e.target.value })} />
-              <TextField label="Email" type="email" value={p.email} onChange={(e) => setProf({ ...p, email: e.target.value })} />
-              <TextField label="Telepon" value={p.phone} onChange={(e) => setProf({ ...p, phone: e.target.value })} />
+              <TextField placeholder="mis. Budi Santoso" label="Nama lengkap" required value={p.name} error={profErr} onChange={(e) => setProf({ ...p, name: e.target.value })} />
+              <TextField placeholder="mis. budi@instansi.go.id" label="Email" type="email" value={p.email} onChange={(e) => setProf({ ...p, email: e.target.value })} />
+              <TextField placeholder="mis. 0812-3456-7890" label="Telepon" value={p.phone} onChange={(e) => setProf({ ...p, phone: e.target.value })} />
               <div>
                 <Button type="submit">Simpan profil</Button>
               </div>
@@ -115,7 +115,7 @@ export default function ProfilPage() {
           <Card title="Ganti kata sandi">
             <form className="stack" style={{ gap: 12 }} noValidate onSubmit={onSubmit}>
               <TextField label="Kata sandi lama" type="password" required value={pw.old} error={errors.old} onChange={(e) => setPw({ ...pw, old: e.target.value })} />
-              <TextField
+              <TextField placeholder="Minimal 8 karakter, huruf & angka"
                 label="Kata sandi baru"
                 type="password"
                 required
@@ -124,7 +124,7 @@ export default function ProfilPage() {
                 error={errors.new1}
                 onChange={(e) => setPw({ ...pw, new1: e.target.value })}
               />
-              <TextField label="Ulangi kata sandi baru" type="password" required value={pw.new2} error={errors.new2} onChange={(e) => setPw({ ...pw, new2: e.target.value })} />
+              <TextField placeholder="Ketik ulang kata sandi baru" label="Ulangi kata sandi baru" type="password" required value={pw.new2} error={errors.new2} onChange={(e) => setPw({ ...pw, new2: e.target.value })} />
               <div>
                 <Button type="submit" variant="primary">
                   Simpan kata sandi

@@ -4,7 +4,6 @@
  */
 import { api, download, request, tokenStore, type ApiEnvelope } from '@/services/api/client';
 
-/* ================= DTO ================= */
 export interface ApiUser {
   id: number;
   username: string;
@@ -300,7 +299,6 @@ export async function fetchAll<T>(path: string, query: object = {}, perPage = 10
 
 const API_BASE = () => (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api/v1').replace(/\/+$/, '');
 
-/* ================= Auth ================= */
 export const authApi = {
   async login(username: string, password: string) {
     const res = await request<LoginResponse>('/auth/login', { method: 'POST', body: { username, password }, anonymous: true });
@@ -329,7 +327,6 @@ export const authApi = {
   ssoUrl: () => `${API_BASE()}/auth/sso`,
 };
 
-/* ================= Pengguna & role ================= */
 export const usersApi = {
   list: () => api.get<ApiUserRow[]>('/users').then((r) => r.data),
   directory: () => api.get<ApiDirectoryUser[]>('/users/directory').then((r) => r.data),
@@ -341,7 +338,6 @@ export const usersApi = {
   updateRole: (id: number, body: Record<string, unknown>) => api.put<ApiRole>(`/roles/${id}`, body).then((r) => r.data),
 };
 
-/* ================= Inventaris ================= */
 export const assetsApi = {
   list: (q: Paging & { search?: string; category_id?: number; location_id?: number; status?: string; condition?: string } = {}) => api.get<ApiAsset[]>('/assets', q),
   all: () => fetchAll<ApiAsset>('/assets'),
@@ -350,6 +346,7 @@ export const assetsApi = {
   update: (id: number, body: ApiAssetInput) => api.put<ApiAsset>(`/assets/${id}`, body).then((r) => r.data),
   setStatus: (id: number, status: string, reason?: string) => api.post<ApiAsset>(`/assets/${id}/status`, { status, reason }).then((r) => r.data),
   deactivate: (id: number) => api.del<null>(`/assets/${id}`),
+  remove: (id: number) => api.del<null>(`/assets/${id}?permanent=1`),
   history: (id: number) => api.get<ApiAssetHistory[]>(`/assets/${id}/history`).then((r) => r.data),
   uploadPhotos: (id: number, files: File[], primary = false) => {
     const fd = new FormData();
@@ -361,7 +358,6 @@ export const assetsApi = {
   orderPhotos: (id: number, photo_ids: number[]) => api.put<ApiAsset>(`/assets/${id}/photos/order`, { photo_ids }).then((r) => r.data),
 };
 
-/* ================= Transaksi ================= */
 export const borrowingsApi = {
   list: (q: Paging & { status?: string; borrower_id?: number } = {}) => api.get<ApiBorrowing[]>('/borrowings', q),
   all: () => fetchAll<ApiBorrowing>('/borrowings'),
@@ -382,7 +378,6 @@ export const returnsApi = {
   lossReports: () => fetchAll<unknown>('/loss-reports'),
 };
 
-/* ================= Master data ================= */
 export type MasterPath = 'organizational-units' | 'categories' | 'locations' | 'borrowers';
 export const masterApi = {
   units: () => api.get<ApiUnit[]>('/organizational-units', { all: 1 }).then((r) => r.data),
@@ -394,7 +389,6 @@ export const masterApi = {
   remove: (path: MasterPath, id: number) => api.del<null>(`/${path}/${id}`),
 };
 
-/* ================= Notifikasi ================= */
 export const notificationsApi = {
   all: () => fetchAll<ApiNotification>('/notifications'),
   templates: () => api.get<ApiTemplate[]>('/notifications/templates').then((r) => r.data),
@@ -405,7 +399,6 @@ export const notificationsApi = {
   readAll: () => api.post<{ marked: number }>('/notifications/read-all'),
 };
 
-/* ================= Dashboard, laporan, audit ================= */
 export const dashboardApi = {
   summary: () => api.get<Record<string, unknown>>('/dashboard/summary').then((r) => r.data),
   overdue: () => api.get<unknown[]>('/dashboard/overdue').then((r) => r.data),
@@ -418,11 +411,10 @@ export const auditApi = {
   all: () => fetchAll<ApiAuditLog>('/audit-logs', {}, 200),
 };
 
-/* ================= Pengaturan, scheduler, backup ================= */
 export const settingsApi = {
   get: () => api.get<Record<string, unknown>>('/settings').then((r) => r.data),
   update: (body: Record<string, unknown>) => api.put<Record<string, unknown>>('/settings', body).then((r) => r.data),
-  testSmtp: () => api.post<{ ok: boolean; mode: string }>('/settings/smtp/test'),
+  testSmtp: (to?: string) => api.post<{ ok: boolean; mode: string; to?: string }>('/settings/smtp/test', to ? { to } : {}),
   runScheduler: (date?: string) => api.post<ApiSchedulerRun>('/scheduler/run', date ? { date } : {}),
   schedulerRuns: () => api.get<ApiSchedulerRun[]>('/scheduler/runs').then((r) => r.data),
   backups: () => api.get<ApiBackup[]>('/backups').then((r) => r.data),

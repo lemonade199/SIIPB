@@ -5,9 +5,6 @@ from scripts.build_complete_docx import (
 )
 
 def build_section_16_to_20(doc):
-    # ========================================================
-    # BAGIAN 16 — RESPONSE API
-    # ========================================================
     add_header_styled(doc, "BAGIAN 16 — RESPONSE API (STANDARD ENVELOPE)", level=1)
     add_p(doc, "Seluruh endpoint backend mengembalikan format JSON seragam (Envelope Pattern) melalui helper backend/app/utils/response.py:")
 
@@ -43,9 +40,6 @@ def build_section_16_to_20(doc):
     )
     add_code_block(doc, error_json)
 
-    # ========================================================
-    # BAGIAN 17 — FILE PENTING UNTUK DIPELAJARI
-    # ========================================================
     add_header_styled(doc, "BAGIAN 17 — FILE PENTING UNTUK DIPELAJARI", level=1)
     add_p(doc, "Bagi developer yang baru pertama kali mempelajari project SIIPB, pelajari berkas dengan urutan prioritas berikut:")
 
@@ -70,9 +64,6 @@ def build_section_16_to_20(doc):
         [Inches(1.8), Inches(2.2), Inches(3.0)]
     )
 
-    # ========================================================
-    # BAGIAN 18 — ROADMAP BELAJAR PROJECT (7 HARI)
-    # ========================================================
     add_header_styled(doc, "BAGIAN 18 — ROADMAP BELAJAR PROJECT", level=1)
     add_p(doc, "Panduan belajar bertahap bagi developer baru agar dapat menguasai sistem dalam 7 hari:")
 
@@ -92,9 +83,6 @@ def build_section_16_to_20(doc):
         [Inches(1.0), Inches(2.0), Inches(4.0)]
     )
 
-    # ========================================================
-    # BAGIAN 19 — GLOSARIUM ISTILAH TEKNIS
-    # ========================================================
     add_header_styled(doc, "BAGIAN 19 — GLOSARIUM ISTILAH TEKNIS", level=1)
     add_p(doc, "Kamus istilah teknis yang digunakan di dalam project SIIPB untuk memudahkan pemula:")
 
@@ -119,9 +107,6 @@ def build_section_16_to_20(doc):
         [Inches(2.5), Inches(4.5)]
     )
 
-    # ========================================================
-    # BAGIAN 20 — KESIMPULAN
-    # ========================================================
     add_header_styled(doc, "BAGIAN 20 — KESIMPULAN", level=1)
     add_p(doc, "1. Integritas Arsitektur:", bold_prefix="• ")
     add_p(doc, "Backend SIIPB dibangun di atas fondasi MariaDB 13 yang kuat dan stabil dengan 26 tabel terstandarisasi. Seluruh aturan bisnis, constraint status, dan relasi data telah teruji 100% selaras dengan cetak biru resmi.")

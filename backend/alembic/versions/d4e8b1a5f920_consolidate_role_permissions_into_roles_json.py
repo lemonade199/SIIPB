@@ -13,7 +13,6 @@ from sqlalchemy.dialects import mysql
 
 from app.models.permission import SYSTEM_PERMISSIONS
 
-# revision identifiers, used by Alembic.
 revision: str = 'd4e8b1a5f920'
 down_revision: Union[str, None] = 'c1f9e2b8a341'
 branch_labels: Union[str, Sequence[str], None] = None
@@ -25,12 +24,11 @@ def upgrade() -> None:
     inspector = sa.inspect(conn)
     tables = inspector.get_table_names()
 
-    # 1. Tambahkan kolom permissions (JSON) pada roles
     roles_cols = [c['name'] for c in inspector.get_columns('roles')]
     if 'permissions' not in roles_cols:
         op.add_column('roles', sa.Column('permissions', sa.JSON(), nullable=True))
 
-    # 2. Migrasi data relasi role_permissions ke roles.permissions
+    # Migrasi data relasi role_permissions ke roles.permissions
     if 'role_permissions' in tables and 'permissions' in tables:
         rows = conn.execute(sa.text("""
             SELECT rp.role_id, p.code
@@ -51,10 +49,9 @@ def upgrade() -> None:
                 {"perms": json.dumps(perms_list), "rid": rid}
             )
 
-    # 3. Fallback jika ada role bernilai NULL
+    # Fallback jika ada role bernilai NULL
     conn.execute(sa.text("UPDATE roles SET permissions = '[]' WHERE permissions IS NULL"))
 
-    # 4. Set NOT NULL dan server_default
     op.alter_column(
         'roles',
         'permissions',
@@ -63,7 +60,6 @@ def upgrade() -> None:
         server_default=sa.text("'[]'")
     )
 
-    # 5. Drop foreign key dan tabel lama
     if 'role_permissions' in tables:
         op.drop_table('role_permissions')
     if 'permissions' in tables:
@@ -75,7 +71,6 @@ def downgrade() -> None:
     inspector = sa.inspect(conn)
     tables = inspector.get_table_names()
 
-    # 1. Buat kembali tabel permissions
     if 'permissions' not in tables:
         op.create_table(
             'permissions',
@@ -93,7 +88,6 @@ def downgrade() -> None:
         )
         op.create_index(op.f('ix_permissions_module'), 'permissions', ['module'], unique=False)
 
-    # 2. Populate katalog permission statis
     for item in SYSTEM_PERMISSIONS:
         conn.execute(
             sa.text("""
@@ -110,7 +104,6 @@ def downgrade() -> None:
             }
         )
 
-    # 3. Buat kembali tabel role_permissions
     if 'role_permissions' not in tables:
         op.create_table(
             'role_permissions',
@@ -126,7 +119,7 @@ def downgrade() -> None:
         )
         op.create_index(op.f('ix_role_permissions_permission_id'), 'role_permissions', ['permission_id'], unique=False)
 
-    # 4. Pulihkan data relasi role_permissions dari JSON roles.permissions
+    # Pulihkan data relasi role_permissions dari JSON roles.permissions
     perm_code_to_id = {
         row[0]: row[1]
         for row in conn.execute(sa.text("SELECT code, id FROM permissions")).fetchall()
@@ -146,7 +139,6 @@ def downgrade() -> None:
                         {"rid": rid, "pid": pid}
                     )
 
-    # 5. Drop kolom permissions dari roles
     roles_cols = [c['name'] for c in inspector.get_columns('roles')]
     if 'permissions' in roles_cols:
         op.drop_column('roles', 'permissions')

@@ -78,7 +78,6 @@ def run_backup(session: Session, by: str = "system", kind: str = "Manual") -> di
         entry["error"] = str(exc)
         target.unlink(missing_ok=True)
 
-    # retensi
     days = int(get_settings(session)["backup"].get("retention_days") or 14)
     limit = now - timedelta(days=days)
     for f in backup_dir().glob("siipb-*.sql.gz"):

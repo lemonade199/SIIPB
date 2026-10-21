@@ -14,11 +14,10 @@ DOCS_DIR = ROOT_DIR / "docs" / "api-learning"
 OUTPUT_DOCX_ROOT = ROOT_DIR / "PANDUAN-LENGKAP-API-SIIPB.docx"
 OUTPUT_DOCX_DOCS = ROOT_DIR / "docs" / "PANDUAN-LENGKAP-API-SIIPB.docx"
 
-# Warna Tema
-COLOR_PRIMARY = RGBColor(30, 58, 138)     # Navy Blue #1E3A8A
-COLOR_SECONDARY = RGBColor(14, 116, 144)  # Cyan/Teal #0E7490
-COLOR_TEXT = RGBColor(30, 41, 59)         # Slate 800 #1E293B
-COLOR_MUTED = RGBColor(100, 116, 139)     # Slate 500 #64748B
+COLOR_PRIMARY = RGBColor(30, 58, 138)
+COLOR_SECONDARY = RGBColor(14, 116, 144)
+COLOR_TEXT = RGBColor(30, 41, 59)
+COLOR_MUTED = RGBColor(100, 116, 139)
 HEX_PRIMARY = "1E3A8A"
 HEX_BG_HEADER = "1E3A8A"
 HEX_BG_ALT = "F8FAFC"
@@ -164,7 +163,6 @@ def add_markdown_table(doc, header_row, data_rows):
     table.autofit = True
     set_table_borders(table, color=HEX_BORDER, sz="4")
     
-    # Header row
     hdr_cells = table.rows[0].cells
     for i, title in enumerate(header_row):
         cell = hdr_cells[i]
@@ -184,7 +182,6 @@ def add_markdown_table(doc, header_row, data_rows):
     header_tr = table.rows[0]._tr.get_or_add_trPr()
     header_tr.append(parse_xml(f'<w:tblHeader {nsdecls("w")}/>'))
 
-    # Data rows
     for r_idx, row_data in enumerate(data_rows):
         row_cells = table.rows[r_idx + 1].cells
         # Zebra striping
@@ -222,7 +219,6 @@ def parse_markdown_file_to_doc(doc, md_filepath):
     while i < len(lines):
         line = lines[i].rstrip("\r\n")
         
-        # 1. Code Block Handling
         if line.startswith("```"):
             if in_code_block:
                 add_code_block(doc, code_lines)
@@ -239,7 +235,6 @@ def parse_markdown_file_to_doc(doc, md_filepath):
             i += 1
             continue
             
-        # 2. Table Handling
         if "|" in line and (line.strip().startswith("|") or line.strip().endswith("|")):
             parts = [p.strip() for p in line.strip().split("|")]
             # Bersihkan elemen kosong di ujung akibat split (| a | b |)
@@ -268,7 +263,6 @@ def parse_markdown_file_to_doc(doc, md_filepath):
                 table_header = []
                 table_rows = []
 
-        # 3. Blockquote Handling
         if line.startswith(">"):
             in_quote = True
             quote_lines.append(line.lstrip("> ").strip())
@@ -280,12 +274,10 @@ def parse_markdown_file_to_doc(doc, md_filepath):
                 in_quote = False
                 quote_lines = []
 
-        # Blank line
         if not line.strip():
             i += 1
             continue
             
-        # Horizontal Rule
         if re.match(r"^-{3,}$", line.strip()):
             p = doc.add_paragraph()
             p.paragraph_format.space_before = Pt(4)
@@ -296,7 +288,6 @@ def parse_markdown_file_to_doc(doc, md_filepath):
             i += 1
             continue
             
-        # 4. Headings
         if line.startswith("# "):
             h = doc.add_heading(level=1)
             h.paragraph_format.space_before = Pt(14)
@@ -336,7 +327,6 @@ def parse_markdown_file_to_doc(doc, md_filepath):
             i += 1
             continue
             
-        # 5. Bullet Lists
         if line.strip().startswith("- ") or line.strip().startswith("* "):
             p = doc.add_paragraph(style='List Bullet')
             p.paragraph_format.space_before = Pt(1)
@@ -347,7 +337,6 @@ def parse_markdown_file_to_doc(doc, md_filepath):
             i += 1
             continue
             
-        # 6. Numbered Lists
         m_num = re.match(r"^(\d+)\.\s+(.*)$", line.strip())
         if m_num:
             p = doc.add_paragraph(style='List Number')
@@ -358,7 +347,6 @@ def parse_markdown_file_to_doc(doc, md_filepath):
             i += 1
             continue
             
-        # 7. Regular Paragraph
         p = doc.add_paragraph()
         p.paragraph_format.space_before = Pt(2)
         p.paragraph_format.space_after = Pt(4)
@@ -378,7 +366,6 @@ def build_cover_page(doc):
     p_pre = doc.add_paragraph()
     p_pre.paragraph_format.space_before = Pt(70)
     
-    # Title Tag Badge
     p_tag = doc.add_paragraph()
     p_tag.alignment = WD_ALIGN_PARAGRAPH.CENTER
     r_tag = p_tag.add_run("MODUL PEMBELAJARAN & DOKUMENTASI LENGKAP BACKEND REST API")
@@ -387,7 +374,6 @@ def build_cover_page(doc):
     r_tag.bold = True
     r_tag.font.color.rgb = COLOR_SECONDARY
     
-    # Main Title
     p_title = doc.add_paragraph()
     p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p_title.paragraph_format.space_before = Pt(12)
@@ -398,7 +384,6 @@ def build_cover_page(doc):
     r_title.bold = True
     r_title.font.color.rgb = COLOR_PRIMARY
     
-    # Subtitle
     p_sub = doc.add_paragraph()
     p_sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p_sub.paragraph_format.space_after = Pt(24)
@@ -407,13 +392,11 @@ def build_cover_page(doc):
     r_sub.font.size = Pt(12)
     r_sub.font.color.rgb = COLOR_MUTED
     
-    # Horizontal Divider
     p_div = doc.add_paragraph()
     p_div.alignment = WD_ALIGN_PARAGRAPH.CENTER
     r_div = p_div.add_run("—" * 35)
     r_div.font.color.rgb = RGBColor(203, 213, 225)
     
-    # Metadata Box
     p_meta = doc.add_paragraph()
     p_meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p_meta.paragraph_format.space_before = Pt(140)
@@ -436,24 +419,21 @@ def generate_full_docx():
     
     # Konfigurasi Page Setup (A4, margin 0.8 inch agar tabel lebar nyaman)
     for section in doc.sections:
-        section.page_width = Inches(8.27)   # A4 Width
-        section.page_height = Inches(11.69) # A4 Height
+        section.page_width = Inches(8.27)
+        section.page_height = Inches(11.69)
         section.top_margin = Inches(0.8)
         section.bottom_margin = Inches(0.8)
         section.left_margin = Inches(0.8)
         section.right_margin = Inches(0.8)
         
-    # Set default style font
     doc.styles['Normal'].font.name = 'Calibri'
     doc.styles['Normal'].font.size = Pt(9.5)
     doc.styles['Normal'].font.color.rgb = COLOR_TEXT
     
-    # 1. Cover Page
     print("Membuat Cover Page...")
     build_cover_page(doc)
     doc.add_page_break()
     
-    # Daftar File Markdown
     md_files = [
         "01-dasar-api.md",
         "02-arsitektur-project.md",

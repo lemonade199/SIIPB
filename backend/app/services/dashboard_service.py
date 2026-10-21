@@ -18,7 +18,6 @@ def get_dashboard_summary(session: Session) -> dict:
     """Compute real-time dashboard analytics directly from existing MariaDB tables."""
     today = date.today()
 
-    # 1. Asset statistics
     total_assets = session.scalar(
         select(func.count(Asset.id)).where(Asset.deleted_at.is_(None), Asset.is_active.is_(True))
     ) or 0
@@ -51,7 +50,6 @@ def get_dashboard_summary(session: Session) -> dict:
         )
     ) or 0
 
-    # 2. Borrowing statistics
     borrowing_aktif = session.scalar(
         select(func.count(Borrowing.id)).where(
             Borrowing.status.in_([BorrowingStatus.AKTIF.value, BorrowingStatus.TERLAMBAT.value])
@@ -81,7 +79,6 @@ def get_dashboard_summary(session: Session) -> dict:
         )
     ) or 0
 
-    # 3. Incident reports
     total_damage_reports = session.scalar(
         select(func.count(AssetIncidentReport.id)).where(AssetIncidentReport.incident_type == "KERUSAKAN")
     ) or 0
@@ -96,7 +93,6 @@ def get_dashboard_summary(session: Session) -> dict:
         select(func.count(AssetIncidentReport.id)).where(AssetIncidentReport.incident_type == "KEHILANGAN")
     ) or 0
 
-    # 4. Recent returns
     recent_returns_query = (
         select(Return)
         .order_by(Return.returned_at.desc())

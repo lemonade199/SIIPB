@@ -34,7 +34,6 @@ Rules:
         AssertDescription: AdminCidr tidak boleh 0.0.0.0/0 - isi IP publik Anda /32.
 
 Resources:
-  # ------------------------------------------------------------------ VPC
   Vpc:
     Type: AWS::EC2::VPC
     Properties:
@@ -152,7 +151,6 @@ Resources:
         - !Ref PublicRouteTable
         - !Ref PrivateRouteTable
 
-  # ------------------------------------------------------------------ Security groups
   # EC2 inbound : 22 hanya dari AdminCidr; 80/443 dari WebIngressCidr
   # EC2 outbound: 80/443 (apt, ECR, API AWS), SMTP 25/465/587, DNS, NTP, 3306 hanya ke SG RDS
   Ec2SecurityGroup:

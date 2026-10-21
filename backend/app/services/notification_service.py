@@ -217,9 +217,6 @@ def create_event_notifications(
     return created, "CREATED"
 
 
-# ---------------------------------------------------------------------------
-# Pengiriman
-# ---------------------------------------------------------------------------
 def record_delivery_attempt(
     session: Session,
     notification_id: int,

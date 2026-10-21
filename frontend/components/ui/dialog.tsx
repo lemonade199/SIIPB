@@ -5,7 +5,6 @@ import { Dialog as DialogPrimitive } from 'radix-ui';
 import type { ComponentProps, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
-/* ---------- Primitif shadcn/ui Dialog (Radix) ---------- */
 export const Dialog = DialogPrimitive.Root;
 export const DialogTrigger = DialogPrimitive.Trigger;
 export const DialogClose = DialogPrimitive.Close;
@@ -41,7 +40,7 @@ export function DialogHeader({ title, desc }: { title: ReactNode; desc?: ReactNo
   );
 }
 
-/* ---------- Pembungkus praktis yang dipakai halaman ---------- */
+/* Pembungkus praktis yang dipakai halaman */
 interface ModalProps {
   open: boolean;
   onClose: () => void;

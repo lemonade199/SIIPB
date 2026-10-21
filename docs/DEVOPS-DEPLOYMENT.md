@@ -296,6 +296,25 @@ Alur `deploy.yml`:
    - menjalankan `deploy.sh <sha>`, yang mengambil secret, login ECR, pull image, mengganti container satu per satu sambil menunggu healthcheck, dan rollback otomatis bila gagal;
    - menjalankan smoke test `/api/health`, lalu menutup kembali port 22 (selalu, walaupun job gagal).
 
+### Alternatif: deploy dari laptop tanpa GitHub Actions (disarankan untuk AWS Academy)
+
+Kredensial lab kedaluwarsa setiap sesi, sehingga secret GitHub harus terus diperbarui. Lebih praktis jika build
+dan deploy dijalankan dari laptop dengan Docker, memakai kredensial lab di `~/.aws/credentials`:
+
+```bash
+cd infrastructure/cloudformation
+./deploy-stacks.sh release
+```
+
+Langkah `release`:
+
+- login ke ECR;
+- build image `backend`, `worker`, dan `frontend` (linux/amd64), lalu push dengan tag `<commit>` dan `latest`;
+- menyalin `deploy/` ke EC2 lewat SSH (port 22 terbuka untuk `ADMIN_CIDR`);
+- menjalankan `deploy.sh <commit>` dan smoke test `/api/health`.
+
+Jalankan ulang setiap kali ada perubahan kode. Bila IP laptop berubah, perbarui `ADMIN_CIDR` lalu jalankan `./deploy-stacks.sh network`.
+
 ## Tahap 7 — HTTPS (Certbot)
 
 Jalankan sekali setelah DNS mengarah ke Elastic IP **dan** deploy pertama sukses:

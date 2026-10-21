@@ -87,3 +87,16 @@ def test_items_alias(client, auth_headers):
     assert assets == items
     res = client.post("/api/v1/items", json={"category_id": 2, "name": "Proyektor via /items"}, headers=auth_headers)
     assert res.status_code == 201
+
+
+def test_permanent_delete_only_for_never_borrowed(client, auth_headers, make_asset, make_borrowing):
+    fresh = make_asset(name="Barang Salah Input")
+    res = client.delete(f"/api/v1/assets/{fresh['id']}?permanent=1", headers=auth_headers)
+    assert res.status_code == 200, res.get_json()
+    assert client.get(f"/api/v1/assets/{fresh['id']}", headers=auth_headers).status_code == 404
+
+    b = make_borrowing()
+    used_id = b["items"][0]["asset_id"]
+    res = client.delete(f"/api/v1/assets/{used_id}?permanent=1", headers=auth_headers)
+    assert res.status_code == 400
+    assert client.get(f"/api/v1/assets/{used_id}", headers=auth_headers).status_code == 200

@@ -1,4 +1,3 @@
-/** Statistik dashboard. */
 import { db } from '@/lib/mock/db';
 import { MON, pad, parseDate, relDue, today as todayStr } from '@/lib/date';
 import { ITEM_STATUS } from '@/lib/constants';

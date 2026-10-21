@@ -11,11 +11,10 @@ from docx.enum.table import WD_TABLE_ALIGNMENT, WD_ALIGN_VERTICAL
 from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls
 
-# Colors
-COLOR_PRIMARY = RGBColor(27, 54, 93)     # Deep Navy #1B365D
-COLOR_SECONDARY = RGBColor(16, 124, 65)  # Emerald #107C41
-COLOR_MUTED = RGBColor(100, 116, 139)    # Slate #64748B
-COLOR_DARK = RGBColor(30, 41, 59)        # Dark Charcoal #1E293B
+COLOR_PRIMARY = RGBColor(27, 54, 93)
+COLOR_SECONDARY = RGBColor(16, 124, 65)
+COLOR_MUTED = RGBColor(100, 116, 139)
+COLOR_DARK = RGBColor(30, 41, 59)
 HEX_PRIMARY = "1B365D"
 HEX_LIGHT_BG = "F8FAFC"
 HEX_BORDER = "CBD5E1"

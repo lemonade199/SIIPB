@@ -14,7 +14,6 @@ NAMING_CONVENTION = {
     "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
 }
 
-# ---- Shared column types -------------------------------------------------
 BigIntU = mysql.BIGINT(unsigned=True)
 IntU = mysql.INTEGER(unsigned=True)
 DateTime6 = mysql.DATETIME(fsp=6)
@@ -40,7 +39,6 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
-# ---- Mixins --------------------------------------------------------------
 class IdMixin:
     id: Mapped[int] = mapped_column(
         BigIntU, primary_key=True, autoincrement=True, sort_order=-1000

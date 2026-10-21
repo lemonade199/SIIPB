@@ -124,7 +124,6 @@ def smtp_test():
         return error_response(f"Email uji gagal: {exc}", error_code="SMTP_FAILED")
 
 
-# ---------------------------------------------------------------- scheduler
 @settings_bp.post("/scheduler/run")
 @permission_required("notification.manage")
 def scheduler_run():
@@ -177,7 +176,6 @@ def scheduler_runs():
         return success_response(data=[serialize_run(r) for r in runs])
 
 
-# ---------------------------------------------------------------- backup
 @settings_bp.get("/backups")
 @permission_required("settings.manage")
 def backups_index():

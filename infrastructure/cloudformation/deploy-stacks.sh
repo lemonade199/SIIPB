@@ -6,6 +6,7 @@
 #   export SEED_ADMIN_PASSWORD='...'        # wajib saat pertama kali
 #   ./deploy-stacks.sh                      # semua stack
 #   ./deploy-stacks.sh network|data|app|billing|outputs   # satu stack / tampilkan output
+#   ./deploy-stacks.sh release              # build image di laptop -> ECR -> deploy ke EC2 (tanpa GitHub Actions)
 #
 # Stack: <project>-<env>-network -> -data -> -app (region utama).
 # Billing alert (-billing, us-east-1) TIDAK termasuk "all" (tidak tersedia di AWS Academy);
@@ -108,6 +109,45 @@ deploy_billing() {
     "AlarmEmail=$ALARM_EMAIL" "BillingThresholdUsd=$BILLING_THRESHOLD_USD"
 }
 
+# Build image di laptop -> push ke ECR -> salin deploy/ ke EC2 -> jalankan deploy.sh (tanpa GitHub Actions).
+# Cocok untuk AWS Academy: cukup kredensial lab di ~/.aws/credentials + Docker + kunci SSH deploy.
+release() {
+  local registry ip key tag ssh_cmd
+  registry=$(out "$DATA_STACK" EcrRegistry)
+  ip=$(out "$APP_STACK" PublicIp)
+  key="${SSH_PUBLIC_KEY_FILE/#\~/$HOME}"; key="${key%.pub}"
+  [ -n "$registry" ] && [ -n "$ip" ] || { echo "Stack data/app belum ada: jalankan ./deploy-stacks.sh dulu" >&2; exit 1; }
+  [ -f "$key" ] || { echo "Private key tidak ditemukan: $key" >&2; exit 1; }
+  tag=$(git rev-parse --short HEAD 2>/dev/null || date +%Y%m%d%H%M%S)
+  # Git Bash: pakai path Windows (D:/SIIPB) karena docker.exe tidak mengenal /d/SIIPB
+  local root; root=$(cd ../.. && { pwd -W 2>/dev/null || pwd; })
+
+  echo "=== Login ECR $registry"
+  aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$registry"
+
+  build_push() { # build_push <image> <context> <dockerfile> [build args...]
+    local image=$1 ctx=$2 file=$3; shift 3
+    echo "=== Build & push siipb-$image:$tag"
+    # Git Bash (Windows) mengubah argumen mirip path (/api/v1 -> C:/Program Files/Git/api/v1); matikan konversi itu.
+    MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL="*" docker build --platform linux/amd64 -f "$root/$file" "$@" \
+      -t "$registry/siipb-$image:$tag" -t "$registry/siipb-$image:latest" "$root/$ctx"
+    docker push "$registry/siipb-$image:$tag"
+    docker push "$registry/siipb-$image:latest"
+  }
+  build_push backend backend backend/Dockerfile
+  build_push worker backend backend/Dockerfile.worker
+  build_push frontend frontend frontend/Dockerfile \
+    --build-arg NEXT_PUBLIC_DATA_SOURCE=api --build-arg NEXT_PUBLIC_API_BASE_URL=/api/v1 \
+    --build-arg "NEXT_PUBLIC_INSTITUTION=$INSTITUTION_NAME" --build-arg NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS=false
+
+  ssh_cmd=(ssh -i "$key" -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 "ubuntu@$ip")
+  echo "=== Salin deploy/ ke EC2 $ip"
+  tar czf - -C "$root/deploy" . | "${ssh_cmd[@]}" 'tar xzf - -C /opt/siipb && chmod +x /opt/siipb/scripts/*.sh'
+  echo "=== Deploy tag $tag di EC2"
+  "${ssh_cmd[@]}" "/opt/siipb/scripts/deploy.sh $tag"
+  curl -fsS --retry 5 --retry-delay 5 "http://$ip/api/health" && echo && echo "Selesai: http://$ip"
+}
+
 show_outputs() {
   outputs "$NETWORK_STACK" "$AWS_REGION"
   outputs "$DATA_STACK" "$AWS_REGION"
@@ -138,5 +178,6 @@ case "$STEP" in
   app)     deploy_app ;;
   billing) deploy_billing ;;
   outputs) show_outputs ;;
-  *) echo "Pemakaian: $0 [all|network|data|app|billing|outputs]" >&2; exit 1 ;;
+  release) release ;;
+  *) echo "Pemakaian: $0 [all|network|data|app|billing|outputs|release]" >&2; exit 1 ;;
 esac

@@ -15,7 +15,6 @@ Parameters:
     Type: String
     Description: Nama stack 01-network (sumber subnet privat & SG RDS).
 
-  # ---------------------------------------------------------------- RDS
   DbName:
     Type: String
     Default: siipb
@@ -63,12 +62,10 @@ Parameters:
     Default: "true"
     AllowedValues: ["true", "false"]
 
-  # ---------------------------------------------------------------- S3
   S3BackupRetentionDays:
     Type: Number
     Default: 90
 
-  # ---------------------------------------------------------------- konfigurasi aplikasi (secret)
   SeedAdminPassword:
     Type: String
     NoEcho: true
@@ -103,7 +100,6 @@ Parameters:
     NoEcho: true
 
 Resources:
-  # ================================================================== S3
   FilesBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Retain
@@ -157,7 +153,6 @@ Resources:
             Condition:
               Bool: { "aws:SecureTransport": "false" }
 
-  # ================================================================== ECR
   BackendRepository:
     Type: AWS::ECR::Repository
     Properties:
@@ -203,7 +198,6 @@ Resources:
             {"rulePriority":2,"description":"Simpan 15 image terakhir","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":15},"action":{"type":"expire"}}
           ]}
 
-  # ================================================================== Secrets Manager
   # Kredensial RDS dibangkitkan AWS (tidak pernah ditulis di template/repo).
   # SecretTargetAttachment menambahkan host/port/engine ke secret setelah RDS jadi.
   DbSecret:
@@ -255,7 +249,6 @@ Resources:
           JWT_ACCESS_TTL_MINUTES: "30"
           JWT_REFRESH_TTL_DAYS: "7"
 
-  # ================================================================== RDS MariaDB
   DbSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
     Properties:
@@ -273,9 +266,9 @@ Resources:
       Parameters:
         character_set_server: utf8mb4
         collation_server: utf8mb4_unicode_ci
-        time_zone: Asia/Jakarta
-        slow_query_log: "1"
-        long_query_time: "2"
+        time_zone: Asia/Bangkok # UTC+7 = WIB (RDS tidak menyediakan Asia/Jakarta)
+        log_slow_query: "1" # nama MariaDB 11 untuk slow_query_log
+        log_slow_query_time: "2" # nama MariaDB 11 untuk long_query_time
 
   DbInstance:
     Type: AWS::RDS::DBInstance
@@ -300,7 +293,7 @@ Resources:
       DBParameterGroupName: !Ref DbParameterGroup
       PubliclyAccessible: false
       MultiAZ: !Ref DbMultiAz
-      # ---- Automated Backups (harian) + point-in-time restore ----
+      # Automated Backups (harian) + point-in-time restore
       BackupRetentionPeriod: !Ref DbBackupRetentionDays
       PreferredBackupWindow: !Ref DbBackupWindow
       PreferredMaintenanceWindow: !Ref DbMaintenanceWindow

@@ -5,9 +5,6 @@ from scripts.build_complete_docx import (
 )
 
 def build_section_6_to_10(doc):
-    # ========================================================
-    # BAGIAN 6 — MODEL / ORM
-    # ========================================================
     add_header_styled(doc, "BAGIAN 6 — MODEL / ORM (SQLALCHEMY 2.X)", level=1)
     add_p(doc, "Backend SIIPB menggunakan modern declarative mapping SQLAlchemy 2.0 (Mapped[T] dan mapped_column). Model bertindak sebagai jembatan object-oriented antara kode Python dan baris tabel MariaDB.")
 
@@ -32,9 +29,6 @@ def build_section_6_to_10(doc):
         [Inches(1.8), Inches(1.0), Inches(0.6), Inches(1.5), Inches(1.6)]
     )
 
-    # ========================================================
-    # BAGIAN 7 — API / ROUTES
-    # ========================================================
     add_header_styled(doc, "BAGIAN 7 — API / ROUTES", level=1)
     add_p(doc, "Seluruh endpoint REST API dikelompokkan dalam prefix standar /api/v1. Format request dan response menggunakan standar Application/JSON.")
 
@@ -87,9 +81,6 @@ def build_section_6_to_10(doc):
         [Inches(0.8), Inches(1.8), Inches(1.1), Inches(1.1), Inches(0.9), Inches(1.8)]
     )
 
-    # ========================================================
-    # BAGIAN 8 — CONTROLLER / ROUTE HANDLERS
-    # ========================================================
     add_header_styled(doc, "BAGIAN 8 — CONTROLLER / ROUTE HANDLERS", level=1)
     add_p(doc, "Pada framework Flask, peran Controller dijalankan oleh fungsi handler di dalam modul Blueprint (backend/app/routes/). Controller bertugas menerima request HTTP, memvalidasi input payload menggunakan Schema Marshmallow, memanggil fungsi bisnis di Service Layer, dan mengembalikan respons JSON terstandarisasi.")
 
@@ -121,9 +112,6 @@ def build_section_6_to_10(doc):
     )
     add_code_block(doc, ctrl_code)
 
-    # ========================================================
-    # BAGIAN 9 — AUTHENTICATION & AUTHORIZATION
-    # ========================================================
     add_header_styled(doc, "BAGIAN 9 — AUTHENTICATION & AUTHORIZATION", level=1)
     add_p(doc, "Keamanan SIIPB menerapkan prinsip pertahanan berlapis (Defense-in-Depth):")
     add_p(doc, "1. Hashing Kata Sandi: Menggunakan PBKDF2/SHA-256 dan Scrypt melalui werkzeug.security, dengan fallback verifikasi aman.")
@@ -145,9 +133,6 @@ def build_section_6_to_10(doc):
         [Inches(2.5), Inches(4.5)]
     )
 
-    # ========================================================
-    # BAGIAN 10 — VALIDATION
-    # ========================================================
     add_header_styled(doc, "BAGIAN 10 — VALIDATION (MARSHMALLOW SCHEMAS)", level=1)
     add_p(doc, "Validasi input dilakukan di backend menggunakan pustaka Marshmallow (backend/app/schemas/) sebelum data menyentuh service bisnis atau database:")
 

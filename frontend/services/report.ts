@@ -170,7 +170,7 @@ export function buildReport(type: ReportType, f: Partial<ReportFilters> = {}): R
       summary: `${rows.length} transaksi terlambat`,
     };
   }
-  // kerusakan & kehilangan
+  // Tipe tersisa: laporan kerusakan & kehilangan
   const rows = db
     .where('items', (it) => it.active && ['RUSAK', 'RUSAK_BERAT', 'DALAM_PERBAIKAN', 'HILANG'].includes(it.item_status) && itemOk(it))
     .map((it) => {

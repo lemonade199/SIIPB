@@ -112,7 +112,6 @@ def test_jwt_ttl_from_system_settings_and_exp_claim(client, auth_headers, db_ses
     from app.models import RefreshToken
     from app.utils.security import hash_token
 
-    # 1. Update pengaturan keamanan via API (PUT /api/v1/settings)
     update_res = client.put(
         "/api/v1/settings",
         json={"security": {"jwt_access_minutes": 45, "jwt_refresh_days": 14}},
@@ -120,7 +119,6 @@ def test_jwt_ttl_from_system_settings_and_exp_claim(client, auth_headers, db_ses
     )
     assert update_res.status_code == 200
 
-    # 2. Login pengguna untuk menerbitkan token baru
     before_login = datetime.now()
     login_res = client.post("/api/v1/auth/login", json={"username": "petugas@siipb.local", "password": "petugas123"})
     assert login_res.status_code == 200
@@ -129,7 +127,6 @@ def test_jwt_ttl_from_system_settings_and_exp_claim(client, auth_headers, db_ses
     # Verifikasi expires_in sesuai (45 menit = 2700 detik)
     assert data["expires_in"] == 45 * 60
 
-    # Verifikasi klaim exp JWT access token
     payload = jwt.decode(data["access_token"], Config.JWT_SECRET_KEY, algorithms=[Config.JWT_ALGORITHM])
     assert payload["exp"] - payload["iat"] == 45 * 60
 
@@ -139,7 +136,6 @@ def test_jwt_ttl_from_system_settings_and_exp_claim(client, auth_headers, db_ses
     diff = (ref_record.expires_at - before_login).total_seconds() / 86400
     assert 13.9 <= diff <= 14.1
 
-    # Kembalikan pengaturan ke default
     client.put(
         "/api/v1/settings",
         json={"security": {"jwt_access_minutes": Config.JWT_ACCESS_TTL_MINUTES, "jwt_refresh_days": Config.JWT_REFRESH_TTL_DAYS}},
@@ -178,7 +174,7 @@ def test_token_ttl_validation_and_safe_fallback(client, auth_headers, db_session
     from app.models import SystemSetting
     from app.services.auth_service import authenticate_user, get_token_ttl
 
-    # 1. Validasi penolakan nilai <= 0 atau non-integer saat update settings
+    # Validasi penolakan nilai <= 0 atau non-integer saat update settings
     res1 = client.put("/api/v1/settings", json={"security": {"jwt_access_minutes": 0}}, headers=auth_headers)
     assert res1.status_code == 400
     assert "security.jwt_access_minutes" in res1.get_json()["errors"]
@@ -199,7 +195,7 @@ def test_token_ttl_validation_and_safe_fallback(client, auth_headers, db_session
     assert res5.status_code == 400
     assert "security.jwt_access_minutes" in res5.get_json()["errors"]
 
-    # 2. Penanganan aman jika data di database berisi nilai tidak valid
+    # Penanganan aman jika data di database berisi nilai tidak valid
     row = db_session.scalars(select(SystemSetting).where(SystemSetting.key == "app.settings")).first()
     if row:
         row.value = json.dumps({"security": {"jwt_access_minutes": -99, "jwt_refresh_days": "invalid"}})
@@ -214,7 +210,6 @@ def test_token_ttl_validation_and_safe_fallback(client, auth_headers, db_session
     login_res = authenticate_user(db_session, "admin", "admin123")
     assert login_res["expires_in"] == Config.JWT_ACCESS_TTL_MINUTES * 60
 
-    # Bersihkan / restore settings
     if row:
         db_session.delete(row)
         db_session.commit()
@@ -240,22 +235,21 @@ def test_consistent_ttl_across_all_issuance_paths(client, auth_headers, db_sessi
         refresh_access_token,
     )
 
-    # Atur TTL kustom
     client.put("/api/v1/settings", json={"security": {"jwt_access_minutes": 35, "jwt_refresh_days": 10}}, headers=auth_headers)
 
-    # 1. Jalur Local Login
+    # Jalur Local Login
     local = authenticate_user(db_session, "admin", "admin123")
     assert local["expires_in"] == 35 * 60
     p1 = jwt.decode(local["access_token"], Config.JWT_SECRET_KEY, algorithms=[Config.JWT_ALGORITHM])
     assert p1["exp"] - p1["iat"] == 35 * 60
 
-    # 2. Jalur Token Refresh
+    # Jalur Token Refresh
     refreshed = refresh_access_token(db_session, local["refresh_token"])
     assert refreshed["expires_in"] == 35 * 60
     p2 = jwt.decode(refreshed["access_token"], Config.JWT_SECRET_KEY, algorithms=[Config.JWT_ALGORITHM])
     assert p2["exp"] - p2["iat"] == 35 * 60
 
-    # 3. Jalur SSO Code Exchange
+    # Jalur SSO Code Exchange
     user = db_session.scalars(select(User).where(User.username == "petugas")).first()
     sso_code = issue_sso_code(db_session, user)
     sso_ex = exchange_sso_code(db_session, sso_code)
@@ -263,7 +257,7 @@ def test_consistent_ttl_across_all_issuance_paths(client, auth_headers, db_sessi
     p3 = jwt.decode(sso_ex["access_token"], Config.JWT_SECRET_KEY, algorithms=[Config.JWT_ALGORITHM])
     assert p3["exp"] - p3["iat"] == 35 * 60
 
-    # 4. Jalur OAuth Identity Login
+    # Jalur OAuth Identity Login
     user.google_subject = "test-google-sub-12345"
     db_session.commit()
     oauth_res = authenticate_oauth_identity(db_session, "google", "test-google-sub-12345", email=user.email)
@@ -271,7 +265,6 @@ def test_consistent_ttl_across_all_issuance_paths(client, auth_headers, db_sessi
     p4 = jwt.decode(oauth_res["access_token"], Config.JWT_SECRET_KEY, algorithms=[Config.JWT_ALGORITHM])
     assert p4["exp"] - p4["iat"] == 35 * 60
 
-    # Restore default
     client.put(
         "/api/v1/settings",
         json={"security": {"jwt_access_minutes": Config.JWT_ACCESS_TTL_MINUTES, "jwt_refresh_days": Config.JWT_REFRESH_TTL_DAYS}},
@@ -293,7 +286,7 @@ def test_ttl_change_does_not_affect_already_issued_tokens(client, auth_headers, 
     from app.models import RefreshToken
     from app.utils.security import hash_token
 
-    # 1. Terbitkan token awal pada konfigurasi TTL 60 menit & 7 hari
+    # Terbitkan token awal pada konfigurasi TTL 60 menit & 7 hari
     client.put(
         "/api/v1/settings",
         json={"security": {"jwt_access_minutes": 60, "jwt_refresh_days": 7}},
@@ -305,18 +298,17 @@ def test_ttl_change_does_not_affect_already_issued_tokens(client, auth_headers, 
     rec1 = db_session.scalars(select(RefreshToken).where(RefreshToken.token_hash == hash_token(ref_token1))).first()
     original_expires_at = rec1.expires_at
 
-    # 2. Administrator mengubah pengaturan TTL ke 15 menit & 2 hari
+    # Administrator mengubah pengaturan TTL ke 15 menit & 2 hari
     client.put(
         "/api/v1/settings",
         json={"security": {"jwt_access_minutes": 15, "jwt_refresh_days": 2}},
         headers=auth_headers,
     )
 
-    # 3. Verifikasi token lama tidak berubah expires_at-nya di database
+    # Verifikasi token lama tidak berubah expires_at-nya di database
     db_session.refresh(rec1)
     assert rec1.expires_at == original_expires_at
 
-    # 4. User me-refresh token menggunakan refresh token lama
     ref_res = client.post("/api/v1/auth/refresh", json={"refresh_token": ref_token1})
     assert ref_res.status_code == 200
     ref_data = ref_res.get_json()["data"]
@@ -329,17 +321,15 @@ def test_ttl_change_does_not_affect_already_issued_tokens(client, auth_headers, 
     rec1 = db_session.scalars(select(RefreshToken).where(RefreshToken.token_hash == hash_token(ref_token1))).first()
     assert rec1.expires_at == original_expires_at
 
-    # 5. Token kedaluwarsa ditolak
+    # Token kedaluwarsa ditolak
     rec1.expires_at = datetime.now() - timedelta(minutes=5)
     db_session.commit()
     assert client.post("/api/v1/auth/refresh", json={"refresh_token": ref_token1}).status_code == 401
 
-    # 6. Logout mencabut refresh token
     login2 = client.post("/api/v1/auth/login", json={"username": "petugas@siipb.local", "password": "petugas123"}).get_json()["data"]
     client.post("/api/v1/auth/logout", json={"refresh_token": login2["refresh_token"]}, headers={"Authorization": f"Bearer {login2['access_token']}"})
     assert client.post("/api/v1/auth/refresh", json={"refresh_token": login2["refresh_token"]}).status_code == 401
 
-    # Restore default
     client.put(
         "/api/v1/settings",
         json={"security": {"jwt_access_minutes": Config.JWT_ACCESS_TTL_MINUTES, "jwt_refresh_days": Config.JWT_REFRESH_TTL_DAYS}},

@@ -82,8 +82,8 @@ const VIEWS: Record<MasterKey, ViewDef> = {
     },
     form: (v, set, err, existing) => (
       <div className="form-grid">
-        <TextField label="NIP / nomor induk" required mono value={v.nip} error={err.nip} onChange={(e) => set('nip', e.target.value)} />
-        <TextField label="Nama lengkap" required value={v.name} error={err.name} onChange={(e) => set('name', e.target.value)} />
+        <TextField placeholder="mis. 198501012010011001" label="NIP / nomor induk" required mono value={v.nip} error={err.nip} onChange={(e) => set('nip', e.target.value)} />
+        <TextField placeholder="mis. Andi Wijaya" label="Nama lengkap" required value={v.name} error={err.name} onChange={(e) => set('name', e.target.value)} />
         <SelectField
           label="Unit kerja"
           required
@@ -92,17 +92,16 @@ const VIEWS: Record<MasterKey, ViewDef> = {
           onChange={(e) => set('unit_id', e.target.value)}
           options={toOptions(db.where('units', (u) => u.active || u.id === (existing as Employee | null)?.unit_id))}
         />
-        <TextField label="Jabatan" value={v.position} onChange={(e) => set('position', e.target.value)} />
-        <TextField
+        <TextField placeholder="mis. Staf Tata Usaha" label="Jabatan" value={v.position} onChange={(e) => set('position', e.target.value)} />
+        <TextField placeholder="mis. andi.wijaya@instansi.go.id"
           label="Email"
           type="email"
           required
           value={v.email}
           error={err.email}
-          hint="Wajib — tujuan notifikasi peminjaman dan pengingat."
           onChange={(e) => set('email', e.target.value)}
         />
-        <TextField label="No. telepon" value={v.phone} onChange={(e) => set('phone', e.target.value)} />
+        <TextField placeholder="mis. 0812-3456-7890" label="No. telepon" value={v.phone} onChange={(e) => set('phone', e.target.value)} />
       </div>
     ),
   },
@@ -121,8 +120,8 @@ const VIEWS: Record<MasterKey, ViewDef> = {
     toForm: (r) => ({ code: (r as Category).code, name: r.name }),
     form: (v, set, err) => (
       <div className="form-grid">
-        <TextField label="Kode (3 huruf)" required mono maxLength={5} style={{ textTransform: 'uppercase' }} value={v.code} error={err.code} onChange={(e) => set('code', e.target.value)} />
-        <TextField label="Nama kategori" required value={v.name} error={err.name} onChange={(e) => set('name', e.target.value)} />
+        <TextField placeholder="mis. LPT" label="Kode (3 huruf)" required mono maxLength={5} style={{ textTransform: 'uppercase' }} value={v.code} error={err.code} onChange={(e) => set('code', e.target.value)} />
+        <TextField placeholder="mis. Laptop & Komputer" label="Nama kategori" required value={v.name} error={err.name} onChange={(e) => set('name', e.target.value)} />
       </div>
     ),
   },
@@ -140,9 +139,9 @@ const VIEWS: Record<MasterKey, ViewDef> = {
     toForm: (r) => ({ code: (r as Location).code, name: r.name, building: (r as Location).building }),
     form: (v, set, err) => (
       <div className="form-grid">
-        <TextField label="Kode" required mono value={v.code} error={err.code} onChange={(e) => set('code', e.target.value)} />
-        <TextField label="Nama lokasi" required value={v.name} error={err.name} onChange={(e) => set('name', e.target.value)} />
-        <TextField label="Gedung / lantai" full value={v.building} onChange={(e) => set('building', e.target.value)} />
+        <TextField placeholder="mis. GDA-GUDANG" label="Kode" required mono value={v.code} error={err.code} onChange={(e) => set('code', e.target.value)} />
+        <TextField placeholder="mis. Gudang Inventaris" label="Nama lokasi" required value={v.name} error={err.name} onChange={(e) => set('name', e.target.value)} />
+        <TextField placeholder="mis. Gedung A, Lt. 1" label="Gedung / lantai" full value={v.building} onChange={(e) => set('building', e.target.value)} />
       </div>
     ),
   },
@@ -155,7 +154,7 @@ const VIEWS: Record<MasterKey, ViewDef> = {
     search: (r) => [r.name],
     blank: { name: '' },
     toForm: (r) => ({ name: r.name }),
-    form: (v, set, err) => <TextField label="Nama unit kerja" required value={v.name} error={err.name} onChange={(e) => set('name', e.target.value)} />,
+    form: (v, set, err) => <TextField placeholder="mis. Tata Usaha" label="Nama unit kerja" required value={v.name} error={err.name} onChange={(e) => set('name', e.target.value)} />,
   },
 };
 
@@ -218,6 +217,19 @@ function MasterTableView({ tabKey: key }: { tabKey: MasterKey }) {
     if (!res.ok) toast(res.error, 'err');
   };
   const remove = async (r: AnyRow) => {
+    if (D.used(r.id)) {
+      if (!r.active) return toast(`${r.name} sudah dipakai di data lain sehingga tidak dapat dihapus permanen, dan saat ini sudah nonaktif.`, 'warn');
+      if (key === 'peminjam' && activeBorrowings().some((b) => b.employee_id === r.id)) return toast('Peminjam masih memiliki pinjaman aktif sehingga tidak dapat dihapus.', 'err');
+      const ok = await confirm({
+        title: `${D.noun[0].toUpperCase()}${D.noun.slice(1)} tidak dapat dihapus permanen`,
+        message: `${r.name} sudah dipakai di data lain, jadi menghapusnya akan merusak riwayat. Nonaktifkan saja? Data tidak muncul lagi sebagai pilihan, tetapi riwayatnya tetap tersimpan.`,
+        confirmText: 'Nonaktifkan',
+        danger: true,
+      });
+      if (!ok) return;
+      const res = await repo.setMasterActive(key, r.id, false);
+      return toast(res.ok ? `${r.name} dinonaktifkan.` : res.error, res.ok ? 'ok' : 'err');
+    }
     const ok = await confirm({ title: `Hapus ${D.noun}?`, message: `${r.name} belum pernah dipakai sehingga dapat dihapus permanen.`, confirmText: 'Hapus', danger: true });
     if (!ok) return;
     const res = await repo.deleteMaster(key, r.id as ID);
@@ -278,7 +290,7 @@ function MasterTableView({ tabKey: key }: { tabKey: MasterKey }) {
                               Aktifkan
                             </Button>
                           )}{' '}
-                          {!D.used(r.id) && <Button size="sm" iconOnly icon="trash" variant="danger" title="Hapus (belum pernah dipakai)" onClick={() => remove(r)} />}
+                          <Button size="sm" iconOnly icon="trash" variant="danger" title="Hapus" onClick={() => remove(r)} />
                         </>
                       ) : (
                         <span className="small muted" title="Backend belum menyediakan endpoint ubah/hapus untuk data ini">
@@ -329,7 +341,6 @@ function MasterTableView({ tabKey: key }: { tabKey: MasterKey }) {
   );
 }
 
-/* ---------- Parameter status & kondisi ---------- */
 type ParamKind = 'item_status' | 'condition';
 
 function ParameterView() {
@@ -354,7 +365,7 @@ function ParameterView() {
 
   return (
     <>
-      <PageHead crumb="Beranda / Master Data" title="Master Data" desc="Data referensi untuk inventaris dan transaksi." />
+      <PageHead crumb="Beranda / Master Data" title="Master Data" />
       <section className="card">
         <MasterNav active="parameter" />
         <div style={{ padding: '14px 20px' }}>
@@ -437,8 +448,8 @@ function ParameterView() {
         {edit && (
           <div className="stack" style={{ gap: 12 }}>
             <TextField label="Kode" mono value={edit.code} readOnly hint="Kode tidak dapat diubah." />
-            <TextField label="Label tampilan" required value={edit.label} error={errors.label} onChange={(e) => setEdit({ ...edit, label: e.target.value })} />
-            <TextareaField label="Keterangan" rows={2} value={edit.desc} onChange={(e) => setEdit({ ...edit, desc: e.target.value })} />
+            <TextField placeholder="mis. Tersedia" label="Label tampilan" required value={edit.label} error={errors.label} onChange={(e) => setEdit({ ...edit, label: e.target.value })} />
+            <TextareaField placeholder="mis. Barang siap dipinjam" label="Keterangan" rows={2} value={edit.desc} onChange={(e) => setEdit({ ...edit, desc: e.target.value })} />
           </div>
         )}
       </Modal>

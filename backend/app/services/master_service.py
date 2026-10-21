@@ -144,7 +144,6 @@ def delete_row(session: Session, kind: str, row_id: int, user_id: int) -> None:
     session.commit()
 
 
-# ---- kompatibilitas fungsi lama ----
 def get_borrowers(session: Session, search: str | None = None, unit_id: int | None = None, active_only: bool = True,
                   page: int = 1, per_page: int = 20) -> tuple[list[Borrower], int]:
     query = select(Borrower).where(Borrower.deleted_at.is_(None))

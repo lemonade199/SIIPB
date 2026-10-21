@@ -9,7 +9,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Asset, AssetCondition, AssetHistory, AssetPhoto, AssetStatus, Category
+from app.models import Asset, AssetCondition, AssetHistory, AssetPhoto, AssetStatus, BorrowingItem, Category
 from app.services.audit_service import record_audit
 
 MAX_PHOTOS = 5
@@ -191,12 +191,27 @@ def delete_asset(session: Session, asset_id: int, user_id: int) -> bool:
     return True
 
 
+def delete_asset_permanently(session: Session, asset_id: int, user_id: int) -> None:
+    """Hapus permanen barang yang belum pernah dipinjam; barang dengan riwayat transaksi hanya boleh dinonaktifkan."""
+    asset = get_asset_by_id(session, asset_id)
+    if not asset:
+        raise AssetError("Aset tidak ditemukan", status=404)
+    used = session.scalar(select(func.count(BorrowingItem.id)).where(BorrowingItem.asset_id == asset.id)) or 0
+    if used:
+        raise AssetError("Barang sudah pernah dipinjam sehingga tidak dapat dihapus permanen. Nonaktifkan saja.")
+    record_audit(session, "DELETE", "asset", "asset", asset.id, user_id,
+                 old_data={"inventory_code": asset.inventory_code, "name": asset.name})
+    for h in session.scalars(select(AssetHistory).where(AssetHistory.asset_id == asset.id)).all():
+        session.delete(h)
+    session.delete(asset)
+    session.commit()
+
+
 def get_asset_history(session: Session, asset_id: int) -> list[AssetHistory]:
     q = select(AssetHistory).where(AssetHistory.asset_id == asset_id).order_by(AssetHistory.created_at.desc(), AssetHistory.id.desc())
     return list(session.scalars(q).all())
 
 
-# ---------------------------------------------------------------- foto
 def _sync_primary(asset: Asset) -> None:
     asset.photo_path = asset.photos[0].path if asset.photos else None
 

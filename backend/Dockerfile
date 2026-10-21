@@ -1,7 +1,5 @@
-# ========================================================
 # SIIPB Backend — Python 3.12 + Gunicorn
 # (WeasyPrint: Pango; backup: mariadb-client)
-# ========================================================
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

@@ -3,7 +3,6 @@ import type { ComponentProps, CSSProperties, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { Icon, type IconName } from '@/components/ui/icon';
 
-/* ---------- Primitif shadcn/ui Card ---------- */
 export function CardRoot({ className, ...props }: ComponentProps<'section'>) {
   return <section data-slot="card" className={cn('card min-w-0 rounded-xl border border-border bg-card text-card-foreground shadow-[var(--shadow)]', className)} {...props} />;
 }
@@ -26,7 +25,6 @@ export function CardFooter({ className, ...props }: ComponentProps<'div'>) {
   return <div data-slot="card-footer" className={cn('flex flex-wrap justify-end gap-2 border-t border-border px-5 py-3', className)} {...props} />;
 }
 
-/* ---------- Pembungkus praktis ---------- */
 interface CardProps {
   title?: ReactNode;
   desc?: ReactNode;

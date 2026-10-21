@@ -41,11 +41,9 @@ def create_app(config_class=Config) -> Flask:
         allow_headers=["Content-Type", "Authorization"],
     )
 
-    # Initialize extensions
     swagger.init_app(app)
     oauth.init_app(app)
 
-    # Register API v1 Blueprints
     register_api_routes(app)
 
     # Static route for uploads (development / local storage)
@@ -92,7 +90,6 @@ def create_app(config_class=Config) -> Flask:
     def too_large(err):
         return error_response("Ukuran berkas terlalu besar", error_code="FILE_TOO_LARGE", status_code=413)
 
-    # Standard JSON Error Handlers
     @app.errorhandler(400)
     def bad_request(err):
         return error_response("Permintaan tidak valid (Bad Request)", error_code="BAD_REQUEST", status_code=400)

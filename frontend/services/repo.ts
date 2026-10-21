@@ -90,7 +90,6 @@ const dataUrlToFile = async (url: string, name: string) => {
   return new File([blob], `${name}.${ext}`, { type: blob.type || 'image/jpeg' });
 };
 
-/* ================= Auth ================= */
 export async function login(username: string, password: string): Promise<Ok<{ user: User }> | Fail> {
   if (!isApiMode) return authSvc.login(username, password);
   return attempt(async () => ({ user: await apiLogin(username, password) }));
@@ -135,7 +134,6 @@ export async function updateProfile(u: User, p: { name: string; email: string; p
   });
 }
 
-/* ================= Inventaris ================= */
 async function syncPhotos(assetId: ID, photos: string[]) {
   let current = (await assetsApi.get(assetId)).photos || [];
   const keep = new Set(photos.map((p) => photoIds.get(p)).filter((x): x is number => !!x));
@@ -209,6 +207,15 @@ export async function setItemActive(id: ID, active: boolean, reason = ''): Promi
   });
 }
 
+export async function deleteItem(id: ID): Promise<Ok<object> | Fail> {
+  if (!isApiMode) return invSvc.deleteItem(id);
+  return attempt(async () => {
+    await assetsApi.remove(id);
+    await pullAll();
+    return {};
+  });
+}
+
 export async function setItemStatus(id: ID, status: Item['item_status'], note = ''): Promise<Ok<object> | Fail> {
   if (!isApiMode) return invSvc.setItemStatus(id, status, note);
   return attempt(async () => {
@@ -222,7 +229,6 @@ export async function loadItemHistory(id: ID) {
   if (isApiMode) await apiLoadHistory(id);
 }
 
-/* ================= Peminjaman ================= */
 type BorrowSave = { ok: true; borrowing: Borrowing; notification?: Notification | null } | { ok: false; errors: FieldErrors };
 
 const borrowBody = (p: borrowSvc.BorrowingInput, checkout?: boolean): ApiBorrowingCreate => ({
@@ -286,7 +292,6 @@ export async function cancelBorrowing(id: ID, reason: string): Promise<Ok<object
   });
 }
 
-/* ================= Pengembalian ================= */
 export async function createReturn(p: returnSvc.ReturnInput): Promise<{ ok: true; ret: Return; notification: Notification | null } | Fail> {
   if (!isApiMode) return returnSvc.createReturn(p);
   const b = db.get('borrowings', p.borrowing_id);
@@ -321,7 +326,6 @@ export async function createReturn(p: returnSvc.ReturnInput): Promise<{ ok: true
   }
 }
 
-/* ================= Master data ================= */
 const MASTER_PATH: Record<masterSvc.MasterKey, MasterPath> = {
   peminjam: 'borrowers',
   kategori: 'categories',
@@ -388,7 +392,6 @@ export async function updateParameter(kind: 'item_status' | 'condition', code: s
   }
 }
 
-/* ================= Notifikasi & scheduler ================= */
 export async function retryNotification(id: ID): Promise<{ ok: boolean; error?: string }> {
   if (!isApiMode) return notifSvc.retryNotification(id);
   try {
@@ -430,7 +433,6 @@ export async function runScheduler(): Promise<Ok<{ result: schedSvc.SchedulerRes
   });
 }
 
-/* ================= Pengaturan ================= */
 /** Simpan bagian pengaturan. Mode api: dikirim ke PUT /settings (sebagian). */
 export async function saveSettings(patch: Partial<Settings> & { smtp_password?: string; oidc_client_secret?: string }, label: string): Promise<Ok<object> | Fail> {
   const { smtp_password, oidc_client_secret, ...rest } = patch;
@@ -484,13 +486,13 @@ export async function saveTemplate(id: ID, subject: string, body: string): Promi
   });
 }
 
-export async function testSmtp(): Promise<{ ok: boolean; message: string }> {
+export async function testSmtp(to?: string): Promise<{ ok: boolean; message: string }> {
   if (!isApiMode) {
     const ok = settingsSvc.testSmtp();
     return { ok, message: ok ? 'Koneksi SMTP berhasil (simulasi).' : 'Koneksi SMTP gagal (simulasi kegagalan aktif).' };
   }
   try {
-    const res = await settingsApi.testSmtp();
+    const res = await settingsApi.testSmtp(to);
     return { ok: true, message: res.message };
   } catch (e) {
     return { ok: false, message: apiFail(e).error };
@@ -513,19 +515,19 @@ export async function downloadBackup(name: string) {
   downloadBlobFile(filename, blob);
 }
 
-/* ================= Laporan ================= */
 export async function exportReport(filters: ReportFilters, format: 'xlsx' | 'pdf'): Promise<{ ok: true } | Fail> {
   try {
     const { type, ...rest } = filters;
     const { blob, filename } = await reportsApi.download(type, format, rest);
     downloadBlobFile(filename, blob);
+    // unduhan tercatat di audit log server; segarkan agar muncul di "Laporan terakhir"
+    await pullAll().catch(() => undefined);
     return { ok: true };
   } catch (e) {
     return apiFail(e);
   }
 }
 
-/* ================= Pengguna & role ================= */
 export async function saveUser(d: usersSvc.UserInput, existing: User | null, actorId: ID): Promise<{ ok: true } | { ok: false; errors: FieldErrors }> {
   if (!isApiMode) return usersSvc.saveUser(d, existing, actorId);
   const body: Record<string, unknown> = {

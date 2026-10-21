@@ -69,7 +69,6 @@ def test_permission_catalog_contract(client, auth_headers):
 
 
 def test_role_with_empty_permissions(client, auth_headers):
-    # Buat role dengan permission kosong
     res = client.post(
         "/api/v1/roles",
         json={"code": "tamu", "name": "Pengunjung Tamu", "permissions": []},
@@ -80,12 +79,10 @@ def test_role_with_empty_permissions(client, auth_headers):
     rid = role_data["id"]
     assert role_data["permissions"] == []
 
-    # Get by id
     get_res = client.get(f"/api/v1/roles/{rid}", headers=auth_headers)
     assert get_res.status_code == 200
     assert get_res.get_json()["data"]["permissions"] == []
 
-    # Buat user dengan role ini
     u_res = client.post(
         "/api/v1/users",
         json={
@@ -106,7 +103,7 @@ def test_role_with_empty_permissions(client, auth_headers):
     assert client.get("/api/v1/audit-logs", headers=tamu_headers).status_code == 403
     assert client.get("/api/v1/assets", headers=tamu_headers).status_code == 403
 
-    # Berikan permission asset.view (menggunakan dashboard.view / inventory.view)
+    # Beri akses lihat inventaris
     client.put(f"/api/v1/roles/{rid}", json={"permissions": ["inventory.view"]}, headers=auth_headers)
     assert client.get("/api/v1/assets", headers=tamu_headers).status_code == 200
     assert client.get("/api/v1/audit-logs", headers=tamu_headers).status_code == 403

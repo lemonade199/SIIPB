@@ -15,7 +15,7 @@ import { PageHead } from '@/components/ui/misc';
 import { PhotoEditor } from '@/components/domain/photo-gallery';
 import { NotFoundView } from '@/components/layout/app-shell';
 import { useToast } from '@/components/providers/feedback-provider';
-import { genItemCode, MAX_PHOTOS, type ItemInput } from '@/services/inventory';
+import { MAX_PHOTOS, type ItemInput } from '@/services/inventory';
 import * as repo from '@/services/repo';
 import { CAPABILITIES } from '@/lib/config';
 import { item as getItem, conditionLabel } from '@/services/lookup';
@@ -93,7 +93,6 @@ export function ItemForm({ id }: { id?: ID }) {
     router.push(`/inventaris/${r.item.id}`);
   };
 
-  const codePlaceholder = !id && v.category_id ? `Otomatis: ${genItemCode(Number(v.category_id))}` : 'Kosongkan untuk dibuat otomatis';
 
   return (
     <>
@@ -104,22 +103,13 @@ export function ItemForm({ id }: { id?: ID }) {
           </>
         }
         title={existing ? `Ubah ${existing.item_name}` : 'Tambah Barang'}
-        desc={existing ? <span className="mono">{existing.item_code}</span> : 'Catat barang baru ke inventaris. Status awal: TERSEDIA.'}
+        desc={existing ? <span className="mono">{existing.item_code}</span> : undefined}
       />
       <form noValidate onSubmit={onSubmit}>
         <div className="split">
           <div className="stack">
             <Card title="Identitas barang">
               <div className="form-grid">
-                <TextField
-                  label="Kode barang"
-                  mono
-                  value={v.item_code}
-                  placeholder={codePlaceholder}
-                  hint="Format: INV-[KODE KATEGORI]-[NOMOR]"
-                  error={errors.item_code}
-                  onChange={(e) => set('item_code', e.target.value)}
-                />
                 <TextField
                   label="Nama barang"
                   required
@@ -152,9 +142,9 @@ export function ItemForm({ id }: { id?: ID }) {
                     (l) => `${l.name} (${l.building})`,
                   )}
                 />
-                <TextField label="Merek" value={v.brand} onChange={(e) => set('brand', e.target.value)} />
-                <TextField label="Model" value={v.model} onChange={(e) => set('model', e.target.value)} />
-                <TextField label="Nomor seri" mono value={v.serial_number} placeholder="Jika ada" onChange={(e) => set('serial_number', e.target.value)} />
+                <TextField placeholder="mis. Lenovo" label="Merek" autoComplete="off" value={v.brand} onChange={(e) => set('brand', e.target.value)} />
+                <TextField label="Model" autoComplete="off" placeholder="mis. ThinkPad T14 Gen 3" value={v.model} onChange={(e) => set('model', e.target.value)} />
+                <TextField label="Nomor seri" mono autoComplete="off" value={v.serial_number} placeholder="Jika ada" onChange={(e) => set('serial_number', e.target.value)} />
                 <SelectField
                   label="Kondisi"
                   value={v.condition_status}
@@ -166,7 +156,7 @@ export function ItemForm({ id }: { id?: ID }) {
             <Card title="Perolehan">
               <div className="form-grid">
                 {CAPABILITIES.acquisitionYear && (
-                  <TextField
+                  <TextField placeholder="mis. 2024"
                   label="Tahun perolehan"
                   type="number"
                   min={1990}
@@ -184,7 +174,7 @@ export function ItemForm({ id }: { id?: ID }) {
                     onChange={(e) => set('acquisition_source', e.target.value)}
                   />
                 )}
-                <TextField
+                <TextField placeholder="mis. 14500000"
                   label="Nilai perolehan (Rp)"
                   type="number"
                   min={0}
@@ -229,7 +219,7 @@ export function ItemForm({ id }: { id?: ID }) {
                 )}
               </div>
               <p className="small muted" style={{ marginTop: 8 }}>
-                Maks. {maxPhotos} foto, {sec.upload_types}, {sec.upload_max_mb} MB per berkas. Foto pertama menjadi foto utama. Disimpan di penyimpanan berkas (MinIO/S3).
+                Maks. {maxPhotos} foto, {sec.upload_types}, {sec.upload_max_mb} MB per berkas.
               </p>
               {photoErr && (
                 <p className="small" style={{ color: 'var(--danger)' }}>

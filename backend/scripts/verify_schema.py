@@ -2,7 +2,6 @@
 import sys
 from pathlib import Path
 
-# Add project root to sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from datetime import date, datetime, timedelta
@@ -61,7 +60,6 @@ def run_checks():
     reset_database()
     print(">>> Starting Schema & Business Rule Verification...\n")
 
-    # 1. Master Data & RBAC
     with SessionLocal() as session:
         sekolah = OrganizationalUnit(code="SEKOLAH", name="SMK Negeri 1")
         session.add(sekolah)
@@ -138,7 +136,7 @@ def run_checks():
         print(f"    - Borrower: {borrower_mhs.name} (NO LOGIN ACCOUNT)")
         print(f"    - Asset: {laptop1.inventory_code} ({laptop1.status})")
 
-    # 2. Test CHECK constraint: due_date < start_date
+    # Test CHECK constraint: due_date < start_date
     with SessionLocal() as session:
         try:
             b = Borrowing(
@@ -156,7 +154,7 @@ def run_checks():
         except (IntegrityError, OperationalError, DBAPIError):
             print("[2] MariaDB CHECK constraint confirmed: due_date < start_date rejected.")
 
-    # 3. Test CHECK constraint: invalid asset status
+    # Test CHECK constraint: invalid asset status
     with SessionLocal() as session:
         try:
             a = Asset(
@@ -172,7 +170,6 @@ def run_checks():
         except (IntegrityError, OperationalError, DBAPIError):
             print("[3] MariaDB CHECK constraint confirmed: invalid asset status rejected.")
 
-    # 4. Transaction: Borrowing & Checkout
     now = datetime.now()
     with SessionLocal() as session:
         tx = Borrowing(
@@ -196,7 +193,6 @@ def run_checks():
         )
         session.add(item)
 
-        # Update Asset TERSEDIA -> DIPINJAM
         asset = session.get(Asset, 1)
         old_status = asset.status
         asset.status = AssetStatus.DIPINJAM.value
@@ -229,7 +225,7 @@ def run_checks():
         print(f"    - Transaction: {tx.transaction_number}")
         print(f"    - Asset status updated to: {asset.status}")
 
-    # 5. Notification Idempotency: UNIQUE(borrowing_id, event_code)
+    # Notification Idempotency: UNIQUE(borrowing_id, event_code)
     with SessionLocal() as session:
         evt = NotificationEvent(
             borrowing_id=1,
@@ -241,7 +237,7 @@ def run_checks():
         session.commit()
         print("[5] Notification event created.")
 
-    # 6. Test Idempotency duplicate event rejection
+    # Test Idempotency duplicate event rejection
     with SessionLocal() as session:
         try:
             evt_dup = NotificationEvent(
@@ -256,7 +252,6 @@ def run_checks():
         except (IntegrityError, OperationalError, DBAPIError):
             print("[6] Idempotency confirmed: duplicate (borrowing_id, event_code) rejected.")
 
-    # 7. Notification creation & Email delivery attempt
     with SessionLocal() as session:
         notif = Notification(
             event_id=1,
@@ -284,7 +279,6 @@ def run_checks():
         session.commit()
         print("[7] Notification & NotificationDelivery attempt recorded.")
 
-    # 8. Return & Damage Report
     with SessionLocal() as session:
         ret = Return(
             borrowing_id=1,
@@ -306,7 +300,6 @@ def run_checks():
         session.add(ret_item)
         session.flush()
 
-        # Update Asset DIPINJAM -> RUSAK
         asset = session.get(Asset, 1)
         old_status = asset.status
         asset.status = AssetStatus.RUSAK.value
@@ -334,7 +327,6 @@ def run_checks():
         )
         session.add(damage)
 
-        # Mark borrowing returned if all items returned
         tx = session.get(Borrowing, 1)
         tx.status = BorrowingStatus.DIKEMBALIKAN.value
 
@@ -344,7 +336,7 @@ def run_checks():
         print(f"    - Asset status: {asset.status}")
         print(f"    - Repair cost: Rp {damage.repair_cost:,.2f}")
 
-    # 9. Test ON DELETE RESTRICT on Borrower with transaction history
+    # Test ON DELETE RESTRICT on Borrower with transaction history
     with SessionLocal() as session:
         try:
             b = session.get(Borrower, 1)
@@ -354,7 +346,7 @@ def run_checks():
         except (IntegrityError, OperationalError, DBAPIError):
             print("[9] ON DELETE RESTRICT confirmed: Borrower cannot be deleted while transaction exists.")
 
-    # 10. Test ON DELETE RESTRICT on Asset with transaction history
+    # Test ON DELETE RESTRICT on Asset with transaction history
     with SessionLocal() as session:
         try:
             a = session.get(Asset, 1)
@@ -364,7 +356,6 @@ def run_checks():
         except (IntegrityError, OperationalError, DBAPIError):
             print("[10] ON DELETE RESTRICT confirmed: Asset cannot be deleted while transaction history exists.")
 
-    # 11. System Settings & Auth Tokens
     with SessionLocal() as session:
         setting = SystemSetting(
             key="smtp.host",
@@ -390,7 +381,7 @@ def run_checks():
         session.commit()
         print("[11] SystemSetting, RefreshToken, and Google SSO fields verified.")
 
-    # 12. Final verification of all 23 application domain tables
+    # Final verification of all 23 application domain tables
     with SessionLocal() as session:
         counts = {}
         for table in Base.metadata.sorted_tables:

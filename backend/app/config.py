@@ -9,12 +9,10 @@ load_dotenv(backend_dir / ".env")
 
 
 class Config:
-    # App
     APP_ENV: str = os.getenv("APP_ENV", "development")
     DEBUG: bool = os.getenv("APP_DEBUG", "true").lower() in ("true", "1", "yes")
     SECRET_KEY: str = os.getenv("SECRET_KEY", "siipb-super-secret-dev-key-change-in-production")
 
-    # Database (MariaDB 13 existing)
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL",
         "mariadb+pymysql://root:123@127.0.0.1:3306/siipb?charset=utf8mb4",
@@ -28,10 +26,8 @@ class Config:
         "max_overflow": 20,
     }
 
-    # Redis
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
 
-    # Celery
     CELERY_BROKER_URL: str = os.getenv("CELERY_BROKER_URL", REDIS_URL)
     CELERY_RESULT_BACKEND: str = os.getenv("CELERY_RESULT_BACKEND", REDIS_URL)
     CELERY_TIMEZONE: str = os.getenv("CELERY_TIMEZONE", "Asia/Jakarta")
@@ -40,7 +36,6 @@ class Config:
         "NOTIFICATION_DISPATCH", "celery" if os.getenv("APP_ENV", "development") == "production" else "sync"
     ).lower()
 
-    # JWT
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", SECRET_KEY)
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TTL_MINUTES: int = int(os.getenv("JWT_ACCESS_TTL_MINUTES", "60"))
@@ -50,7 +45,6 @@ class Config:
     GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
     GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
 
-    # SMTP (Email notification)
     SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
     SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
     SMTP_USERNAME: str = os.getenv("SMTP_USERNAME", "")
@@ -59,7 +53,6 @@ class Config:
     SMTP_SENDER_EMAIL: str = os.getenv("SMTP_SENDER_EMAIL", "no-reply@siipb.sch.id")
     SMTP_SENDER_NAME: str = os.getenv("SMTP_SENDER_NAME", "SIIPB Sarpras IT")
 
-    # S3 / MinIO Object Storage
     S3_ENDPOINT: str = os.getenv("S3_ENDPOINT", "http://127.0.0.1:9000")
     S3_ACCESS_KEY: str = os.getenv("S3_ACCESS_KEY", "minioadmin")
     S3_SECRET_KEY: str = os.getenv("S3_SECRET_KEY", "minioadmin")
@@ -74,7 +67,6 @@ class Config:
     # URL frontend untuk redirect setelah login SSO.
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
-    # Pagination Defaults
     DEFAULT_PAGE: int = 1
     DEFAULT_PER_PAGE: int = 20
     MAX_PER_PAGE: int = 100

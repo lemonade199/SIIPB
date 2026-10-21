@@ -1,10 +1,8 @@
-# ========================================================
 # SIIPB Worker — Celery worker & beat (email SMTP, jatuh tempo, backup)
 # Basis sama dengan API (kode & dependensi identik), tetapi tanpa Gunicorn/port 5000
 # dan dengan healthcheck yang memeriksa proses Celery, bukan HTTP.
 #   worker: CMD bawaan
 #   beat  : command: ["celery", "-A", "celery_app.celery", "beat", "--loglevel=info", "--schedule=/tmp/celerybeat-schedule"]
-# ========================================================
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

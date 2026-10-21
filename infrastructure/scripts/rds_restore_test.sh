@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Simulasi restore AWS RDS MariaDB dari automated backup (point-in-time, waktu terakhir yang bisa dipulihkan).
-#   1. restore ke instans BARU <sumber>-restore-test-<waktu> (instans produksi tidak disentuh)
-#   2. bandingkan jumlah baris tabel inti sumber vs hasil restore (query dijalankan di EC2 —
-#      satu-satunya host yang boleh mengakses RDS)
-#   3. hapus instans uji (KEEP=1 untuk menyimpannya)
+# Restore ke instans BARU <sumber>-restore-test-<waktu> (instans produksi tidak disentuh)
+# Bandingkan jumlah baris tabel inti sumber vs hasil restore (query dijalankan di EC2 —
+#   satu-satunya host yang boleh mengakses RDS)
+# Hapus instans uji (KEEP=1 untuk menyimpannya)
 #
 # Dijalankan dari mesin admin (butuh: aws cli + kredensial admin, jq, ssh ke EC2), setelah ada >= 1 backup harian:
 #   ./infrastructure/scripts/rds_restore_test.sh

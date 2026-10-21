@@ -5,9 +5,6 @@ from scripts.build_complete_docx import (
 )
 
 def build_section_11_to_15(doc):
-    # ========================================================
-    # BAGIAN 11 — BUSINESS LOGIC
-    # ========================================================
     add_header_styled(doc, "BAGIAN 11 — BUSINESS LOGIC (LOGIKA BISNIS UTAMA)", level=1)
     
     add_header_styled(doc, "1. Pencegahan Peminjaman Ganda (Row-Level Locking)", level=2)
@@ -41,9 +38,6 @@ def build_section_11_to_15(doc):
     add_header_styled(doc, "3. Notifikasi Idempoten (Pencegahan Email Spam)", level=2)
     add_p(doc, "Sebelum mengirim email, sistem membuat event di tabel notification_events dengan batasan UNIQUE(borrowing_id, event_code). Jika cron job scheduler berjalan dua kali dalam satu menit, event kedua diabaikan sehingga peminjam tidak akan pernah menerima email ganda untuk kejadian yang sama.")
 
-    # ========================================================
-    # BAGIAN 12 — CRUD
-    # ========================================================
     add_header_styled(doc, "BAGIAN 12 — CRUD (CREATE, READ, UPDATE, DELETE)", level=1)
     add_p(doc, "Berikut adalah ringkasan siklus CRUD pada entitas utama sistem:")
 
@@ -61,9 +55,6 @@ def build_section_11_to_15(doc):
         [Inches(1.5), Inches(1.5), Inches(1.5), Inches(1.3), Inches(1.4)]
     )
 
-    # ========================================================
-    # BAGIAN 13 — ALUR FITUR UTAMA
-    # ========================================================
     add_header_styled(doc, "BAGIAN 13 — ALUR FITUR UTAMA (END-TO-END FLOW)", level=1)
 
     add_header_styled(doc, "Fitur 1: Pencatatan Peminjaman Barang (Checkout)", level=2)
@@ -89,9 +80,6 @@ def build_section_11_to_15(doc):
     add_p(doc, "5. H-0: Mengirim email bahwa hari ini batas akhir pengembalian.")
     add_p(doc, "6. Lewat Jatuh Tempo: Status transaksi diubah menjadi 'TERLAMBAT'. Notifikasi eskalasi dikirim pada H+1 ke peminjam, H+3 ke petugas, dan H+7 ke pimpinan unit.")
 
-    # ========================================================
-    # BAGIAN 14 — CONTOH DATA DUMMY
-    # ========================================================
     add_header_styled(doc, "BAGIAN 14 — CONTOH DATA DUMMY", level=1)
     add_p(doc, "Berikut adalah visualisasi contoh data konkret yang tersimpan di dalam database untuk memudahkan pemahaman relasi:")
 
@@ -140,9 +128,6 @@ def build_section_11_to_15(doc):
         [Inches(0.6), Inches(2.2), Inches(1.4), Inches(1.2), Inches(1.1), Inches(1.0)]
     )
 
-    # ========================================================
-    # BAGIAN 15 — ERROR HANDLING
-    # ========================================================
     add_header_styled(doc, "BAGIAN 15 — ERROR HANDLING & STATUS CODES", level=1)
     add_p(doc, "Backend SIIPB menerapkan standardisasi error handling JSON yang konsisten di semua rute:")
 

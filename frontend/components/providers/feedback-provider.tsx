@@ -6,7 +6,6 @@ import { Modal } from '@/components/ui/dialog';
 import { TextareaField } from '@/components/ui/form';
 import { Icon } from '@/components/ui/icon';
 
-/* ================= Toast ================= */
 export type ToastType = 'ok' | 'warn' | 'err';
 interface ToastItem {
   id: number;
@@ -15,7 +14,6 @@ interface ToastItem {
   leaving?: boolean;
 }
 
-/* ================= Confirm ================= */
 export interface ConfirmOptions {
   title: ReactNode;
   message?: ReactNode;

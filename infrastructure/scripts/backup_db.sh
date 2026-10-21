@@ -13,5 +13,4 @@ docker compose exec -T -e MYSQL_PWD="$DB_PASSWORD" mariadb \
   mariadb-dump -u "${DB_USER:-siipb}" --single-transaction --quick --no-tablespaces --routines --triggers "${DB_NAME:-siipb}" \
   | gzip > "$FILE"
 echo "Backup: $FILE ($(du -h "$FILE" | cut -f1))"
-# retensi
 find "$OUT" -name 'siipb-*.sql.gz' -mtime +"${RETENTION_DAYS:-14}" -delete

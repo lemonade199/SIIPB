@@ -1,4 +1,3 @@
-# ==========================================================================
 # SIIPB — arsitektur production (dokumen Plan §9 & §23)
 # Pengguna → Nginx → Next.js (frontend) / Flask REST API → MariaDB
 # Flask ↔ Redis; Celery Worker (email SMTP) & Celery Beat (jatuh tempo, backup)
@@ -7,7 +6,6 @@
 #   cp .env.example .env    # isi rahasia (WAJIB diganti)
 #   docker compose up -d --build
 #   buka http://localhost   (Swagger: http://localhost/api/docs)
-# ==========================================================================
 
 x-backend-env: &backend-env
   APP_ENV: production

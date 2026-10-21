@@ -5,7 +5,6 @@ import { Checkbox as CheckboxPrimitive, Switch as SwitchPrimitive } from 'radix-
 import type { ComponentProps } from 'react';
 import { cn } from '@/lib/utils';
 
-/** shadcn/ui Checkbox (Radix). */
 export function Checkbox({ className, ...props }: ComponentProps<typeof CheckboxPrimitive.Root>) {
   return (
     <CheckboxPrimitive.Root
@@ -23,7 +22,6 @@ export function Checkbox({ className, ...props }: ComponentProps<typeof Checkbox
   );
 }
 
-/** shadcn/ui Switch (Radix). */
 export function Switch({ className, ...props }: ComponentProps<typeof SwitchPrimitive.Root>) {
   return (
     <SwitchPrimitive.Root

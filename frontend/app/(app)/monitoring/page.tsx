@@ -139,14 +139,13 @@ export default function MonitoringPage() {
         }
       />
       <div className="grid g-4 mb-[18px]">
-        <StatTile label="Transaksi aktif" value={s.active.length} sub={`${s.byStatus.DIPINJAM} barang di luar`} icon="out" tone="info" />
-        <StatTile label="Jatuh tempo ≤ 3 hari" value={s.due.length} sub="Pengingat H-3/H-1/H" icon="clock" tone="warn" />
-        <StatTile label="Terlambat" value={s.late.length} sub="Eskalasi H+3 ke petugas, H+7 ke pimpinan" icon="alert" tone="late" />
+        <StatTile label="Transaksi aktif" value={s.active.length} icon="out" tone="info" />
+        <StatTile label="Jatuh tempo ≤ 3 hari" value={s.due.length} icon="clock" tone="warn" />
+        <StatTile label="Terlambat" value={s.late.length} icon="alert" tone="late" />
         <StatTile
           label="Pemeriksaan terakhir"
           value={run ? fmtDateTime(run.at) : '—'}
           valueStyle={{ fontSize: 20 }}
-          sub={run ? run.trigger : 'Belum dijalankan'}
           icon="refresh"
           tone="gray"
         />
@@ -287,7 +286,6 @@ function BrokenItems({ q, category, onQ, onCategory }: { q: string; category: st
       <div className="toolbar">
         <SearchInput value={q} onChange={onQ} placeholder="Cari kode, nama, merek…" label="Cari barang" />
         <Select aria-label="Kategori barang" value={category} onChange={(e) => onCategory(e.target.value)} options={toOptions(db.all('categories'), 'Semua kategori')} />
-        <span className="small muted">Barang dengan status ini tidak dapat dipinjam sampai statusnya dipulihkan.</span>
       </div>
       <TableWrap>
         <table className="table">

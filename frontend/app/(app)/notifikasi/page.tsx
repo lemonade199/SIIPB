@@ -54,7 +54,7 @@ export default function NotifikasiPage() {
     <>
       <PageHead
         crumb="Beranda / Notifikasi"
-        title="Notifikasi Otomatis"
+        title="Notifikasi"
         actions={
           <>
             {can('settings.manage') && (
@@ -85,7 +85,6 @@ export default function NotifikasiPage() {
                 </span>
                 <Badge status={r.active ? 'AKTIF' : 'NONAKTIF'} />
               </div>
-              <div className="strong">{r.desc}</div>
             </div>
           ))}
         </div>

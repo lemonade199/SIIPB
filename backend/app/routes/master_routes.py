@@ -105,7 +105,7 @@ for _path, (_kind, _schema, _ser, _label) in RESOURCES.items():
     _register(_path, _kind, _schema, _ser, _label)
 
 
-# ---- Peminjam (TANPA AKUN) ----
+# Peminjam tidak memiliki akun login
 @master_bp.get("/borrowers")
 @jwt_required
 def list_borrowers():

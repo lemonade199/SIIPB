@@ -4,7 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/mock/db';
-import { fmtDate, fmtDateTime, nowISO, parseDate, toDateStr, today } from '@/lib/date';
+import { fmtDate, fmtDateTime, nowISO, today } from '@/lib/date';
 import { ITEM_STATUS, REPORTS } from '@/lib/constants';
 import { exportPdf, exportXlsx } from '@/lib/export';
 import { rupiah } from '@/lib/utils';
@@ -21,15 +21,8 @@ import { cat, loc, unit, userName } from '@/services/lookup';
 import { buildReport, logReport, type ReportColumn } from '@/services/report';
 import * as repo from '@/services/repo';
 import { isApiMode } from '@/lib/config';
-import type { ReportFilters, ReportType } from '@/types';
+import type { ID, ReportFilters, ReportType } from '@/types';
 import { TableWrap } from '@/components/ui/table-wrap';
-
-function defaultFrom() {
-  const d = parseDate(today());
-  d.setMonth(d.getMonth() - 2);
-  d.setDate(1);
-  return toDateStr(d);
-}
 
 
 /** Kolom pendek (kode, tanggal, angka) tidak dipecah ke baris baru; kolom teks panjang dibatasi 2 baris. */
@@ -42,7 +35,7 @@ export default function LaporanPage() {
   const params = useSearchParams();
   const [f, setF] = usePersistentState<ReportFilters>('rp.filter', {
     type: 'peminjaman',
-    from: defaultFrom(),
+    from: '',
     to: '',
     unit_id: '',
     category_id: '',
@@ -62,7 +55,11 @@ export default function LaporanPage() {
   const rep = buildReport(f.type, f);
   const meta = REPORTS[f.type];
   const posisi = f.type === 'inventaris' || f.type === 'kerusakan';
-  const periodText = posisi ? `Posisi per ${fmtDate(today(), true)}` : `Periode ${f.from ? fmtDate(f.from) : 'awal'} s.d. ${f.to ? fmtDate(f.to) : 'sekarang'}`;
+  const periodText = posisi
+    ? `Posisi per ${fmtDate(today(), true)}`
+    : !f.from && !f.to
+      ? 'Semua periode'
+      : `Periode ${f.from ? fmtDate(f.from) : 'awal'} s.d. ${f.to ? fmtDate(f.to) : 'sekarang'}`;
   const filt = [
     f.unit_id ? `Unit: ${unit(Number(f.unit_id))?.name}` : '',
     f.category_id ? `Kategori: ${cat(Number(f.category_id))?.name}` : '',
@@ -71,7 +68,22 @@ export default function LaporanPage() {
   ]
     .filter(Boolean)
     .join(' · ');
-  const hist = db.all('reports_generated').slice(-6).reverse();
+  // Mode api: riwayat diambil dari audit log server (unduhan PDF/Excel tercatat di sana);
+  // tanpa izin audit, dipakai catatan sesi di browser.
+  const hist: { id: ID; type: ReportType; format: string; rows: number; user_id: ID; at: string }[] =
+    isApiMode && can('audit.view')
+      ? db
+          .all('activity_logs')
+          .filter((a) => a.action === 'report.export')
+          .sort((a, b) => b.at.localeCompare(a.at))
+          .map((a) => {
+            const v = (a.new_value || {}) as { type?: string; format?: string; rows?: number };
+            const format = v.format === 'pdf' ? 'PDF' : v.format === 'xlsx' ? 'Excel' : String(v.format || '');
+            return { id: a.id, type: v.type as ReportType, format, rows: Number(v.rows || 0), user_id: a.user_id, at: a.at };
+          })
+          .filter((h) => h.type in REPORTS)
+          .slice(0, 6)
+      : db.all('reports_generated').slice(-6).reverse();
   const s = db.data.settings;
 
   const cell = (c: ReportColumn, v: string | number | undefined) => {
@@ -126,7 +138,7 @@ export default function LaporanPage() {
     <>
       <div className="no-print">
         <PageHead crumb="Beranda / Laporan" title="Laporan" />
-        <div className="grid g-auto mb-[18px]">
+        <div className="report-types mb-[18px]">
           {(Object.keys(REPORTS) as ReportType[]).map((k) => {
             const r = REPORTS[k];
             const on = f.type === k;
@@ -139,8 +151,8 @@ export default function LaporanPage() {
                 onClick={() => set('type', k)}
                 style={{ textAlign: 'left', font: 'inherit', color: 'inherit', borderColor: on ? 'var(--primary)' : undefined, background: on ? 'var(--primary-soft)' : undefined }}
               >
-                <StatIcon icon={r.icon} tone="primary" size={18} />
-                <span className="strong" style={{ fontSize: 15 }}>
+                <StatIcon icon={r.icon} tone="primary" size={16} />
+                <span className="strong" style={{ fontSize: 14 }}>
                   {r.label}
                 </span>
               </button>
@@ -150,29 +162,41 @@ export default function LaporanPage() {
       </div>
       <div className="split report-split">
         <section className="card">
-          <div className="toolbar no-print">
+          <div className="report-filters no-print">
             {!posisi && (
-              <span className="row" style={{ gap: 8 }}>
-                <label className="small muted" htmlFor="rp-from">
-                  Dari
+              <>
+                <label className="rf">
+                  <span>Dari tanggal</span>
+                  <Input type="date" value={f.from} onChange={(e) => set('from', e.target.value)} />
                 </label>
-                <Input type="date" id="rp-from" value={f.from} onChange={(e) => set('from', e.target.value)} />
-                <label className="small muted" htmlFor="rp-to">
-                  s.d.
+                <label className="rf">
+                  <span>Sampai tanggal</span>
+                  <Input type="date" value={f.to} onChange={(e) => set('to', e.target.value)} />
                 </label>
-                <Input type="date" id="rp-to" value={f.to} onChange={(e) => set('to', e.target.value)} />
-              </span>
+              </>
             )}
-            <Select aria-label="Unit kerja" value={f.unit_id} onChange={(e) => set('unit_id', e.target.value)} options={toOptions(db.all('units'), 'Semua unit kerja')} />
-            <Select aria-label="Kategori" value={f.category_id} onChange={(e) => set('category_id', e.target.value)} options={toOptions(db.all('categories'), 'Semua kategori')} />
-            <Select aria-label="Lokasi" value={f.location_id} onChange={(e) => set('location_id', e.target.value)} options={toOptions(db.all('locations'), 'Semua lokasi')} />
+            <label className="rf">
+              <span>Unit kerja</span>
+              <Select className="w-full" value={f.unit_id} onChange={(e) => set('unit_id', e.target.value)} options={toOptions(db.all('units'), 'Semua unit kerja')} />
+            </label>
+            <label className="rf">
+              <span>Kategori</span>
+              <Select className="w-full" value={f.category_id} onChange={(e) => set('category_id', e.target.value)} options={toOptions(db.all('categories'), 'Semua kategori')} />
+            </label>
+            <label className="rf">
+              <span>Lokasi</span>
+              <Select className="w-full" value={f.location_id} onChange={(e) => set('location_id', e.target.value)} options={toOptions(db.all('locations'), 'Semua lokasi')} />
+            </label>
             {f.type === 'inventaris' && (
-              <Select
-                aria-label="Status barang"
-                value={f.status}
-                onChange={(e) => set('status', e.target.value)}
-                options={[{ value: '', label: 'Semua status' }, ...ITEM_STATUS.map((x) => ({ value: x, label: x }))]}
-              />
+              <label className="rf">
+                <span>Status barang</span>
+                <Select
+                  className="w-full"
+                  value={f.status}
+                  onChange={(e) => set('status', e.target.value)}
+                  options={[{ value: '', label: 'Semua status' }, ...ITEM_STATUS.map((x) => ({ value: x, label: x }))]}
+                />
+              </label>
             )}
           </div>
           <div className="card-body">
@@ -255,11 +279,6 @@ export default function LaporanPage() {
                 <Button icon="printer" block onClick={doPrint}>
                   Cetak
                 </Button>
-                <p className="small muted">
-                  {isApiMode
-                    ? 'PDF (A4 lanskap, kop & tanda tangan) dibuat server dengan WeasyPrint dan Excel (.xlsx, filter & format Rupiah) dengan openpyxl; setiap unduhan tercatat di audit log.'
-                    : 'PDF (A4 lanskap, dengan kop & kolom tanda tangan) dan Excel (.xlsx, dengan filter & format Rupiah) dibuat langsung di browser (mode demo).'}
-                </p>
               </div>
             ) : (
               <p className="small muted">Peran Anda hanya dapat melihat laporan.</p>

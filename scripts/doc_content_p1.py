@@ -36,9 +36,6 @@ TABLE_DESCRIPTIONS = {
 }
 
 def build_section_1_to_5(doc):
-    # ========================================================
-    # COVER PAGE
-    # ========================================================
     p_title = doc.add_paragraph()
     p_title.paragraph_format.space_before = Pt(36)
     p_title.paragraph_format.space_after = Pt(8)
@@ -71,9 +68,6 @@ def build_section_1_to_5(doc):
 
     doc.add_page_break()
 
-    # ========================================================
-    # DAFTAR ISI RINGKAS
-    # ========================================================
     add_header_styled(doc, "DAFTAR ISI DOKUMEN", level=1)
     toc_items = [
         ["BAGIAN 1", "Gambaran Besar Project (Tujuan, Masalah, & Teknologi)"],
@@ -101,9 +95,6 @@ def build_section_1_to_5(doc):
 
     doc.add_page_break()
 
-    # ========================================================
-    # BAGIAN 1 — GAMBARAN BESAR PROJECT
-    # ========================================================
     add_header_styled(doc, "BAGIAN 1 — GAMBARAN BESAR PROJECT", level=1)
     add_p(doc, "SIIPB (Sistem Informasi Inventaris Barang, Peminjaman, dan Pengembalian Barang)", bold_prefix="Nama Project: ")
     add_p(doc, "Sistem informasi terintegrasi untuk membantu petugas Sarpras/IT dalam melakukan pencatatan inventaris barang, sirkulasi peminjaman, verifikasi pengembalian, pemantauan batas jatuh tempo, otomasi notifikasi email, audit trail pergerakan aset, dan pelaporan eksekutif.", bold_prefix="Tujuan Project: ")
@@ -152,9 +143,6 @@ def build_section_1_to_5(doc):
     )
     add_code_block(doc, flow_text)
 
-    # ========================================================
-    # BAGIAN 2 — STRUKTUR FOLDER BACKEND
-    # ========================================================
     add_header_styled(doc, "BAGIAN 2 — STRUKTUR FOLDER BACKEND", level=1)
     add_p(doc, "Struktur folder backend dirancang modular di dalam direktori backend/app/ untuk memastikan skalabilitas, kemudahan pemeliharaan, dan pemisahan logika:")
 
@@ -176,9 +164,6 @@ def build_section_1_to_5(doc):
     ]
     create_table_from_rows(doc, ["Folder / Berkas", "Fungsi", "Pentingnya bagi Sistem"], folder_rows, [2.0, 1.8, 2.7])
 
-    # ========================================================
-    # BAGIAN 3 — DATABASE
-    # ========================================================
     add_header_styled(doc, "BAGIAN 3 — DATABASE", level=1)
     add_p(doc, "Backend SIIPB dibangun di atas basis data existing yang telah disediakan pada berkas database/SIIPB.sql. Sistem tidak merancang ulang skema atau membuat database baru dari nol, melainkan menyesuaikan ORM dan service layer agar selaras sempurna dengan struktur yang ada.")
 
@@ -203,9 +188,6 @@ def build_section_1_to_5(doc):
         title="KEAMANAN KREDENSIAL"
     )
 
-    # ========================================================
-    # BAGIAN 4 — DAFTAR SEMUA TABEL
-    # ========================================================
     add_header_styled(doc, "BAGIAN 4 — DAFTAR SEMUA TABEL (KAMUS DATA LENGKAP)", level=1)
     add_p(doc, "Database SIIPB memiliki total 27 tabel fisik yang diekstraksi langsung dari MariaDB information_schema dan database/SIIPB.sql. Berikut adalah rincian struktur kolom, tipe data, indeks, default value, dan fungsi dari masing-masing tabel:")
 
@@ -216,7 +198,6 @@ def build_section_1_to_5(doc):
         add_header_styled(doc, f"4.{table_index} Tabel: {tname}", level=2)
         add_p(doc, desc, bold_prefix="Fungsi Tabel: ")
 
-        # Foreign keys summary
         fks = tinfo["foreign_keys"]
         if fks:
             fk_str = ", ".join([f"{fk[0]} -> {fk[1]}({fk[2]})" for fk in fks])
@@ -255,9 +236,6 @@ def build_section_1_to_5(doc):
         )
         table_index += 1
 
-    # ========================================================
-    # BAGIAN 5 — RELASI DATABASE
-    # ========================================================
     add_header_styled(doc, "BAGIAN 5 — RELASI DATABASE & ERD", level=1)
     add_p(doc, "Seluruh tabel dihubungkan oleh relasi relasional ketat menggunakan batasan Foreign Key dengan aturan aksi ON DELETE RESTRICT (untuk data transaksi berharga) atau ON DELETE CASCADE (untuk relasi pivot dan token):")
 

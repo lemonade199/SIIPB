@@ -75,7 +75,6 @@ export const isDueSoon = (b: Borrowing, today = todayStr()) => {
   return n >= 0 && n <= 3;
 };
 
-/* ---------- Parameter status & kondisi (master data) ---------- */
 export const conditionLabel = (c: Condition | null | undefined) => (c ? db.data.settings.parameters?.condition[c]?.label || c : '—');
 export const statusLabel = (s: ItemStatus) => db.data.settings.parameters?.item_status[s]?.label || s;
 export const statusDesc = (s: ItemStatus) => db.data.settings.parameters?.item_status[s]?.desc || '';

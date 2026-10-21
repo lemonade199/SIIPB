@@ -42,7 +42,6 @@ export default function DashboardPage() {
   const need = [...st.late, ...st.due].sort((a, b) => a.due_date.localeCompare(b.due_date));
   const maxM = Math.max(1, ...st.months.map((m) => m.count));
   const run = lastSchedulerRun();
-  const sc = db.data.settings.scheduler;
   const acts = db.all('activity_logs').slice(-6).reverse();
 
   const onRun = async () => {
@@ -81,19 +80,18 @@ export default function DashboardPage() {
 
 
       <div className="grid mb-[18px]" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))' }}>
-        <StatTile label="Total barang aktif" value={num(st.total)} sub="Seluruh inventaris" icon="box" tone="primary" href="/inventaris" />
-        <StatTile label="Tersedia" value={num(st.byStatus.TERSEDIA)} sub="Siap dipinjam" icon="checkCircle" tone="ok" href="/inventaris?status=TERSEDIA" />
+        <StatTile label="Total barang aktif" value={num(st.total)} icon="box" tone="primary" href="/inventaris" />
+        <StatTile label="Tersedia" value={num(st.byStatus.TERSEDIA)} icon="checkCircle" tone="ok" href="/inventaris?status=TERSEDIA" />
         <StatTile
           label="Sedang dipinjam"
           value={num(st.active.length)}
-          sub={`${st.byStatus.DIPINJAM} barang dalam ${st.active.length} transaksi`}
           icon="out"
           tone="info"
           href="/monitoring"
         />
-        <StatTile label="Jatuh tempo ≤ 3 hari" value={num(st.due.length)} sub="H-3 sampai hari ini" icon="clock" tone="warn" href="/monitoring?tab=jatuh_tempo" />
-        <StatTile label="Terlambat" value={num(st.late.length)} sub="Melewati batas kembali" icon="alert" tone="late" href="/monitoring?tab=terlambat" />
-        <StatTile label="Rusak / perbaikan / hilang" value={num(broken)} sub="Tidak dapat dipinjam" icon="wrench" tone="purple" href="/laporan?type=kerusakan" />
+        <StatTile label="Jatuh tempo ≤ 3 hari" value={num(st.due.length)} icon="clock" tone="warn" href="/monitoring?tab=jatuh_tempo" />
+        <StatTile label="Terlambat" value={num(st.late.length)} icon="alert" tone="late" href="/monitoring?tab=terlambat" />
+        <StatTile label="Rusak / perbaikan / hilang" value={num(broken)} icon="wrench" tone="purple" href="/laporan?type=kerusakan" />
       </div>
 
       <div className="split">
@@ -209,15 +207,6 @@ export default function DashboardPage() {
             ) : (
               <p className="muted">Belum pernah dijalankan.</p>
             )}
-            <p className="small muted" style={{ marginTop: 10 }}>
-              {CAPABILITIES.scheduler ? (
-                <>
-                  Celery Beat memeriksa setiap hari pukul <b>{sc.time}</b> ({sc.timezone}).
-                </>
-              ) : (
-                <>Pemeriksaan keterlambatan dijalankan oleh Celery Beat di server.</>
-              )}
-            </p>
           </Card>
 
           {st.drafts.length > 0 && (

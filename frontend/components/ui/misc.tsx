@@ -1,13 +1,12 @@
 'use client';
 
-import type { CSSProperties, ReactNode } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import { cn, initials, type Page } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { Input } from '@/components/ui/input';
 import type { Item } from '@/types';
 
-/* ---------- Alert ---------- */
 export type AlertType = 'info' | 'warn' | 'danger' | 'ok';
 const ALERT_ICON: Record<AlertType, IconName> = { info: 'info', warn: 'alert', danger: 'alert', ok: 'checkCircle' };
 export function Alert({ type = 'info', icon, children, className }: { type?: AlertType; icon?: IconName; children: ReactNode; className?: string }) {
@@ -19,7 +18,6 @@ export function Alert({ type = 'info', icon, children, className }: { type?: Ale
   );
 }
 
-/* ---------- Empty state ---------- */
 export function Empty({ icon = 'search', children, className }: { icon?: IconName; children: ReactNode; className?: string }) {
   return (
     <div className={cn('empty', className)}>
@@ -29,7 +27,6 @@ export function Empty({ icon = 'search', children, className }: { icon?: IconNam
   );
 }
 
-/* ---------- Key/value ---------- */
 export function KV({ items, one }: { items: [string, ReactNode][]; one?: boolean }) {
   return (
     <dl className={cn('kv', one && 'one')}>
@@ -43,7 +40,6 @@ export function KV({ items, one }: { items: [string, ReactNode][]; one?: boolean
   );
 }
 
-/* ---------- Avatar & thumbnail ---------- */
 export function Avatar({ name, dark }: { name?: string | null; dark?: boolean }) {
   return (
     <span className={cn('avatar', dark && 'dark')} aria-hidden="true">
@@ -52,32 +48,40 @@ export function Avatar({ name, dark }: { name?: string | null; dark?: boolean })
   );
 }
 
+/** Foto yang gagal dimuat (berkas hilang di server) diganti placeholder, bukan ikon gambar rusak. */
+function useBroken(src?: string | null) {
+  const [broken, setBroken] = useState<string | null>(null);
+  return { ok: !!src && broken !== src, onError: () => setBroken(src ?? null), missing: !!src && broken === src };
+}
+
 export function Thumb({ item }: { item?: Item | null }) {
+  const src = item?.photos?.[0];
+  const img = useBroken(src);
   return (
     <span className="thumb">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      {item?.photos?.[0] ? <img src={item.photos[0]} alt="" /> : <Icon name="image" />}
+      {img.ok ? <img src={src} alt="" onError={img.onError} /> : <Icon name="image" />}
     </span>
   );
 }
 
 export function Photo({ src, alt, style }: { src?: string | null; alt: string; style?: CSSProperties }) {
+  const img = useBroken(src);
   return (
     <div className="photo" style={style}>
-      {src ? (
+      {img.ok ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt={alt} />
+        <img src={src!} alt={alt} onError={img.onError} />
       ) : (
         <div className="center small">
           <Icon name="image" size={30} className="mx-auto" />
-          Belum ada foto
+          {img.missing ? 'Foto tidak ditemukan' : 'Belum ada foto'}
         </div>
       )}
     </div>
   );
 }
 
-/* ---------- Pagination ---------- */
 export function Pager<T>({ page, label = 'data', onPage }: { page: Page<T>; label?: string; onPage: (p: number) => void }) {
   return (
     <div className="pager">
@@ -99,10 +103,8 @@ export function Pager<T>({ page, label = 'data', onPage }: { page: Page<T>; labe
   );
 }
 
-/* ---------- Tabs (shadcn/Radix) ---------- */
 export { Tabs, type TabDef } from '@/components/ui/tabs';
 
-/* ---------- Toolbar search ---------- */
 export function SearchInput({ value, onChange, placeholder, label, autoFocus }: { value: string; onChange: (v: string) => void; placeholder: string; label?: string; autoFocus?: boolean }) {
   return (
     <div className="grow">
@@ -112,7 +114,6 @@ export function SearchInput({ value, onChange, placeholder, label, autoFocus }: 
   );
 }
 
-/* ---------- Page header ---------- */
 export function PageHead({ title, desc, actions, crumb, className }: { title: ReactNode; desc?: ReactNode; actions?: ReactNode; crumb?: ReactNode; className?: string }) {
   return (
     <div className={cn('page-head', className)}>

@@ -48,7 +48,6 @@ class User(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
     )
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime6)
 
-    # Integrated Google OAuth / OIDC Identity
     google_subject: Mapped[str | None] = mapped_column(String(255), unique=True, index=True)
     google_email: Mapped[str | None] = mapped_column(String(255))
     google_linked_at: Mapped[datetime | None] = mapped_column(DateTime6)

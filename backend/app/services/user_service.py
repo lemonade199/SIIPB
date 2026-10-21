@@ -23,7 +23,6 @@ class UserError(ValueError):
         self.status = status
 
 
-# ---------------------------------------------------------------- serializers
 def serialize_user(u: User) -> dict[str, Any]:
     roles = [r for r in u.roles]
     return {
@@ -64,7 +63,6 @@ def list_permissions(session: Session | None = None) -> list[dict[str, Any]]:
     return get_all_permissions()
 
 
-# ---------------------------------------------------------------- users
 def list_users(session: Session, search: str | None = None, include_inactive: bool = True) -> list[User]:
     q = select(User).where(User.deleted_at.is_(None))
     if not include_inactive:
@@ -223,7 +221,6 @@ def delete_user(session: Session, user_id: int, actor_id: int) -> None:
     session.commit()
 
 
-# ---------------------------------------------------------------- roles
 def validate_permission_codes(codes: list[str]) -> list[str]:
     clean_codes = list(dict.fromkeys(codes))
     unknown = set(clean_codes) - ALL_PERMISSION_CODES

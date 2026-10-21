@@ -82,7 +82,6 @@ test('admin: pengguna, role, pengaturan, scheduler, laporan, audit', async ({ pa
   const errors = trackErrors(page);
   await login(page, 'admin', 'admin123');
 
-  // pengguna baru
   await page.goto('/pengguna');
   await page.getByRole('button', { name: 'Tambah pengguna' }).click();
   const dlg = page.getByRole('dialog');
@@ -93,7 +92,6 @@ test('admin: pengguna, role, pengaturan, scheduler, laporan, audit', async ({ pa
   await dlg.getByRole('button', { name: 'Simpan' }).click();
   await expect(page.getByText(`Staf E2E ${stamp}`)).toBeVisible({ timeout: 15_000 });
 
-  // pengaturan umum
   await page.goto('/pengaturan?tab=umum');
   await page.getByLabel('Nama instansi').fill(`Instansi E2E ${stamp}`);
   await page.getByRole('button', { name: 'Simpan' }).click();
@@ -101,19 +99,16 @@ test('admin: pengguna, role, pengaturan, scheduler, laporan, audit', async ({ pa
   await page.reload();
   await expect(page.getByLabel('Nama instansi')).toHaveValue(`Instansi E2E ${stamp}`, { timeout: 15_000 });
 
-  // scheduler manual
   await page.goto('/notifikasi');
   await page.getByRole('button', { name: /Jalankan/ }).first().click();
   await expect(page.locator('.toast').last()).toContainText('Pemeriksaan selesai', { timeout: 15_000 });
 
-  // laporan PDF & Excel dari server
   await page.goto('/laporan?type=inventaris');
   const [pdf] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: /Unduh PDF/ }).click()]);
   expect(pdf.suggestedFilename()).toMatch(/^laporan-inventaris-.*\.pdf$/);
   const [xlsx] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: /Unduh Excel/ }).click()]);
   expect(xlsx.suggestedFilename()).toMatch(/\.xlsx$/);
 
-  // audit log memuat aktivitas
   await page.goto('/audit');
   await expect(page.locator('tbody tr').first()).toBeVisible();
 

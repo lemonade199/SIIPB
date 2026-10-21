@@ -99,7 +99,6 @@ function SaveBtn() {
   );
 }
 
-/* ---------- Umum ---------- */
 function Umum({ s }: { s: Settings }) {
   const toast = useToast();
   const [v, setV] = useState({ institution: s.institution, unit_sarpras: s.unit_sarpras, staff_email: s.staff_email, staff_phone: s.staff_phone, return_location: s.return_location });
@@ -118,24 +117,24 @@ function Umum({ s }: { s: Settings }) {
           toast(r.ok ? 'Pengaturan umum disimpan.' : r.error, r.ok ? 'ok' : 'err');
         }}
       >
-        <TextField label="Nama instansi" required value={v.institution} error={err} onChange={set('institution')} />
-        <TextField label="Nama unit pengelola" value={v.unit_sarpras} onChange={set('unit_sarpras')} />
-        <TextField label="Email petugas Sarpras/IT" type="email" value={v.staff_email} onChange={set('staff_email')} />
-        <TextField label="Telepon / ext. petugas" value={v.staff_phone} onChange={set('staff_phone')} />
-        <TextField label="Tempat pengembalian barang" full value={v.return_location} onChange={set('return_location')} />
+        <TextField placeholder="mis. SMA Negeri 1 Contoh" label="Nama instansi" required value={v.institution} error={err} onChange={set('institution')} />
+        <TextField placeholder="mis. Bagian Sarana & Prasarana / IT" label="Nama unit pengelola" value={v.unit_sarpras} onChange={set('unit_sarpras')} />
+        <TextField placeholder="mis. sarpras@instansi.go.id" label="Email petugas Sarpras/IT" type="email" value={v.staff_email} onChange={set('staff_email')} />
+        <TextField placeholder="mis. 0812-3456-7890 / ext. 1020" label="Telepon / ext. petugas" value={v.staff_phone} onChange={set('staff_phone')} />
+        <TextField placeholder="mis. Ruang Sarpras, Gedung A Lt. 1" label="Tempat pengembalian barang" full value={v.return_location} onChange={set('return_location')} />
         <SaveBtn />
       </form>
     </Card>
   );
 }
 
-/* ---------- SMTP ---------- */
 function Smtp({ s }: { s: Settings }) {
   const toast = useToast();
   const { user } = useAuth();
   const [v, setV] = useState({ ...s.smtp });
   const [password, setPassword] = useState('');
   const [testing, setTesting] = useState(false);
+  const [testTo, setTestTo] = useState(s.smtp.username.includes('@') ? s.smtp.username : user?.email || '');
   const passwordSet = (s.smtp as Settings['smtp'] & { password_set?: boolean }).password_set;
   return (
     <Card title="Server email (SMTP)">
@@ -151,19 +150,19 @@ function Smtp({ s }: { s: Settings }) {
           toast(r.ok ? 'Pengaturan SMTP disimpan.' : r.error, r.ok ? 'ok' : 'err');
         }}
       >
-        <TextField label="Host" mono value={v.host} hint="Gmail: smtp.gmail.com · port 587 · STARTTLS · kata sandi = App Password" onChange={(e) => setV({ ...v, host: e.target.value })} />
-        <TextField label="Port" type="number" mono value={v.port} onChange={(e) => setV({ ...v, port: Number(e.target.value) })} />
-        <TextField label="Username" mono value={v.username} onChange={(e) => setV({ ...v, username: e.target.value })} />
+        <TextField placeholder="smtp.gmail.com" label="Host" mono value={v.host} hint="Gmail: smtp.gmail.com · port 587 · STARTTLS · kata sandi = App Password" onChange={(e) => setV({ ...v, host: e.target.value })} />
+        <TextField placeholder="587" label="Port" type="number" mono value={v.port} onChange={(e) => setV({ ...v, port: Number(e.target.value) })} />
+        <TextField placeholder="mis. sarpras@gmail.com" label="Username" mono value={v.username} onChange={(e) => setV({ ...v, username: e.target.value })} />
         <SelectField
           label="Enkripsi"
           value={v.encryption}
           onChange={(e) => setV({ ...v, encryption: e.target.value })}
           options={['STARTTLS', 'SSL/TLS', 'Tidak ada'].map((x) => ({ value: x, label: x }))}
         />
-        <TextField label="Nama pengirim" value={v.from_name} onChange={(e) => setV({ ...v, from_name: e.target.value })} />
-        <TextField label="Email pengirim" type="email" value={v.from_email} onChange={(e) => setV({ ...v, from_email: e.target.value })} />
+        <TextField placeholder="mis. SIIPB Sarpras IT" label="Nama pengirim" value={v.from_name} onChange={(e) => setV({ ...v, from_name: e.target.value })} />
+        <TextField placeholder="mis. sarpras@gmail.com" label="Email pengirim" type="email" value={v.from_email} onChange={(e) => setV({ ...v, from_email: e.target.value })} />
         {isApiMode && (
-          <TextField
+          <TextField placeholder="App Password Gmail (16 huruf)"
             label="Kata sandi SMTP"
             type="password"
             autoComplete="new-password"
@@ -172,6 +171,15 @@ function Smtp({ s }: { s: Settings }) {
             onChange={(e) => setPassword(e.target.value)}
           />
         )}
+        <TextField
+          label="Kirim email uji ke"
+          type="email"
+          full
+          value={testTo}
+          placeholder={user?.email}
+          hint="Alamat penerima email uji. Kosongkan untuk mengirim ke email akun Anda."
+          onChange={(e) => setTestTo(e.target.value)}
+        />
         <div className="full row">
           <Button variant="primary" type="submit" icon="check">
             Simpan
@@ -181,9 +189,9 @@ function Smtp({ s }: { s: Settings }) {
             disabled={testing}
             onClick={async () => {
               setTesting(true);
-              const r = await repo.testSmtp();
+              const r = await repo.testSmtp(testTo.trim() || undefined);
               setTesting(false);
-              toast(isApiMode ? r.message : r.ok ? `Email uji terkirim ke ${user?.email} melalui ${s.smtp.host}:${s.smtp.port}.` : 'Email uji gagal: koneksi SMTP ditolak.', r.ok ? 'ok' : 'err');
+              toast(isApiMode ? r.message : r.ok ? `Email uji terkirim ke ${testTo.trim() || user?.email} melalui ${s.smtp.host}:${s.smtp.port}.` : 'Email uji gagal: koneksi SMTP ditolak.', r.ok ? 'ok' : 'err');
             }}
           >
             {testing ? 'Mengirim…' : 'Kirim email uji'}
@@ -194,7 +202,6 @@ function Smtp({ s }: { s: Settings }) {
   );
 }
 
-/* ---------- Aturan notifikasi ---------- */
 function Notifikasi({ s }: { s: Settings }) {
   const toast = useToast();
   const [v, setV] = useState({ time: s.scheduler.time, timezone: s.scheduler.timezone, enabled: s.scheduler.enabled, checkout_notify: s.checkout_notify, return_notify: s.return_notify });
@@ -292,7 +299,6 @@ function Notifikasi({ s }: { s: Settings }) {
   );
 }
 
-/* ---------- Template email ---------- */
 function Templates() {
   const toast = useToast();
   const [edit, setEdit] = useState<{ t: EmailTemplate; subject: string; body: string } | null>(null);
@@ -367,8 +373,8 @@ function Templates() {
       >
         {edit && (
           <div className="stack" style={{ gap: 12 }}>
-            <TextField label="Subjek" required value={edit.subject} error={err} onChange={(e) => setEdit({ ...edit, subject: e.target.value })} />
-            <TextareaField label="Isi email" rows={12} mono value={edit.body} onChange={(e) => setEdit({ ...edit, body: e.target.value })} />
+            <TextField placeholder="mis. [SIIPB] Pengingat pengembalian &#123;&#123;kode_transaksi&#125;&#125;" label="Subjek" required value={edit.subject} error={err} onChange={(e) => setEdit({ ...edit, subject: e.target.value })} />
+            <TextareaField placeholder="mis. Yth. &#123;&#123;nama_peminjam&#125;&#125;, batas pengembalian barang adalah ..." label="Isi email" rows={12} mono value={edit.body} onChange={(e) => setEdit({ ...edit, body: e.target.value })} />
             <div className="small muted">
               Placeholder:{' '}
               {TEMPLATE_PLACEHOLDERS.map((p) => (
@@ -397,7 +403,6 @@ function Templates() {
   );
 }
 
-/* ---------- Keamanan ---------- */
 function Keamanan({ s }: { s: Settings }) {
   const toast = useToast();
   const [v, setV] = useState({ ...s.security });
@@ -422,14 +427,14 @@ function Keamanan({ s }: { s: Settings }) {
           toast(r.ok ? 'Pengaturan keamanan disimpan.' : r.error, r.ok ? 'ok' : 'err');
         }}
       >
-        <TextField label="Masa berlaku access token (menit)" type="number" min={5} value={v.jwt_access_minutes} onChange={num('jwt_access_minutes')} />
-        <TextField label="Masa berlaku refresh token (hari)" type="number" min={1} value={v.jwt_refresh_days} onChange={num('jwt_refresh_days')} />
-        <TextField label="Sesi antarmuka (jam)" type="number" min={1} value={v.session_hours} onChange={num('session_hours')} />
-        <TextField label="Batas ukuran unggahan foto (MB)" type="number" min={1} max={10} value={v.upload_max_mb} onChange={num('upload_max_mb')} />
+        <TextField placeholder="mis. 60" label="Masa berlaku access token (menit)" type="number" min={5} value={v.jwt_access_minutes} onChange={num('jwt_access_minutes')} />
+        <TextField placeholder="mis. 7" label="Masa berlaku refresh token (hari)" type="number" min={1} value={v.jwt_refresh_days} onChange={num('jwt_refresh_days')} />
+        <TextField placeholder="mis. 8" label="Sesi antarmuka (jam)" type="number" min={1} value={v.session_hours} onChange={num('session_hours')} />
+        <TextField placeholder="mis. 5" label="Batas ukuran unggahan foto (MB)" type="number" min={1} max={10} value={v.upload_max_mb} onChange={num('upload_max_mb')} />
         <label className="check full">
           <Checkbox checked={v.oidc_enabled} onCheckedChange={(c) => setV({ ...v, oidc_enabled: c === true })} /> Aktifkan login SSO (OAuth 2.0 + OpenID Connect)
         </label>
-        <TextField
+        <TextField placeholder="https://accounts.google.com"
           label="Issuer / Identity Provider"
           mono
           full
@@ -437,9 +442,9 @@ function Keamanan({ s }: { s: Settings }) {
           hint="Google: https://accounts.google.com · Microsoft: https://login.microsoftonline.com/<tenant-id>/v2.0 · Keycloak: https://<host>/realms/<realm>"
           onChange={(e) => setV({ ...v, oidc_issuer: e.target.value })}
         />
-        <TextField label="Client ID" mono value={v.oidc_client_id} onChange={(e) => setV({ ...v, oidc_client_id: e.target.value })} />
+        <TextField placeholder="mis. 1234567890-abc.apps.googleusercontent.com" label="Client ID" mono value={v.oidc_client_id} onChange={(e) => setV({ ...v, oidc_client_id: e.target.value })} />
         {isApiMode ? (
-          <TextField
+          <TextField placeholder="mis. GOCSPX-xxxxxxxxxxxx"
             label="Client secret"
             type="password"
             autoComplete="new-password"
@@ -473,7 +478,6 @@ function Keamanan({ s }: { s: Settings }) {
   );
 }
 
-/* ---------- Backup ---------- */
 function Backup({ s }: { s: Settings }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
@@ -560,16 +564,6 @@ function Backup({ s }: { s: Settings }) {
             toast('Data berhasil dipulihkan.');
           }}
         />
-        <p className="small muted" style={{ marginTop: 10 }}>
-          {isApiMode ? (
-            <>
-              Backup memakai <span className="mono">mariadb-dump</span> (gzip) dan dijadwalkan Celery Beat setiap hari 01.00. Pemulihan dilakukan administrator server dengan
-              <span className="mono"> infrastructure/scripts/restore_db.sh</span> agar tidak dapat dipicu dari browser.
-            </>
-          ) : (
-            'Pada mode demo, backup berisi seluruh data aplikasi dalam format JSON. Di production, backup MariaDB dijadwalkan dan diuji dengan restore berkala.'
-          )}
-        </p>
       </Card>
       <Card title="Riwayat backup" flush>
         <TableWrap>
@@ -620,7 +614,6 @@ function Backup({ s }: { s: Settings }) {
   );
 }
 
-/* ---------- Mode demo ---------- */
 function Demo({ s }: { s: Settings }) {
   const toast = useToast();
   const confirm = useConfirm();

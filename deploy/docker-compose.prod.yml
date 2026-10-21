@@ -1,11 +1,9 @@
-# ==========================================================================
 # SIIPB — container production di EC2 (dikelola deploy/scripts/deploy.sh)
 #   - image dari Amazon ECR: ${ECR_REGISTRY}/siipb-{backend,worker,frontend}:${IMAGE_TAG}
 #   - database: AWS RDS MariaDB (DATABASE_URL dari Secrets Manager -> app.env)
 #   - Nginx berjalan di host (bukan container) dan meneruskan ke 127.0.0.1:3000 / :5000
 #   - log container dikirim ke CloudWatch Logs (driver awslogs)
 # Variabel ECR_REGISTRY, IMAGE_TAG, AWS_REGION, LOG_GROUP diekspor deploy.sh dari /etc/siipb/siipb.conf.
-# ==========================================================================
 name: siipb
 
 x-logging: &logging

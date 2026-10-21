@@ -1,7 +1,5 @@
-# ========================================================
 # SIIPB Frontend — Next.js (standalone) di Node 22
 # Variabel NEXT_PUBLIC_* dibaca saat build -> diteruskan sebagai build args.
-# ========================================================
 FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./

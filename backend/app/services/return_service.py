@@ -52,7 +52,6 @@ def process_return(
     send_confirmation: bool = True,
 ) -> tuple[Return, list[int]]:
     """Process return of borrowed items (supports partial or complete returns)."""
-    # 1. Validate Borrowing exists and is open
     borrowing = session.get(Borrowing, borrowing_id)
     if not borrowing:
         raise ValueError("Transaksi peminjaman tidak ditemukan")
@@ -70,7 +69,6 @@ def process_return(
         if returned_on != now.date():
             now = datetime.combine(returned_on, now.time())
 
-    # 2. Create Return Header
     return_header = Return(
         borrowing_id=borrowing.id,
         received_by=received_by,
@@ -82,7 +80,6 @@ def process_return(
 
     processed_item_ids: set[int] = set()
 
-    # 3. Process each returned item
     for item_input in items_data:
         borrowing_item_id = item_input["borrowing_item_id"]
         asset_id = item_input["asset_id"]
@@ -90,24 +87,20 @@ def process_return(
         completeness = item_input.get("completeness")
         item_notes = item_input.get("notes")
 
-        # Validate borrowing item belongs to this borrowing
         b_item = session.get(BorrowingItem, borrowing_item_id)
         if not b_item or b_item.borrowing_id != borrowing.id or b_item.asset_id != asset_id:
             raise ValueError(f"Borrowing item ID {borrowing_item_id} tidak valid untuk transaksi ini")
 
-        # Check if already returned
         existing_return_item = session.scalars(
             select(ReturnItem).where(ReturnItem.borrowing_item_id == borrowing_item_id)
         ).first()
         if existing_return_item:
             raise ValueError(f"Barang {b_item.asset.name} sudah pernah dikembalikan sebelumnya")
 
-        # Lock and load asset
         asset = session.get(Asset, asset_id, with_for_update=True)
         if not asset:
             raise ValueError(f"Aset ID {asset_id} tidak ditemukan")
 
-        # Create ReturnItem record
         ret_item = ReturnItem(
             return_id=return_header.id,
             borrowing_item_id=borrowing_item_id,
@@ -121,7 +114,6 @@ def process_return(
 
         old_status = asset.status
 
-        # 4. Handle Status Transitions based on final_condition
         old_condition = asset.condition
         if final_condition == ReturnCondition.BAIK.value:
             asset.status = AssetStatus.TERSEDIA.value
@@ -147,7 +139,6 @@ def process_return(
             event_type = "RETURNED_DAMAGED"
             reason = f"Dikembalikan dalam kondisi rusak (TX: {borrowing.transaction_number})"
 
-            # Create Damage Report
             damage_report = AssetIncidentReport(
                 return_item_id=ret_item.id,
                 reported_by=received_by,
@@ -169,7 +160,6 @@ def process_return(
             event_type = "RETURNED_LOST"
             reason = f"Dilaporkan hilang saat peminjaman (TX: {borrowing.transaction_number})"
 
-            # Create Loss Report
             loss_data = item_input.get("loss") or {}
             loss_report = AssetIncidentReport(
                 return_item_id=ret_item.id,
@@ -187,7 +177,6 @@ def process_return(
 
         ret_item.asset_status_after = new_status
 
-        # 5. Append to Asset History
         history = AssetHistory(
             asset_id=asset.id,
             changed_by=received_by,
@@ -201,7 +190,6 @@ def process_return(
         session.add(history)
         processed_item_ids.add(borrowing_item_id)
 
-    # 6. Check if ALL items in this borrowing are returned
     total_borrowing_items = len(borrowing.items)
     all_returned_query = select(ReturnItem.borrowing_item_id).where(
         ReturnItem.borrowing_item_id.in_([it.id for it in borrowing.items])
@@ -211,7 +199,6 @@ def process_return(
     if returned_count >= total_borrowing_items:
         borrowing.status = BorrowingStatus.DIKEMBALIKAN.value
 
-    # 8. Record Audit Log
     record_audit(
         session=session,
         action="RETURN_PROCESSED",
@@ -227,7 +214,7 @@ def process_return(
         },
     )
 
-    # 7. Konfirmasi pengembalian ke peminjam (idempoten) bila seluruh barang sudah kembali
+    # Konfirmasi pengembalian ke peminjam (idempoten) bila seluruh barang sudah kembali
     notif_ids: list[int] = []
     session.flush()
     session.refresh(return_header)

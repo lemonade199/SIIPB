@@ -61,7 +61,6 @@ import type {
   User,
 } from '@/types';
 
-/* ================= Izin ================= */
 const UI_PERMS = new Set<string>(PERMISSIONS.map((p) => p.key));
 /** Kode lama backend (sebelum migrasi a7c3e91d2b40) → izin antarmuka. */
 const LEGACY_PERM_MAP: Record<string, PermissionKey[]> = {
@@ -119,7 +118,6 @@ export function mapUser(u: ApiUserRow): User {
   };
 }
 
-/* ================= Pemetaan entitas ================= */
 const ITEM_STATUSES: ItemStatus[] = ['TERSEDIA', 'DIPINJAM', 'RUSAK', 'RUSAK_BERAT', 'DALAM_PERBAIKAN', 'HILANG'];
 const CONDS: Condition[] = ['BAIK', 'RUSAK_RINGAN', 'RUSAK_BERAT'];
 
@@ -247,7 +245,7 @@ export function mapReturn(r: ApiReturn, b: Borrowing | undefined): { ret: Return
   };
 }
 
-/* ---- Notifikasi: backend menyimpan satu baris per penerima; UI menampilkan satu notifikasi per event ---- */
+/* Notifikasi: backend menyimpan satu baris per penerima; UI menampilkan satu notifikasi per event */
 const NOTIF_STATUS: Record<string, Notification['status']> = { SENT: 'TERKIRIM', FAILED: 'GAGAL', QUEUED: 'MENUNGGU', PROCESSING: 'MENUNGGU', RETRYING: 'MENUNGGU' };
 const RECIPIENT: Record<string, Recipient['type']> = { PEMINJAM: 'Peminjam', PETUGAS: 'Petugas', PIMPINAN: 'Pimpinan' };
 const EVENT_TEMPLATE: Record<string, string> = {
@@ -416,7 +414,6 @@ export function mapHistory(itemId: ID, h: ApiAssetHistory): ItemMovement {
   };
 }
 
-/* ================= Store ================= */
 function baseData(): DbData {
   const at = () => nowISO();
   const data = { version: 1, created_at: nowISO(), _seq: {} } as DbData;
@@ -473,6 +470,7 @@ const can = (p: PermissionKey) => !!me && me.role.permissions.includes(p);
 /** Tarik seluruh data dari API lalu ganti isi store. */
 export async function pullAll() {
   const movements = db.ready ? db.data.item_movements : [];
+  const reportLog = db.ready ? db.data.reports_generated : [];
   const safe = <T,>(p: Promise<T>, fallback: T) => p.catch(() => fallback);
   const when = <T,>(ok: boolean, p: () => Promise<T>, fallback: T) => (ok ? safe(p(), fallback) : Promise.resolve(fallback));
 
@@ -498,7 +496,9 @@ export async function pullAll() {
   data.settings = mergeSettings(data.settings, settings);
   if (templates.length) data.email_templates = templates.map(mapTemplate);
   data.item_movements = movements;
-  data.scheduler_runs = runs.map(mapSchedulerRun);
+  data.reports_generated = reportLog;
+  // API mengirim terbaru lebih dulu; store menyimpan urut kronologis seperti mode mock
+  data.scheduler_runs = runs.map(mapSchedulerRun).reverse();
 
   const locName = new Map(locs.map((l) => [l.id, l.name]));
   data.categories = cats.map((c) => ({ id: c.id, code: c.code, name: c.name, active: c.is_active ?? true }));

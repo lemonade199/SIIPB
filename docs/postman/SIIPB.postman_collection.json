@@ -1,0 +1,3123 @@
+{
+  "info": {
+    "name": "SIIPB API",
+    "description": "Koleksi seluruh endpoint SIIPB. Jalankan Authentication > POST /auth/login lebih dulu: token tersimpan otomatis dan dipakai request lain.\n\nUbah variabel baseUrl ke https://averus.my.id untuk server AWS.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "POST /auth/login - Login internal user (Admin/Petugas/Pimpinan).",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Login internal user (Admin/Petugas/Pimpinan).",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"admin123\",\n  \"username\": \"admin\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success && j.data.access_token) {",
+                  "  pm.collectionVariables.set('token', j.data.access_token);",
+                  "  if (j.data.refresh_token) pm.collectionVariables.set('refreshToken', j.data.refresh_token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/change-password - Ganti kata sandi sendiri (minimal 8 karakter, huruf & angka). Semua sesi lain dicabut.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/change-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "change-password"
+              ]
+            },
+            "description": "Ganti kata sandi sendiri (minimal 8 karakter, huruf & angka). Semua sesi lain dicabut.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_password\": \"contoh\",\n  \"new_password\": \"contoh\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "POST /auth/logout - Logout and revoke refresh token.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Logout and revoke refresh token.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET /auth/me - Profil pengguna yang sedang login beserta role & permission.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Profil pengguna yang sedang login beserta role & permission."
+          }
+        },
+        {
+          "name": "PUT /auth/me - Ubah profil sendiri (nama, email, telepon).",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Ubah profil sendiri (nama, email, telepon).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Administrator SIIPB\",\n  \"phone\": \"0812-3456-7890\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "POST /auth/refresh - Refresh expired access token using valid refresh token.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "Refresh expired access token using valid refresh token.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success && j.data.access_token) {",
+                  "  pm.collectionVariables.set('token', j.data.access_token);",
+                  "  if (j.data.refresh_token) pm.collectionVariables.set('refreshToken', j.data.refresh_token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auth/sso - Mulai login SSO (OAuth 2.0 / OpenID Connect) ke Identity Provider yang diatur di Pengaturan.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/sso",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "sso"
+              ]
+            },
+            "description": "Mulai login SSO (OAuth 2.0 / OpenID Connect) ke Identity Provider yang diatur di Pengaturan.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "GET /auth/sso/callback - Callback Identity Provider: validasi state & nonce, cocokkan pengguna, lalu redirect ke frontend",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/sso/callback",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "sso",
+                "callback"
+              ]
+            },
+            "description": "dengan kode sekali pakai (#sso_code=…) yang ditukar lewat POST /auth/sso/exchange.<br/>",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "POST /auth/sso/exchange - Tukar kode sekali pakai hasil login SSO (berlaku 60 detik) dengan token JWT.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/sso/exchange",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "sso",
+                "exchange"
+              ]
+            },
+            "description": "Tukar kode sekali pakai hasil login SSO (berlaku 60 detik) dengan token JWT.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"kode-sekali-pakai-dari-redirect-sso\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success && j.data.access_token) {",
+                  "  pm.collectionVariables.set('token', j.data.access_token);",
+                  "  if (j.data.refresh_token) pm.collectionVariables.set('refreshToken', j.data.refresh_token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Assets",
+      "item": [
+        {
+          "name": "GET /assets - Daftar barang dengan filter & paginasi.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assets"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "category_id",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "location_id",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "condition",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "is_active",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "per_page",
+                  "value": "20",
+                  "disabled": true,
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Daftar barang dengan filter & paginasi."
+          }
+        },
+        {
+          "name": "POST /assets - Tambah barang. `inventory_code` kosong -> dibuat otomatis (INV-<KATEGORI>-0001).",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assets"
+              ]
+            },
+            "description": "Tambah barang. `inventory_code` kosong -> dibuat otomatis (INV-<KATEGORI>-0001).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category_id\": 1,\n  \"location_id\": 1,\n  \"name\": \"Laptop Lenovo ThinkPad T14\",\n  \"brand\": \"Lenovo\",\n  \"model\": \"ThinkPad T14 Gen 3\",\n  \"serial_number\": \"PF-3A21\",\n  \"purchase_date\": \"2024-01-15\",\n  \"acquisition_cost\": 14500000,\n  \"acquisition_source\": \"APBN 2024\",\n  \"condition\": \"BAIK\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET /assets/by-code/{code} - Cari barang dari hasil pindai QR/barcode (`SIIPB:<kode>` atau kode saja).",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assets/by-code/:code",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assets",
+                "by-code",
+                ":code"
+              ],
+              "variable": [
+                {
+                  "key": "code",
+                  "value": "INV-LPT-0001",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Cari barang dari hasil pindai QR/barcode (`SIIPB:<kode>` atau kode saja)."
+          }
+        },
+        {
+          "name": "DELETE /assets/{asset_id} - Nonaktifkan barang (riwayat tetap tersimpan). `permanent=1` menghapus permanen barang yang belum pernah dipinjam.",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assets/:asset_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assets",
+                ":asset_id"
+              ],
+              "variable": [
+                {
+                  "key": "asset_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ],
+              "query": [
+                {
+                  "key": "permanent",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Hapus permanen (hanya barang tanpa riwayat peminjaman)"
+                }
+              ]
+            },
+            "description": "Nonaktifkan barang (riwayat tetap tersimpan). `permanent=1` menghapus permanen barang yang belum pernah dipinjam."
+          }
+        },
+        {
+          "name": "GET /assets/{asset_id} - Detail barang.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assets/:asset_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assets",
+                ":asset_id"
+              ],
+              "variable": [
+                {
+                  "key": "asset_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Detail barang."
+          }
+        },
+        {
+          "name": "PUT /assets/{asset_id} - Ubah data barang / aktif-nonaktif (`is_active`, dengan `reason`).",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assets/:asset_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assets",
+                ":asset_id"
+              ],
+              "variable": [
+                {
+                  "key": "asset_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Ubah data barang / aktif-nonaktif (`is_active`, dengan `reason`).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Laptop Lenovo ThinkPad T14\",\n  \"location_id\": 2,\n  \"condition\": \"BAIK\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET /assets/{asset_id}/history - Riwayat pergerakan & status barang.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assets/:asset_id/history",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assets",
+                ":asset_id",
+                "history"
+              ],
+              "variable": [
+                {
+                  "key": "asset_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Riwayat pergerakan & status barang."
+          }
+        },
+        {
+          "name": "POST /assets/{asset_id}/photos - Unggah satu/lebih foto barang (field `files` atau `file`, maks 5 foto per barang, JPG/PNG/WEBP).",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assets/:asset_id/photos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assets",
+                ":asset_id",
+                "photos"
+              ],
+              "variable": [
+                {
+                  "key": "asset_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "`primary=true` menjadikan foto baru sebagai foto utama.<br/>",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "files",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "PUT /assets/{asset_id}/photos/order - Atur urutan foto (`photo_ids`, indeks 0 = foto utama).",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assets/:asset_id/photos/order",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assets",
+                ":asset_id",
+                "photos",
+                "order"
+              ],
+              "variable": [
+                {
+                  "key": "asset_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Atur urutan foto (`photo_ids`, indeks 0 = foto utama).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"photo_ids\": [\n    3,\n    2\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "DELETE /assets/{asset_id}/photos/{photo_id} - Hapus satu foto barang.",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assets/:asset_id/photos/:photo_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assets",
+                ":asset_id",
+                "photos",
+                ":photo_id"
+              ],
+              "variable": [
+                {
+                  "key": "asset_id",
+                  "value": "1",
+                  "description": ""
+                },
+                {
+                  "key": "photo_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Hapus satu foto barang."
+          }
+        },
+        {
+          "name": "GET /assets/{asset_id}/qr - QR Code identitas barang (python `qrcode`). `format=svg` (bawaan) atau `png`.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assets/:asset_id/qr",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assets",
+                ":asset_id",
+                "qr"
+              ],
+              "variable": [
+                {
+                  "key": "asset_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Isi QR: `SIIPB:<kode_inventaris>`.<br/>"
+          }
+        },
+        {
+          "name": "POST /assets/{asset_id}/status - Ubah status barang secara manual (mis. selesai diperbaiki). DIPINJAM hanya lewat checkout.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assets/:asset_id/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assets",
+                ":asset_id",
+                "status"
+              ],
+              "variable": [
+                {
+                  "key": "asset_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Ubah status barang secara manual (mis. selesai diperbaiki). DIPINJAM hanya lewat checkout.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"contoh\",\n  \"status\": \"TERSEDIA\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "POST /assets/{asset_id}/upload-photo - (Kompatibilitas) unggah satu foto sebagai foto utama.",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assets/:asset_id/upload-photo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "assets",
+                ":asset_id",
+                "upload-photo"
+              ],
+              "variable": [
+                {
+                  "key": "asset_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "(Kompatibilitas) unggah satu foto sebagai foto utama.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Audit Logs",
+      "item": [
+        {
+          "name": "GET /audit-logs - List system audit log trail.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/audit-logs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "audit-logs"
+              ],
+              "query": [
+                {
+                  "key": "module",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "action",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "user_id",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "entity_type",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "entity_id",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "from",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "to",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "per_page",
+                  "value": "20",
+                  "disabled": true,
+                  "description": ""
+                }
+              ]
+            },
+            "description": "List system audit log trail."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Backup",
+      "item": [
+        {
+          "name": "GET /backups - Daftar berkas backup database.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/backups",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "backups"
+              ]
+            },
+            "description": "Daftar berkas backup database."
+          }
+        },
+        {
+          "name": "POST /backups - Buat backup database sekarang (mysqldump, gzip).",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/backups",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "backups"
+              ]
+            },
+            "description": "Buat backup database sekarang (mysqldump, gzip).",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET /backups/{name} - Unduh berkas backup.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/backups/:name",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "backups",
+                ":name"
+              ],
+              "variable": [
+                {
+                  "key": "name",
+                  "value": "siipb-20261021-010000.sql.gz",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Unduh berkas backup."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Borrowings",
+      "item": [
+        {
+          "name": "GET /borrowings - Daftar transaksi peminjaman.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/borrowings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "borrowings"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "borrower_id",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": "nomor transaksi / nama peminjam"
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "per_page",
+                  "value": "20",
+                  "disabled": true,
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Daftar transaksi peminjaman."
+          }
+        },
+        {
+          "name": "POST /borrowings - Catat peminjaman oleh petugas (peminjam tidak login).",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/borrowings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "borrowings"
+              ]
+            },
+            "description": "`checkout: true` (bawaan) langsung menyerahkan barang (status DIPINJAM + email konfirmasi);<br/>`checkout: false` menyimpan DRAF. Ketersediaan divalidasi dengan SELECT ... FOR UPDATE.<br/>",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"borrower_id\": 1,\n  \"asset_ids\": [\n    1\n  ],\n  \"start_date\": \"2026-10-21\",\n  \"due_date\": \"2026-10-24\",\n  \"purpose\": \"Presentasi kegiatan\",\n  \"notes\": \"Termasuk charger\",\n  \"checkout\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET /borrowings/{borrowing_id} - Detail transaksi peminjaman.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/borrowings/:borrowing_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "borrowings",
+                ":borrowing_id"
+              ],
+              "variable": [
+                {
+                  "key": "borrowing_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Detail transaksi peminjaman."
+          }
+        },
+        {
+          "name": "PUT /borrowings/{borrowing_id} - Ubah draf peminjaman (hanya status DRAF).",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/borrowings/:borrowing_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "borrowings",
+                ":borrowing_id"
+              ],
+              "variable": [
+                {
+                  "key": "borrowing_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Ubah draf peminjaman (hanya status DRAF).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"due_date\": \"2026-10-24\",\n  \"purpose\": \"Presentasi kegiatan\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "POST /borrowings/{borrowing_id}/cancel - Batalkan draf peminjaman (tetap tersimpan sebagai riwayat).",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/borrowings/:borrowing_id/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "borrowings",
+                ":borrowing_id",
+                "cancel"
+              ],
+              "variable": [
+                {
+                  "key": "borrowing_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Batalkan draf peminjaman (tetap tersimpan sebagai riwayat).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Kegiatan dibatalkan\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "POST /borrowings/{borrowing_id}/checkout - Konfirmasi penyerahan barang (DRAF -> DIPINJAM) dan kirim email konfirmasi.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/borrowings/:borrowing_id/checkout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "borrowings",
+                ":borrowing_id",
+                "checkout"
+              ],
+              "variable": [
+                {
+                  "key": "borrowing_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Konfirmasi penyerahan barang (DRAF -> DIPINJAM) dan kirim email konfirmasi.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Damage Reports",
+      "item": [
+        {
+          "name": "GET /damage-reports - List damage incident reports.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/damage-reports",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "damage-reports"
+              ],
+              "query": [
+                {
+                  "key": "repair_status",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "severity",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "per_page",
+                  "value": "20",
+                  "disabled": true,
+                  "description": ""
+                }
+              ]
+            },
+            "description": "List damage incident reports."
+          }
+        },
+        {
+          "name": "PUT /damage-reports/{report_id}/repair-status - Update repair lifecycle status for a damage report.",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/damage-reports/:report_id/repair-status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "damage-reports",
+                ":report_id",
+                "repair-status"
+              ],
+              "variable": [
+                {
+                  "key": "report_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Update repair lifecycle status for a damage report.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"repair_status\": \"SELESAI\",\n  \"action_taken\": \"Ganti keyboard\",\n  \"repair_cost\": 350000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "GET /dashboard/overdue - Daftar transaksi terlambat beserta jumlah hari & tingkat eskalasi.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/dashboard/overdue",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "dashboard",
+                "overdue"
+              ]
+            },
+            "description": "Daftar transaksi terlambat beserta jumlah hari & tingkat eskalasi."
+          }
+        },
+        {
+          "name": "GET /dashboard/statistics - Statistik: tren bulanan peminjaman/pengembalian, barang terpopuler, distribusi status, ketepatan waktu.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/dashboard/statistics",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "dashboard",
+                "statistics"
+              ],
+              "query": [
+                {
+                  "key": "months",
+                  "value": "12",
+                  "disabled": true,
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Statistik: tren bulanan peminjaman/pengembalian, barang terpopuler, distribusi status, ketepatan waktu."
+          }
+        },
+        {
+          "name": "GET /dashboard/summary - Ringkasan dashboard: jumlah barang per status, transaksi aktif/terlambat/jatuh tempo, insiden.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/dashboard/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "dashboard",
+                "summary"
+              ]
+            },
+            "description": "Ringkasan dashboard: jumlah barang per status, transaksi aktif/terlambat/jatuh tempo, insiden."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Loss Reports",
+      "item": [
+        {
+          "name": "GET /loss-reports - List loss incident reports.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/loss-reports",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "loss-reports"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "per_page",
+                  "value": "20",
+                  "disabled": true,
+                  "description": ""
+                }
+              ]
+            },
+            "description": "List loss incident reports."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Master Data",
+      "item": [
+        {
+          "name": "GET /borrowers - Daftar peminjam (pegawai/siswa; tidak memiliki akun).",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/borrowers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "borrowers"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "unit_id",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "all",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "per_page",
+                  "value": "20",
+                  "disabled": true,
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Daftar peminjam (pegawai/siswa; tidak memiliki akun)."
+          }
+        },
+        {
+          "name": "POST /borrowers - Tambah peminjam.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/borrowers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "borrowers"
+              ]
+            },
+            "description": "Tambah peminjam.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Andi Wijaya\",\n  \"identity_number\": \"198501012010011001\",\n  \"email\": \"andi.wijaya@instansi.go.id\",\n  \"phone\": \"0812-3456-7890\",\n  \"position\": \"Staf Tata Usaha\",\n  \"unit_id\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "DELETE /borrowers/{borrower_id} - Hapus peminjam yang belum pernah bertransaksi.",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/borrowers/:borrower_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "borrowers",
+                ":borrower_id"
+              ],
+              "variable": [
+                {
+                  "key": "borrower_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Hapus peminjam yang belum pernah bertransaksi."
+          }
+        },
+        {
+          "name": "PUT /borrowers/{borrower_id} - Ubah / aktif-nonaktifkan peminjam.",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/borrowers/:borrower_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "borrowers",
+                ":borrower_id"
+              ],
+              "variable": [
+                {
+                  "key": "borrower_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Ubah / aktif-nonaktifkan peminjam.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"0812-3456-7890\",\n  \"is_active\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET /categories - Daftar Kategori.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories"
+              ],
+              "query": [
+                {
+                  "key": "all",
+                  "value": "",
+                  "disabled": true,
+                  "description": "sertakan data nonaktif"
+                }
+              ]
+            },
+            "description": "Daftar Kategori."
+          }
+        },
+        {
+          "name": "POST /categories - Tambah Kategori.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories"
+              ],
+              "query": [
+                {
+                  "key": "all",
+                  "value": "",
+                  "disabled": true,
+                  "description": "sertakan data nonaktif"
+                }
+              ]
+            },
+            "description": "Tambah Kategori.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"LPT\",\n  \"name\": \"Laptop & Komputer\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "DELETE /categories/{row_id} - Hapus Kategori.",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/categories/:row_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories",
+                ":row_id"
+              ],
+              "variable": [
+                {
+                  "key": "row_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ],
+              "query": [
+                {
+                  "key": "all",
+                  "value": "",
+                  "disabled": true,
+                  "description": "sertakan data nonaktif"
+                }
+              ]
+            },
+            "description": "Hapus Kategori."
+          }
+        },
+        {
+          "name": "PUT /categories/{row_id} - Ubah Kategori.",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/categories/:row_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories",
+                ":row_id"
+              ],
+              "variable": [
+                {
+                  "key": "row_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ],
+              "query": [
+                {
+                  "key": "all",
+                  "value": "",
+                  "disabled": true,
+                  "description": "sertakan data nonaktif"
+                }
+              ]
+            },
+            "description": "Ubah Kategori.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Laptop & Komputer\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET /locations - Daftar Lokasi.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locations"
+              ],
+              "query": [
+                {
+                  "key": "all",
+                  "value": "",
+                  "disabled": true,
+                  "description": "sertakan data nonaktif"
+                }
+              ]
+            },
+            "description": "Daftar Lokasi."
+          }
+        },
+        {
+          "name": "POST /locations - Tambah Lokasi.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locations"
+              ],
+              "query": [
+                {
+                  "key": "all",
+                  "value": "",
+                  "disabled": true,
+                  "description": "sertakan data nonaktif"
+                }
+              ]
+            },
+            "description": "Tambah Lokasi.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"GDA-GUDANG\",\n  \"name\": \"Gudang Inventaris\",\n  \"description\": \"Gedung A, Lt. 1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "DELETE /locations/{row_id} - Hapus Lokasi.",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locations/:row_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locations",
+                ":row_id"
+              ],
+              "variable": [
+                {
+                  "key": "row_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ],
+              "query": [
+                {
+                  "key": "all",
+                  "value": "",
+                  "disabled": true,
+                  "description": "sertakan data nonaktif"
+                }
+              ]
+            },
+            "description": "Hapus Lokasi."
+          }
+        },
+        {
+          "name": "PUT /locations/{row_id} - Ubah Lokasi.",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locations/:row_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locations",
+                ":row_id"
+              ],
+              "variable": [
+                {
+                  "key": "row_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ],
+              "query": [
+                {
+                  "key": "all",
+                  "value": "",
+                  "disabled": true,
+                  "description": "sertakan data nonaktif"
+                }
+              ]
+            },
+            "description": "Ubah Lokasi.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Gudang Inventaris\",\n  \"description\": \"Gedung A, Lt. 1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET /organizational-units - Daftar Unit kerja.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/organizational-units",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "organizational-units"
+              ],
+              "query": [
+                {
+                  "key": "all",
+                  "value": "",
+                  "disabled": true,
+                  "description": "sertakan data nonaktif"
+                }
+              ]
+            },
+            "description": "Daftar Unit kerja."
+          }
+        },
+        {
+          "name": "POST /organizational-units - Tambah Unit kerja.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/organizational-units",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "organizational-units"
+              ],
+              "query": [
+                {
+                  "key": "all",
+                  "value": "",
+                  "disabled": true,
+                  "description": "sertakan data nonaktif"
+                }
+              ]
+            },
+            "description": "Tambah Unit kerja.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"TU\",\n  \"name\": \"Tata Usaha\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "DELETE /organizational-units/{row_id} - Hapus Unit kerja.",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/organizational-units/:row_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "organizational-units",
+                ":row_id"
+              ],
+              "variable": [
+                {
+                  "key": "row_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ],
+              "query": [
+                {
+                  "key": "all",
+                  "value": "",
+                  "disabled": true,
+                  "description": "sertakan data nonaktif"
+                }
+              ]
+            },
+            "description": "Hapus Unit kerja."
+          }
+        },
+        {
+          "name": "PUT /organizational-units/{row_id} - Ubah Unit kerja.",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/organizational-units/:row_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "organizational-units",
+                ":row_id"
+              ],
+              "variable": [
+                {
+                  "key": "row_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ],
+              "query": [
+                {
+                  "key": "all",
+                  "value": "",
+                  "disabled": true,
+                  "description": "sertakan data nonaktif"
+                }
+              ]
+            },
+            "description": "Ubah Unit kerja.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Tata Usaha\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "GET /notifications - Riwayat notifikasi & log pengiriman.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "event",
+                  "value": "",
+                  "disabled": true,
+                  "description": "CHECKOUT, H-3, H-1, H, H+1, H+3, H+7, PENGEMBALIAN"
+                },
+                {
+                  "key": "borrowing_id",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "inbox",
+                  "value": "",
+                  "disabled": true,
+                  "description": "hanya notifikasi untuk pengguna ini"
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "per_page",
+                  "value": "20",
+                  "disabled": true,
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Riwayat notifikasi & log pengiriman."
+          }
+        },
+        {
+          "name": "POST /notifications/read-all - Tandai semua notifikasi di kotak masuk pengguna sebagai terbaca.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications/read-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications",
+                "read-all"
+              ]
+            },
+            "description": "Tandai semua notifikasi di kotak masuk pengguna sebagai terbaca.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET /notifications/templates - Template email notifikasi (placeholder `{{nama_peminjam}}`, `{{kode_transaksi}}`, ...).",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications/templates",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications",
+                "templates"
+              ]
+            },
+            "description": "Template email notifikasi (placeholder `{{nama_peminjam}}`, `{{kode_transaksi}}`, ...)."
+          }
+        },
+        {
+          "name": "PUT /notifications/templates/{template_id} - Ubah template email.",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications/templates/:template_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications",
+                "templates",
+                ":template_id"
+              ],
+              "variable": [
+                {
+                  "key": "template_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Ubah template email.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"[SIIPB] Pengingat pengembalian\",\n  \"body\": \"Yth. peminjam, mohon kembalikan barang sebelum batas waktu.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET /notifications/unread-count - Jumlah notifikasi belum dibaca untuk pengguna ini (ikon lonceng).",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications/unread-count",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications",
+                "unread-count"
+              ]
+            },
+            "description": "Jumlah notifikasi belum dibaca untuk pengguna ini (ikon lonceng)."
+          }
+        },
+        {
+          "name": "POST /notifications/{notification_id}/read - Tandai notifikasi terbaca oleh pengguna ini.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications/:notification_id/read",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications",
+                ":notification_id",
+                "read"
+              ],
+              "variable": [
+                {
+                  "key": "notification_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Tandai notifikasi terbaca oleh pengguna ini.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "POST /notifications/{notification_id}/resend - Kirim ulang notifikasi (mis. setelah SMTP gagal).",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications/:notification_id/resend",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications",
+                ":notification_id",
+                "resend"
+              ],
+              "variable": [
+                {
+                  "key": "notification_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Kirim ulang notifikasi (mis. setelah SMTP gagal).",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "GET /reports - Jenis laporan yang tersedia.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reports",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports"
+              ]
+            },
+            "description": "Jenis laporan yang tersedia."
+          }
+        },
+        {
+          "name": "GET /reports/{rtype} - Buat laporan. `format=json` (pratinjau), `xlsx`, atau `pdf`.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reports/:rtype",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                ":rtype"
+              ],
+              "variable": [
+                {
+                  "key": "rtype",
+                  "value": "peminjaman",
+                  "description": ""
+                }
+              ],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "json",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "from",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "to",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "unit_id",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "category_id",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "location_id",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Buat laporan. `format=json` (pratinjau), `xlsx`, atau `pdf`."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Returns",
+      "item": [
+        {
+          "name": "GET /returns - List return transactions.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/returns",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "returns"
+              ],
+              "query": [
+                {
+                  "key": "borrowing_id",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": true,
+                  "description": ""
+                },
+                {
+                  "key": "per_page",
+                  "value": "20",
+                  "disabled": true,
+                  "description": ""
+                }
+              ]
+            },
+            "description": "List return transactions."
+          }
+        },
+        {
+          "name": "POST /returns - Process return of borrowed items (supports partial or complete returns).",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/returns",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "returns"
+              ]
+            },
+            "description": "Process return of borrowed items (supports partial or complete returns).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"borrowing_id\": 1,\n  \"notes\": \"\",\n  \"send_confirmation\": true,\n  \"items\": [\n    {\n      \"borrowing_item_id\": 1,\n      \"asset_id\": 1,\n      \"final_condition\": \"BAIK\",\n      \"completeness\": \"Lengkap\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET /returns/{return_id} - Get single return detail.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/returns/:return_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "returns",
+                ":return_id"
+              ],
+              "variable": [
+                {
+                  "key": "return_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Get single return detail."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Scheduler",
+      "item": [
+        {
+          "name": "POST /scheduler/run - Jalankan pemeriksaan jatuh tempo sekarang (sama dengan Celery Beat). Idempoten.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/scheduler/run",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "scheduler",
+                "run"
+              ]
+            },
+            "description": "Jalankan pemeriksaan jatuh tempo sekarang (sama dengan Celery Beat). Idempoten.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET /scheduler/runs - Riwayat pemeriksaan scheduler.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/scheduler/runs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "scheduler",
+                "runs"
+              ]
+            },
+            "description": "Riwayat pemeriksaan scheduler."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Settings",
+      "item": [
+        {
+          "name": "GET /settings - Pengaturan aplikasi. Pengguna tanpa izin `settings.manage` hanya menerima bagian umum.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "settings"
+              ]
+            },
+            "description": "Pengaturan aplikasi. Pengguna tanpa izin `settings.manage` hanya menerima bagian umum."
+          }
+        },
+        {
+          "name": "PUT /settings - Simpan pengaturan (sebagian). `smtp.password` dan `security.oidc_client_secret` disimpan terenkripsi",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "settings"
+              ]
+            },
+            "description": "dan tidak pernah dikembalikan.<br/>",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"institution\": \"SMA Negeri 1 Contoh\",\n  \"smtp\": {\n    \"host\": \"smtp.gmail.com\",\n    \"port\": 587,\n    \"encryption\": \"STARTTLS\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET /settings/public - Info publik untuk halaman login (nama instansi, SSO aktif).",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/settings/public",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "settings",
+                "public"
+              ]
+            },
+            "description": "Info publik untuk halaman login (nama instansi, SSO aktif).",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "POST /settings/smtp/test - Kirim email uji dengan konfigurasi SMTP tersimpan ke alamat `to` (bawaan: email pengguna yang login).",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/settings/smtp/test",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "settings",
+                "smtp",
+                "test"
+              ]
+            },
+            "description": "Kirim email uji dengan konfigurasi SMTP tersimpan ke alamat `to` (bawaan: email pengguna yang login).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"to\": \"email.tujuan@contoh.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "System",
+      "item": [
+        {
+          "name": "GET /api/health - Health check (database & versi migrasi).",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "health"
+              ]
+            },
+            "description": "Health check (database & versi migrasi).",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Uploads",
+      "item": [
+        {
+          "name": "POST /uploads - Upload photo evidence or document.",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/uploads",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "uploads"
+              ]
+            },
+            "description": "Upload photo evidence or document.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "GET /permissions - Daftar permission yang tersedia.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/permissions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "permissions"
+              ]
+            },
+            "description": "Daftar permission yang tersedia."
+          }
+        },
+        {
+          "name": "GET /roles - Daftar role beserta permission.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/roles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "roles"
+              ]
+            },
+            "description": "Daftar role beserta permission."
+          }
+        },
+        {
+          "name": "POST /roles - Tambah role.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/roles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "roles"
+              ]
+            },
+            "description": "Tambah role.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"STAF_GUDANG\",\n  \"name\": \"Staf Gudang\",\n  \"description\": \"Mengelola stok barang di gudang\",\n  \"permissions\": [\n    \"dashboard.view\",\n    \"inventory.view\",\n    \"inventory.manage\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "DELETE /roles/{role_id} - Hapus role non-sistem yang tidak dipakai.",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/roles/:role_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "roles",
+                ":role_id"
+              ],
+              "variable": [
+                {
+                  "key": "role_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Hapus role non-sistem yang tidak dipakai."
+          }
+        },
+        {
+          "name": "GET /roles/{role_id} - Detail role berdasarkan ID.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/roles/:role_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "roles",
+                ":role_id"
+              ],
+              "variable": [
+                {
+                  "key": "role_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Detail role berdasarkan ID."
+          }
+        },
+        {
+          "name": "PUT /roles/{role_id} - Ubah role & permission (matriks RBAC).",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/roles/:role_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "roles",
+                ":role_id"
+              ],
+              "variable": [
+                {
+                  "key": "role_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Ubah role & permission (matriks RBAC).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"permissions\": [\n    \"dashboard.view\",\n    \"inventory.view\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET /users - Daftar pengguna internal.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Daftar pengguna internal."
+          }
+        },
+        {
+          "name": "POST /users - Tambah pengguna internal (admin/petugas/pimpinan).",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            },
+            "description": "Tambah pengguna internal (admin/petugas/pimpinan).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"budi.santoso\",\n  \"email\": \"budi@instansi.go.id\",\n  \"full_name\": \"Budi Santoso\",\n  \"password\": \"Rahasia123\",\n  \"role_id\": 2,\n  \"phone\": \"0812-3456-7890\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET /users/directory - Nama pengguna internal untuk tampilan (petugas pada transaksi/audit). Tanpa data sensitif.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/directory",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "directory"
+              ]
+            },
+            "description": "Nama pengguna internal untuk tampilan (petugas pada transaksi/audit). Tanpa data sensitif."
+          }
+        },
+        {
+          "name": "DELETE /users/{user_id} - Hapus (soft delete) pengguna.",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/:user_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                ":user_id"
+              ],
+              "variable": [
+                {
+                  "key": "user_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Hapus (soft delete) pengguna."
+          }
+        },
+        {
+          "name": "GET /users/{user_id} - Detail pengguna.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/:user_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                ":user_id"
+              ],
+              "variable": [
+                {
+                  "key": "user_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Detail pengguna."
+          }
+        },
+        {
+          "name": "PUT /users/{user_id} - Ubah pengguna (profil, role, aktif/nonaktif, reset kata sandi).",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/:user_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                ":user_id"
+              ],
+              "variable": [
+                {
+                  "key": "user_id",
+                  "value": "1",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Ubah pengguna (profil, role, aktif/nonaktif, reset kata sandi).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Budi Santoso\",\n  \"role_id\": 2,\n  \"is_active\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

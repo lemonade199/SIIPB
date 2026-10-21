@@ -120,13 +120,11 @@ def authenticate_user(session: Session, username_or_email: str, password: str) -
     if needs_rehash(user.password_hash):
         user.password_hash = hash_password(password)
 
-    # Update last login
     now = datetime.now()
     user.last_login_at = now
 
     access_ttl_minutes, refresh_ttl_days = get_token_ttl(session)
 
-    # Issue tokens
     roles = [r.code for r in user.roles if r.is_active]
     permissions = list(user.permission_codes)
 
@@ -233,18 +231,15 @@ def resolve_oauth_user(
     email: str | None = None,
 ) -> User:
     """Cari pengguna internal untuk identitas OAuth (provider, subject); tautkan via email terverifikasi."""
-    # 1. Lookup by google_subject directly on User
     user = session.scalars(
         select(User).where(User.google_subject == provider_subject, User.deleted_at.is_(None))
     ).first()
 
     if not user and email:
-        # Check if internal user exists with this email
         user = session.scalars(
             select(User).where(User.email == email, User.deleted_at.is_(None))
         ).first()
         if user:
-            # Link Google identity directly to User
             user.google_subject = provider_subject
             user.google_email = email
             user.google_linked_at = datetime.now()

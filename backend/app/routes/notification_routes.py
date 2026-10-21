@@ -192,7 +192,6 @@ def resend_notification(notification_id: int):
         return success_response(data=serialize_notification(notif), message="Notifikasi dikirim ulang")
 
 
-# ---------------------------------------------------------------- templates
 class TemplateSchema(Schema):
     name = fields.String(validate=validate.Length(min=2, max=100))
     subject = fields.String(validate=validate.Length(min=3, max=255))

@@ -15,7 +15,6 @@ Parameters:
   DataStackName:
     Type: String
 
-  # ---------------------------------------------------------------- EC2
   InstanceType:
     Type: String
     Default: t3.small
@@ -33,10 +32,9 @@ Parameters:
     Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
     Description: AMI Ubuntu 24.04 LTS terbaru (parameter publik Canonical).
 
-  # ---------------------------------------------------------------- domain
   DomainName:
     Type: String
-    Default: siipb.averus.my.id
+    Default: averus.my.id
   HostedZoneId:
     Type: String
     Default: ""
@@ -44,7 +42,6 @@ Parameters:
   LetsEncryptEmail:
     Type: String
 
-  # ---------------------------------------------------------------- CI/CD
   GitHubRepository:
     Type: String
     Default: lemonade199/SIIPB
@@ -71,7 +68,6 @@ Parameters:
     AllowedValues: ["true", "false"]
     Description: false bila OIDC provider token.actions.githubusercontent.com sudah ada di akun.
 
-  # ---------------------------------------------------------------- monitoring
   AlarmEmail:
     Type: String
     Description: Penerima notifikasi CloudWatch Alarm (konfirmasi langganan lewat email).
@@ -98,7 +94,6 @@ Conditions:
     - !Equals [!Ref CreateGitHubOidcProvider, "true"]
 
 Resources:
-  # ================================================================== Logs & konfigurasi agent
   AppLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
@@ -147,7 +142,6 @@ Resources:
           }
         }
 
-  # ================================================================== IAM EC2
   Ec2Role:
     Type: AWS::IAM::Role
     Condition: CreateEc2Role
@@ -212,7 +206,6 @@ Resources:
       KeyName: !Sub "${ProjectName}-${EnvironmentName}-key"
       PublicKeyMaterial: !Ref SshPublicKey
 
-  # ================================================================== EC2
   LaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
     Properties:
@@ -388,7 +381,6 @@ Resources:
       TTL: "300"
       ResourceRecords: [!Ref ElasticIp]
 
-  # ================================================================== GitHub Actions (OIDC)
   GitHubOidcProvider:
     Type: AWS::IAM::OIDCProvider
     Condition: CreateOidcProvider
@@ -458,7 +450,6 @@ Resources:
                 Action: [ec2:DescribeSecurityGroups, ec2:DescribeSecurityGroupRules]
                 Resource: "*"
 
-  # ================================================================== SNS & CloudWatch Alarms
   AlarmTopic:
     Type: AWS::SNS::Topic
     Properties:

@@ -60,7 +60,6 @@ def serialize_return(r) -> dict:
 
 
 
-# ---- Return Transactions ----
 @return_bp.get("/returns")
 @permission_required("borrowing.view")
 def list_returns():
@@ -213,7 +212,6 @@ def create_return_transaction():
         )
 
 
-# ---- Damage Reports ----
 @return_bp.get("/damage-reports")
 @permission_required("borrowing.view")
 def list_damage_reports():
@@ -336,7 +334,6 @@ def update_repair_status(report_id: int):
             return error_response(str(e), status_code=400)
 
 
-# ---- Loss Reports ----
 @return_bp.get("/loss-reports")
 @permission_required("borrowing.view")
 def list_loss_reports():

@@ -14,8 +14,10 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, toOptions } from '@/components/ui/form';
 import { Empty, PageHead, Pager, SearchInput, Thumb } from '@/components/ui/misc';
+import { useConfirm, useToast } from '@/components/providers/feedback-provider';
 import { cat, categoryStock, loc, conditionLabel } from '@/services/lookup';
-import type { Condition, ID, ItemStatus } from '@/types';
+import * as repo from '@/services/repo';
+import type { Condition, ID, Item, ItemStatus } from '@/types';
 import { TableWrap } from '@/components/ui/table-wrap';
 
 interface Filter {
@@ -74,6 +76,33 @@ export default function InventarisPage() {
     .sort((a, b) => a.c.name.localeCompare(b.c.name));
   const chips: [ItemStatus | '', string, number][] = [['', 'Semua', activeItems.length], ...ITEM_STATUS.map((s): [ItemStatus, string, number] => [s, s, counts[s] || 0])];
 
+  const confirm = useConfirm();
+  const toast = useToast();
+  const remove = async (it: Item) => {
+    if (db.where('borrowing_details', (d) => d.item_id === it.id).length) {
+      if (!it.active) return toast(`${it.item_code} sudah pernah dipinjam sehingga tidak dapat dihapus permanen, dan saat ini sudah nonaktif.`, 'warn');
+      if (it.item_status === 'DIPINJAM') return toast('Barang sedang dipinjam sehingga tidak dapat dihapus.', 'err');
+      const ok = await confirm({
+        title: 'Barang tidak dapat dihapus permanen',
+        message: `${it.item_name} sudah pernah dipinjam, jadi riwayat transaksinya harus tetap ada. Nonaktifkan saja? Barang tidak muncul lagi saat peminjaman, tetapi riwayatnya tetap tersimpan.`,
+        confirmText: 'Nonaktifkan',
+        danger: true,
+      });
+      if (!ok) return;
+      const r = await repo.setItemActive(it.id, false, 'Dihapus dari daftar inventaris');
+      return toast(r.ok ? `${it.item_code} dinonaktifkan.` : r.error, r.ok ? 'ok' : 'err');
+    }
+    const ok = await confirm({
+      title: 'Hapus barang?',
+      message: `${it.item_code} — ${it.item_name} belum pernah dipinjam sehingga dapat dihapus permanen. Tindakan ini tidak dapat dibatalkan.`,
+      confirmText: 'Hapus',
+      danger: true,
+    });
+    if (!ok) return;
+    const r = await repo.deleteItem(it.id);
+    toast(r.ok ? `${it.item_code} dihapus.` : r.error, r.ok ? 'ok' : 'err');
+  };
+
   const toggle = (id: ID, on: boolean) =>
     setSelected((s) => {
       const n = new Set(s);
@@ -86,7 +115,6 @@ export default function InventarisPage() {
   return (
     <>
       <PageHead
-        crumb="Beranda / Inventaris"
         title="Inventaris Barang"
         actions={
           <>
@@ -115,7 +143,6 @@ export default function InventarisPage() {
           <div className="card-header">
             <div>
               <div className="card-title">Stok per kategori</div>
-              <div className="small muted">Tersedia berkurang saat barang dipinjam dan bertambah saat dikembalikan dalam kondisi baik.</div>
             </div>
           </div>
           <TableWrap>
@@ -235,7 +262,8 @@ export default function InventarisPage() {
                         </td>
                         <td className="right nowrap">
                           <Button size="sm" iconOnly icon="eye" title="Detail" href={`/inventaris/${it.id}`} />{' '}
-                          {canManage && <Button size="sm" iconOnly icon="pencil" title="Ubah" href={`/inventaris/${it.id}/ubah`} />}
+                          {canManage && <Button size="sm" iconOnly icon="pencil" title="Ubah" href={`/inventaris/${it.id}/ubah`} />}{' '}
+                          {canManage && <Button size="sm" iconOnly icon="trash" variant="danger" title="Hapus" onClick={() => remove(it)} />}
                         </td>
                       </tr>
                     );

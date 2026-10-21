@@ -10,7 +10,6 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import mysql
 
-# revision identifiers, used by Alembic.
 revision: str = 'c1f9e2b8a341'
 down_revision: Union[str, None] = 'a7c3e91d2b40'
 branch_labels: Union[str, Sequence[str], None] = None
@@ -20,9 +19,7 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     conn = op.get_bind()
 
-    # -------------------------------------------------------------
-    # 1. Tabel asset_incident_reports (gabungan damage & loss)
-    # -------------------------------------------------------------
+    # Tabel asset_incident_reports (gabungan damage & loss)
     op.create_table(
         'asset_incident_reports',
         sa.Column('id', mysql.BIGINT(unsigned=True), autoincrement=True, nullable=False),
@@ -83,9 +80,7 @@ def upgrade() -> None:
         FROM loss_reports
     """))
 
-    # -------------------------------------------------------------
-    # 2. Tabel notification_deliveries (gabungan deliveries & logs)
-    # -------------------------------------------------------------
+    # Tabel notification_deliveries (gabungan deliveries & logs)
     op.create_table(
         'notification_deliveries',
         sa.Column('id', mysql.BIGINT(unsigned=True), autoincrement=True, nullable=False),
@@ -123,9 +118,7 @@ def upgrade() -> None:
         FROM email_deliveries
     """))
 
-    # -------------------------------------------------------------
-    # 3. Penambahan kolom role_id & Google SSO pada users
-    # -------------------------------------------------------------
+    # Penambahan kolom role_id & Google SSO pada users
     op.add_column('users', sa.Column('role_id', mysql.BIGINT(unsigned=True), nullable=True))
     op.add_column('users', sa.Column('google_subject', sa.String(length=255), nullable=True))
     op.add_column('users', sa.Column('google_email', sa.String(length=255), nullable=True))
@@ -153,7 +146,6 @@ def upgrade() -> None:
         WHERE role_id IS NULL
     """))
 
-    # Ubah role_id menjadi NOT NULL
     op.alter_column('users', 'role_id',
                     existing_type=mysql.BIGINT(unsigned=True),
                     nullable=False)
@@ -167,9 +159,7 @@ def upgrade() -> None:
             u.google_linked_at = ei.created_at
     """))
 
-    # -------------------------------------------------------------
-    # 4. Hapus tabel lama yang telah digabungkan / dieliminasi
-    # -------------------------------------------------------------
+    # Hapus tabel lama yang telah digabungkan / dieliminasi
     op.drop_table('damage_reports')
     op.drop_table('loss_reports')
     op.drop_table('notification_logs')
@@ -181,7 +171,6 @@ def upgrade() -> None:
 def downgrade() -> None:
     conn = op.get_bind()
 
-    # Recreate user_roles
     op.create_table(
         'user_roles',
         sa.Column('user_id', mysql.BIGINT(unsigned=True), nullable=False),
@@ -201,7 +190,6 @@ def downgrade() -> None:
         SELECT id, role_id FROM users WHERE role_id IS NOT NULL
     """))
 
-    # Recreate external_identities
     op.create_table(
         'external_identities',
         sa.Column('id', mysql.BIGINT(unsigned=True), autoincrement=True, nullable=False),
@@ -224,7 +212,6 @@ def downgrade() -> None:
         FROM users WHERE google_subject IS NOT NULL
     """))
 
-    # Drop added columns on users
     op.drop_constraint('fk_users_role_id_roles', 'users', type_='foreignkey')
     op.drop_constraint('uq_users_google_subject', 'users', type_='unique')
     op.drop_index('ix_users_role_id', table_name='users')
@@ -233,7 +220,6 @@ def downgrade() -> None:
     op.drop_column('users', 'google_subject')
     op.drop_column('users', 'role_id')
 
-    # Recreate email_deliveries
     op.create_table(
         'email_deliveries',
         sa.Column('id', mysql.BIGINT(unsigned=True), autoincrement=True, nullable=False),
@@ -258,7 +244,6 @@ def downgrade() -> None:
         FROM notification_deliveries
     """))
 
-    # Recreate notification_logs
     op.create_table(
         'notification_logs',
         sa.Column('id', mysql.BIGINT(unsigned=True), autoincrement=True, nullable=False),
@@ -275,7 +260,6 @@ def downgrade() -> None:
 
     op.drop_table('notification_deliveries')
 
-    # Recreate damage_reports
     op.create_table(
         'damage_reports',
         sa.Column('id', mysql.BIGINT(unsigned=True), autoincrement=True, nullable=False),
@@ -311,7 +295,6 @@ def downgrade() -> None:
         FROM asset_incident_reports WHERE incident_type = 'KERUSAKAN'
     """))
 
-    # Recreate loss_reports
     op.create_table(
         'loss_reports',
         sa.Column('id', mysql.BIGINT(unsigned=True), autoincrement=True, nullable=False),

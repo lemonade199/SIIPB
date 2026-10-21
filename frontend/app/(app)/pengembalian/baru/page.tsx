@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { db } from '@/lib/mock/db';
 import { diffDays, fmtDate, today } from '@/lib/date';
 import { RETURN_CONDITIONS } from '@/lib/constants';
-import { cn, match, stripQrPrefix } from '@/lib/utils';
+import { match, stripQrPrefix } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { useTitle } from '@/hooks/use-title';
 import { Badge } from '@/components/ui/badge';
@@ -46,7 +46,7 @@ export default function ReturnFormPage() {
   return <ReturnForm key={b.id} b={b} />;
 }
 
-/* ---------- Langkah 1: pilih transaksi aktif ---------- */
+/* Pilih transaksi aktif yang akan dikembalikan */
 function Picker() {
   const router = useRouter();
   const toast = useToast();
@@ -79,7 +79,6 @@ function Picker() {
           </>
         }
         title="Catat Pengembalian"
-        desc="Langkah 1: buka transaksi aktif — cari nama/kode, atau pindai QR barang yang dikembalikan."
       />
       <section className="card">
         <div className="toolbar">
@@ -155,7 +154,7 @@ function Picker() {
   );
 }
 
-/* ---------- Langkah 2: pemeriksaan barang ---------- */
+/* Pemeriksaan kondisi & kelengkapan tiap barang */
 function ReturnForm({ b }: { b: Borrowing }) {
   const router = useRouter();
   const toast = useToast();
@@ -202,7 +201,6 @@ function ReturnForm({ b }: { b: Borrowing }) {
           </>
         }
         title={`Pengembalian ${b.code}`}
-        desc="Langkah 2: periksa kondisi dan kelengkapan setiap barang, lalu simpan."
         actions={
           <Button icon="refresh" href="/pengembalian/baru">
             Ganti transaksi
@@ -310,7 +308,7 @@ function ReturnForm({ b }: { b: Borrowing }) {
                   onChange={(ev) => setReturnDate(ev.target.value)}
                 />
                 <TextField label="Diterima oleh" value={user?.name ?? ''} readOnly />
-                <TextareaField label="Catatan" full rows={2} value={notes} onChange={(ev) => setNotes(ev.target.value)} />
+                <TextareaField placeholder="mis. Diterima lengkap bersama charger" label="Catatan" full rows={2} value={notes} onChange={(ev) => setNotes(ev.target.value)} />
                 <label className="check full">
                   <Checkbox checked={sendConfirm} disabled={!s.return_notify} onCheckedChange={(c) => setSendConfirm(c === true)} />
                   <span>
@@ -358,9 +356,6 @@ function ReturnForm({ b }: { b: Borrowing }) {
                   Batal
                 </Button>
               </div>
-              <p className={cn('small muted')} style={{ marginTop: 10 }}>
-                Riwayat peminjaman tetap disimpan. Jadwal pengingat transaksi ini otomatis berhenti.
-              </p>
             </Card>
           </div>
         </div>
