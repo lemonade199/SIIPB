@@ -133,6 +133,7 @@ function Smtp({ s }: { s: Settings }) {
   const { user } = useAuth();
   const [v, setV] = useState({ ...s.smtp });
   const [password, setPassword] = useState('');
+  const [unreadable, setUnreadable] = useState(!!s.smtp.password_unreadable);
   const [testing, setTesting] = useState(false);
   const [testTo, setTestTo] = useState(s.smtp.username.includes('@') ? s.smtp.username : user?.email || '');
   return (
@@ -146,7 +147,10 @@ function Smtp({ s }: { s: Settings }) {
           delete (smtp as { password_set?: boolean }).password_set;
           delete smtp.password_unreadable;
           const r = await repo.saveSettings({ smtp, smtp_password: password || undefined }, 'SMTP');
-          if (r.ok) setPassword('');
+          if (r.ok && password) {
+            setPassword('');
+            setUnreadable(false);
+          }
           toast(r.ok ? 'Pengaturan SMTP disimpan.' : r.error, r.ok ? 'ok' : 'err');
         }}
       >
@@ -161,7 +165,7 @@ function Smtp({ s }: { s: Settings }) {
         />
         <TextField placeholder="mis. SIIPB Sarpras IT" label="Nama pengirim" value={v.from_name} onChange={(e) => setV({ ...v, from_name: e.target.value })} />
         <TextField placeholder="mis. sarpras@gmail.com" label="Email pengirim" type="email" value={v.from_email} onChange={(e) => setV({ ...v, from_email: e.target.value })} />
-        {isApiMode && s.smtp.password_unreadable && (
+        {isApiMode && unreadable && (
           <div className="full">
             <Alert type="danger">Kata sandi SMTP yang tersimpan tidak bisa dibaca server, sehingga email tidak terkirim. Isi ulang kata sandi lalu klik Simpan.</Alert>
           </div>

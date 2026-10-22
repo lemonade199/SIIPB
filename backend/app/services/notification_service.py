@@ -273,7 +273,8 @@ def deliver(session: Session, notification_id: int, attempt_number: int = 1, fin
         return False
     if cfg["password_unreadable"]:
         logger.warning("SMTP: kata sandi tersimpan tidak bisa didekripsi (notifikasi #%s)", notification_id)
-        record_delivery_attempt(session, notification_id, attempt_number, False, SMTP_PASSWORD_UNREADABLE, final=final)
+        # kesalahan konfigurasi, bukan gangguan sementara: langsung GAGAL agar bisa dikirim ulang setelah diperbaiki
+        record_delivery_attempt(session, notification_id, attempt_number, False, SMTP_PASSWORD_UNREADABLE, final=True)
         return False
 
     msg = MIMEMultipart("alternative")

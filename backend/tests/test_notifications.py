@@ -64,6 +64,13 @@ def test_unreadable_smtp_password_marks_failed(client, auth_headers, make_borrow
         n = client.get(f"/api/v1/notifications?borrowing_id={b['id']}", headers=auth_headers).get_json()["data"][0]
         assert n["status"] == "FAILED"
         assert "tidak bisa dibaca" in n["deliveries"][0]["error"]
+        # worker Celery tidak menjadwalkan percobaan ulang untuk kesalahan konfigurasi ini
+        from app.tasks.email_tasks import send_email_notification_task
+
+        result = send_email_notification_task.apply(args=[n["id"]])
+        assert result.state == "SUCCESS" and result.result is False
+        n = client.get(f"/api/v1/notifications?borrowing_id={b['id']}", headers=auth_headers).get_json()["data"][0]
+        assert n["status"] == "FAILED" and len(n["deliveries"]) == 2
         res = client.post("/api/v1/settings/smtp/test", json={"to": "uji@contoh.id"}, headers=auth_headers)
         assert res.status_code == 400 and res.get_json()["error_code"] == "SMTP_FAILED"
     finally:

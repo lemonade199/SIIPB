@@ -18,7 +18,9 @@ def send_email_notification_task(self, notification_id: int):
     final = self.request.retries >= MAX_RETRIES
     with SessionLocal() as session:
         ok = deliver(session, notification_id, attempt_number=attempt, final=final)
-    if not ok and not final:
+        notif = session.get(Notification, notification_id)
+        gave_up = notif is not None and notif.status == NotificationStatus.FAILED.value
+    if not ok and not final and not gave_up:
         raise self.retry(countdown=30 * (2 ** self.request.retries))
     return ok
 
