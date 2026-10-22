@@ -1,4 +1,4 @@
-"""Return transactions and incident reports (damage & loss) routes."""
+"""Pengembalian serta laporan kerusakan dan kehilangan."""
 from flask import Blueprint, g, request
 
 from app.database import SessionLocal
@@ -123,7 +123,7 @@ def get_return_detail(return_id: int):
 @return_bp.post("/returns")
 @permission_required("return.manage")
 def create_return_transaction():
-    """Process return of borrowed items (supports partial or complete returns).
+    """Catat pengembalian barang (boleh sebagian).
     ---
     tags:
       - Returns
@@ -283,7 +283,7 @@ def list_damage_reports():
 @return_bp.put("/damage-reports/<int:report_id>/repair-status")
 @permission_required("return.manage")
 def update_repair_status(report_id: int):
-    """Update repair lifecycle status for a damage report.
+    """Ubah status perbaikan pada laporan kerusakan.
     ---
     tags:
       - Damage Reports

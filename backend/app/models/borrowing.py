@@ -90,7 +90,7 @@ class Borrowing(IdMixin, TimestampMixin, Base):
 class BorrowingItem(IdMixin, CreatedAtMixin, Base):
     __tablename__ = "borrowing_items"
     __table_args__ = table_args(
-        # Leading column also serves as the index for borrowing_id.
+        # kolom pertama sekaligus menjadi indeks untuk borrowing_id
         UniqueConstraint(
             "borrowing_id", "asset_id", name="uq_borrowing_items_borrowing_id_asset_id"
         ),

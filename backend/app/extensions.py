@@ -1,4 +1,4 @@
-"""Flask extensions and external integrations."""
+"""Ekstensi Flask: Swagger dan Celery."""
 import re
 
 from celery import Celery

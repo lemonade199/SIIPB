@@ -1,4 +1,4 @@
-"""Import every model so Base.metadata knows all tables (needed by Alembic)."""
+"""Semua model diimpor di sini agar Base.metadata mengenal seluruh tabel (dibutuhkan Alembic)."""
 from app.models.base import Base
 from app.models.organizational_unit import OrganizationalUnit
 from app.models.user import User

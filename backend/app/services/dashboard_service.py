@@ -1,4 +1,4 @@
-"""Dashboard statistics and summary service querying directly from existing tables."""
+"""Ringkasan dan statistik dashboard."""
 from datetime import date, datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -15,7 +15,7 @@ from app.models import (
 
 
 def get_dashboard_summary(session: Session) -> dict:
-    """Compute real-time dashboard analytics directly from existing MariaDB tables."""
+    """Hitung angka dashboard langsung dari tabel transaksi dan barang."""
     today = date.today()
 
     total_assets = session.scalar(

@@ -120,7 +120,7 @@ export default function LoginPage() {
     const r = await repo.login(username, password, captcha?.id, captchaAnswer.trim());
     setBusy(false);
     if (!r.ok) {
-      // Reset CAPTCHA answer dan muat CAPTCHA baru setiap kali percobaan login gagal
+      // kode CAPTCHA sekali pakai: setiap login gagal minta gambar baru
       setCaptchaAnswer('');
       loadCaptcha();
       if (r.errors?.captcha_answer) {

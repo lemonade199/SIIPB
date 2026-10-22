@@ -1,4 +1,4 @@
-"""Celery asynchronous and periodic tasks package."""
+"""Tugas Celery: kirim email, cek jatuh tempo, dan backup."""
 from app.tasks.email_tasks import (
     process_queued_notifications_task,
     send_email_notification_task,

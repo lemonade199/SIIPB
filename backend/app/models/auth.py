@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 
 class RefreshToken(IdMixin, CreatedAtMixin, Base):
-    """Only the SHA-256 hex digest of the refresh token is stored."""
+    """Yang disimpan hanya hash SHA-256 dari refresh token."""
 
     __tablename__ = "refresh_tokens"
     __table_args__ = table_args()

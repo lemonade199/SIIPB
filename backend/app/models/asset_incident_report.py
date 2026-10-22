@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 
 class AssetIncidentReport(IdMixin, TimestampMixin, Base):
-    """Consolidated incident report for returned assets (KERUSAKAN or KEHILANGAN)."""
+    """Laporan kerusakan atau kehilangan barang yang dicatat saat pengembalian."""
 
     __tablename__ = "asset_incident_reports"
     __table_args__ = table_args(

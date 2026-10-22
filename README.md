@@ -1,304 +1,226 @@
-<div align="center">
+# SIIPB
 
-# 🏛️ SIIPB — SISTEM INFORMASI INVENTARIS, PEMINJAMAN, DAN PENGEMBALIAN BARANG
-**Platform Tata Kelola Aset dan Sirkulasi Inventaris Terintegrasi Berstandar Enterprise**
+Sistem Informasi Inventaris Barang, Peminjaman, dan Pengembalian Barang.
 
-[![Status](https://img.shields.io/badge/Status-Production%20Ready-success?style=for-the-badge)]()
-[![Architecture](https://img.shields.io/badge/Architecture-Monorepo%20REST%20API-blue?style=for-the-badge)]()
-[![Security](https://img.shields.io/badge/Security-RBAC%20%2B%20JWT%20%2B%20Audit%20Log-orange?style=for-the-badge)]()
-[![Testing](https://img.shields.io/badge/Tests-16%20Passed%20(100%25)-brightgreen?style=for-the-badge)]()
+SIIPB dipakai petugas Sarpras/IT untuk mendata inventaris, mencatat peminjaman dan pengembalian, memantau barang
+yang jatuh tempo atau terlambat, mengirim pengingat lewat email, membuat laporan, dan menyimpan audit aktivitas.
+Peminjam tidak perlu punya akun. Semua transaksi dicatat petugas, sedangkan peminjam menerima email konfirmasi,
+pengingat, dan pemberitahuan keterlambatan.
 
-</div>
+Isi:
 
----
+1. Fitur
+2. Arsitektur
+3. Basis data
+4. Struktur repositori
+5. Teknologi
+6. Pengujian
+7. Menjalankan aplikasi
+8. Akun bawaan
+9. Dokumentasi lain
 
-## 📑 Daftar Isi
-1. [Ringkasan Eksekutif (Executive Summary)](#1-ringkasan-eksekutif-executive-summary)
-2. [Tujuan Strategis & Nilai Bisnis](#2-tujuan-strategis--nilai-bisnis)
-3. [Arsitektur Sistem Terintegrasi](#3-arsitektur-sistem-terintegrasi)
-4. [Diagram Relasi Basis Data (ERD)](#4-diagram-relasi-basis-data-erd)
-5. [Fitur Unggulan & Kapabilitas Utama](#5-fitur-unggulan--kapabilitas-utama)
-6. [Prinsip Tata Kelola & Integritas Data](#6-prinsip-tata-kelola--integritas-data)
-7. [Struktur Repositori (Monorepo Governance)](#7-struktur-repositori-monorepo-governance)
-8. [Matriks Kesesuaian Teknologi](#8-matriks-kesesuaian-teknologi)
-9. [Kesiapan Pengujian & Jaminan Mutu (QA)](#9-kesiapan-pengujian--jaminan-mutu-qa)
-10. [Panduan Deployment & Operasional](#10-panduan-deployment--operasional)
-11. [Kredensial & Akun Bawaan (Default Accounts)](#11-kredensial--akun-bawaan-default-accounts)
-12. [Dokumentasi API & Kontak](#12-dokumentasi-api--kontak)
+## 1. Fitur
 
----
+Inventaris
 
-## 1. Ringkasan Eksekutif (Executive Summary)
+- Data barang: kode inventaris, nama, kategori, lokasi, unit pemilik, merek/model, nomor seri, tahun, sumber dan
+  nilai perolehan, kondisi, status, serta foto.
+- Riwayat perubahan lokasi, kondisi, dan status setiap barang.
+- Pencatatan kerusakan dan perbaikan sampai barang kembali berstatus Tersedia.
 
-**SIIPB (Sistem Informasi Inventaris Barang, Peminjaman, dan Pengembalian Barang)** adalah solusi tata kelola aset digital yang dirancang untuk memodernisasi dan mengamankan seluruh siklus pengelolaan barang inventaris di lingkungan organisasi/lembaga.
+Peminjaman dan pengembalian
 
-Sistem ini memusatkan pencatatan aset fisik, mendigitalkan proses peminjaman dan pengembalian, memantau risiko keterlambatan melalui otomasi notifikasi terjadwal, serta mencatat rekam jejak audit (*audit trail*) yang tidak dapat dimanipulasi secara sepihak. Seluruh arsitektur dikembangkan mengacu pada cetak biru resmi **Blueprint Proyek SIIPB** dengan penekanan pada keandalan tinggi, konkurensi data bebas benturan (*race condition*), serta kepatuhan tata kelola TI (*IT Governance*).
+- Petugas memilih peminjam dari master data, memilih satu atau beberapa barang, lalu menentukan tanggal pinjam,
+  batas kembali, tujuan, dan catatan. Transaksi bisa disimpan sebagai draf atau langsung diserahkan (checkout).
+- Checkout memakai `SELECT ... FOR UPDATE`, sehingga satu barang tidak bisa dipinjamkan dua kali secara bersamaan.
+- Pengembalian bisa sebagian. Kondisi barang saat kembali (baik, rusak ringan, diperbaiki, rusak berat, hilang)
+  langsung mengubah status barang.
+- Bukti peminjaman dan pengembalian dapat dicetak.
 
----
+Monitoring dan notifikasi
 
-## 2. Tujuan Strategis & Nilai Bisnis
+- Daftar transaksi aktif, jatuh tempo dalam 3 hari, terlambat, serta barang rusak atau hilang.
+- Pemeriksaan jatuh tempo dijalankan Celery Beat sekali sehari pada jam yang diatur di Pengaturan (bawaan 08.00 WIB).
+  Transaksi yang lewat batas diubah menjadi TERLAMBAT.
+- Email pengingat H-3, H-1, H, dan H+1 untuk peminjam, H+3 ditambah petugas, dan H+7 ditambah pimpinan. Email yang
+  sama tidak dikirim dua kali.
 
-| Aspek Strategis | Manfaat & Dampak Nyata |
-| :--- | :--- |
-| **Pencegahan Kehilangan Aset** | Identifikasi real-time status barang (`TERSEDIA`, `DIPINJAM`, `RUSAK`, `HILANG`) dengan histori mutasi lengkap. |
-| **Mitigasi Keterlambatan** | Notifikasi pengingat otomatis multi-tahap (H-3, H-1, H, hingga eskalasi H+1, H+3, H+7) langsung ke peminjam dan pimpinan. |
-| **Efisiensi Kerja Petugas** | Peminjam tidak dibebani akun/formulir rumit; transaksi diverifikasi cepat oleh petugas Sarpras/IT. |
-| **Akuntabilitas & Audit Trail** | Log aktivitas *append-only* mencatat pelaku, waktu, alamat IP, data sebelum, dan data sesudah perubahan. |
-| **Pengambilan Keputusan Cepat** | Dashboard analitik terpusat menampilkan ketersediaan aset, transaksi aktif, rasio kerusakan, dan biaya perbaikan. |
+QR / Barcode
 
----
+- Label QR untuk setiap barang (dibuat dengan `qrcode` di backend) dan cetak label.
+- Pencarian barang lewat pemindai QR/barcode USB atau kamera di browser yang mendukung BarcodeDetector.
 
-## 3. Arsitektur Sistem Terintegrasi
+Laporan
 
-Sistem mengadopsi arsitektur *Service-Oriented Monorepo* berbasis standar industri:
+- Laporan inventaris, peminjaman, pengembalian, keterlambatan, serta kerusakan dan kehilangan dalam bentuk PDF,
+  Excel, atau cetak.
+
+Keamanan
+
+- Login lokal dengan CAPTCHA gambar, atau SSO melalui OAuth 2.0/OpenID Connect (Authlib).
+- JWT access token dan refresh token. Refresh token disimpan sebagai hash SHA-256.
+- RBAC dengan 16 permission. Role dan izinnya dapat diatur dari menu Pengguna & Role.
+- Audit log mencatat pelaku, waktu, alamat IP, serta data sebelum dan sesudah perubahan.
+- Riwayat transaksi tidak pernah dihapus. Relasi memakai `ON DELETE RESTRICT` dan status dibatasi dengan CHECK constraint.
+
+## 2. Arsitektur
 
 ```mermaid
 graph TD
-    Client[Pengguna / Petugas / Pimpinan] -->|HTTPS :80 / :443| Nginx[Nginx Reverse Proxy & Load Balancer]
-    Nginx -->|Static Assets| Frontend[Frontend Next.js / Web SPA]
-    Nginx -->|API Requests /api/v1| FlaskApp[Flask REST API Engine]
-    
-    FlaskApp -->|ORM SQLAlchemy 2.x & Row Locking| DB[(MariaDB 11+ - 23 Tabel)]
-    FlaskApp -->|Message Broker & Token Cache| Redis[(Redis In-Memory Cache)]
-    FlaskApp -->|Foto barang & backup| Storage[(Volume uploads / backups)]
-    
-    Redis --> CeleryWorker[Celery Async Worker]
-    CeleryWorker -->|SMTP Protocol| EmailServer[SMTP Email Gateway]
-    
-    CeleryBeat[Celery Beat Scheduler] -->|Tiap 15m: Cek Jatuh Tempo| Redis
-    CeleryBeat -->|Harian 01.00 WIB: Backup Basis Data| Redis
-    CeleryBeat -->|Tiap 5m: Antrean Notifikasi Email| Redis
-    CeleryWorker --> DB
+    Client[Pengguna] -->|HTTP/HTTPS| Nginx
+    Nginx -->|/| Frontend[Next.js]
+    Nginx -->|/api/v1| API[Flask REST API]
+    API -->|SQLAlchemy| DB[(MariaDB)]
+    API --> Redis[(Redis)]
+    API --> Storage[(Volume uploads dan backups)]
+    Redis --> Worker[Celery worker]
+    Worker -->|SMTP| Email[Server email]
+    Worker --> DB
+    Beat[Celery Beat] -->|tiap 15 menit: cek jatuh tempo| Redis
+    Beat -->|tiap 5 menit: antrean email| Redis
+    Beat -->|01.00 WIB: backup database| Redis
 ```
 
----
+## 3. Basis data
 
-## 4. Diagram Relasi Basis Data (ERD)
+MariaDB 11 dengan 23 tabel aplikasi. Skema dikelola dengan Alembic (revisi terbaru `c3e7a9d1f052`).
 
-Basis data SIIPB menggunakan **MariaDB 11+ / MariaDB 13 (InnoDB Engine)** dengan **23 tabel produksi** aktif (Head Revision Alembic `d4e8b1a5f920`) yang saling terhubung dalam 8 domain fungsional:
+![ERD SIIPB](database/ERD.png)
 
-<div align="center">
-  <a href="database/ERD.png" target="_blank">
-    <img src="database/ERD.png" alt="Entity Relationship Diagram SIIPB (23 Tabel)" width="95%" />
-  </a>
-  <p><em>Diagram Relasi Entitas (ERD) Crow's Foot SIIPB — 23 Tabel Produksi Aktif</em></p>
-</div>
+- Kamus data: [database/README.md](database/README.md)
+- Penjelasan ERD dan relasi: [docs/database_erd.md](docs/database_erd.md)
+- ERD interaktif (bisa di-zoom, buka di browser): [docs/SIIPB_ERD_diagram.html](docs/SIIPB_ERD_diagram.html)
+- ERD format SVG: [database/ERD.svg](database/ERD.svg)
+- DDL skema: [database/SIIPB.sql](database/SIIPB.sql)
 
-- 🗄️ **Kamus Data & Panduan Basis Data:** [`database/README.md`](database/README.md)
-- 📑 **Dokumentasi ERD & Spesifikasi Relasional:** [`docs/database_erd.md`](docs/database_erd.md)
-- 🔍 **Penampil Diagram Interaktif (Pan/Zoom):** [`docs/SIIPB_ERD_diagram.html`](docs/SIIPB_ERD_diagram.html) *(Dapat dibuka langsung di peramban web)*
-- 📐 **Diagram Vektor Skalabel (Lossless SVG):** [`database/ERD.svg`](database/ERD.svg)
-- 💾 **DDL Skema SQL Terkini:** [`database/SIIPB.sql`](database/SIIPB.sql)
-
----
-
-## 5. Fitur Unggulan & Kapabilitas Utama
-
-### A. Siklus Hidup Aset Terpadu (*Asset Lifecycle Management*)
-- **Pencatatan Komprehensif:** Kode inventaris unik, nomor seri pabrikan, kategori, lokasi gedung/ruangan, unit pemilik, serta foto fisik aset.
-- **Histori Pergerakan (Timeline):** Rekam jejak kronologis perpindahan lokasi, pergantian status, mutasi penanggung jawab, dan pemeliharaan.
-- **Pencatatan Kerusakan & Pemulihan:** Alur perbaikan terstruktur dari pelaporan insiden, estimasi biaya reparasi, perbaikan teknis, hingga pengembalian kondisi siap pakai (`TERSEDIA`).
-
-### B. Sirkulasi Peminjaman Berkeamanan Tinggi
-- **Pencegahan Double-Lending (Concurrency Safe):** Transaksi checkout dilindungi mekanisme *Pessimistic Row Locking* (`SELECT ... FOR UPDATE`) pada level basis data, menjamin dua petugas tidak dapat meminjamkan unit barang yang sama secara bersamaan.
-- **Peminjam Tanpa Beban Akun:** Peminjam dicatat sebagai entitas master terverifikasi tanpa perlu membuat akun atau login ke sistem, menjaga privasi dan kecepatan pelayanan.
-- **Dukungan Pengembalian Parsial:** Peminjam dapat mengembalikan sebagian barang terlebih dahulu dari transaksi gabungan tanpa merusak integritas data transaksi.
-
-### C. Sistem Peringatan Dini & Eskalasi Terjadwal (*Idempotent Notifications*)
-- **Jadwal Pengingat Terukur (Celery Beat):**
-  - Evaluasi berkala setiap 15 menit terhadap jam operasional yang ditentukan di Pengaturan (bawaan 08.00 WIB) tanpa perlu restart server.
-  - `H-3`: Notifikasi email persiapan pengembalian.
-  - `H-1`: Notifikasi email pengingat H-1 batas waktu.
-  - `H-0`: Notifikasi batas pengembalian hari ini.
-  - `H+1` s/d `H+7`: Penandaan otomatis status `TERLAMBAT` dan eskalasi bertingkat ke Pimpinan Unit & Kasubag Sarpras.
-- **Jaminan Idempoten & Antrean Otomatis:** Mencegah pengiriman email berulang kali (*anti-spam*) untuk kejadian yang sama, serta pemrosesan antrean pengiriman email background setiap 5 menit.
-
-### D. Identifikasi Cepat & Labeling Fisik (QR Code & Barcode)
-- **Generasi Label Ganda:** Mendukung pencetakan label QR Code dinamis (resolusi tinggi via Python `qrcode`) serta Barcode standar industri (Code128).
-- **Pemindai Terintegrasi:** Pemindai QR interaktif langsung dari peramban (*webcam / kamera smartphone*) serta kompatibilitas penuh dengan pemindai barcode optik (USB/Bluetooth) untuk percepatan verifikasi sirkulasi barang.
-
-### E. Keamanan Tingkat Enterprise (*Enterprise Security & RBAC*)
-- **Hierarki Peran (RBAC):** Administrator, Petugas Sarpras/IT, dan Pimpinan dengan izin per-modul (`asset.create`, `borrowing.checkout`, `damage.manage`, `audit.read`).
-- **Tokenisasi JWT & Keamanan Refresh:** JWT Access Token berumur pendek dengan Refresh Token yang disimpan dalam bentuk hash SHA-256 (bukan plaintext).
-- **Single Sign-On (SSO):** Integrasi Google Workspace / OAuth 2.0 / OIDC melalui Authlib.
-
----
-
-## 6. Prinsip Tata Kelola & Integritas Data
-
-1. **Non-Destructive History:** Tidak ada riwayat transaksi peminjaman atau pengembalian yang dihapus (`ON DELETE RESTRICT`). Integritas pembukuan organisasi terjaga seumur hidup sistem.
-2. **Strict State Transitions:** Status ketersediaan barang diikat dengan *CHECK Constraint* basis data untuk mencegah inkonsistensi data.
-3. **Audit Trail Lengkap:** Seluruh aksi kritis (tambah/ubah barang, approval checkout, penerimaan kondisi rusak, update perbaikan) dicatat ke tabel `audit_logs`.
-
----
-
-## 7. Struktur Repositori (Monorepo Governance)
+## 4. Struktur repositori
 
 ```text
 SIIPB/
-├── backend/                      # 🐍 Flask REST API, aturan bisnis, Celery worker & beat
+├── backend/                      Flask REST API, aturan bisnis, Celery worker dan beat
 │   ├── app/
-│   │   ├── middleware/           # JWT + RBAC (izin dibaca ulang dari DB setiap permintaan)
-│   │   ├── models/               # 23 tabel produksi (SQLAlchemy 2.x)
-│   │   ├── routes/               # Blueprint /api/v1/... (Swagger di /api/docs)
-│   │   ├── schemas/              # Validasi payload (Marshmallow)
-│   │   ├── services/             # Aturan bisnis, row locking, notifikasi, laporan, backup
-│   │   ├── tasks/                # Celery: email SMTP (retry), pemeriksaan jatuh tempo, backup
-│   │   └── utils/                # Keamanan (scrypt, JWT) & format respons
-│   ├── alembic/versions/         # Migrasi skema (f627… awal s/d d4e8… roles JSON)
-│   ├── scripts/seed_data.py      # Seed idempoten (role, permission, template, akun awal)
-│   ├── tests/                    # pytest — database uji terpisah (siipb_test)
-│   ├── Dockerfile                # Gunicorn + WeasyPrint + mariadb-client
-│   └── docker-entrypoint.sh      # alembic upgrade head + seed sebelum start
-│
-├── frontend/                     # ⚛️ Next.js 16 + React 19 + TypeScript + Tailwind + shadcn/ui
+│   │   ├── middleware/           JWT dan RBAC (izin dibaca ulang dari database setiap request)
+│   │   ├── models/               model SQLAlchemy
+│   │   ├── routes/               endpoint /api/v1 (Swagger di /api/docs)
+│   │   ├── schemas/              validasi payload (Marshmallow)
+│   │   ├── services/             aturan bisnis, notifikasi, laporan, backup, CAPTCHA
+│   │   ├── tasks/                tugas Celery: kirim email, cek jatuh tempo, backup
+│   │   └── utils/                keamanan, validasi, format respons
+│   ├── alembic/versions/         migrasi skema
+│   ├── scripts/seed_data.py      data awal (role, template email, akun)
+│   ├── tests/                    pytest dengan database uji terpisah (siipb_test)
+│   ├── Dockerfile                Gunicorn, WeasyPrint, mariadb-client
+│   └── docker-entrypoint.sh      alembic upgrade head dan seed sebelum start
+├── frontend/                     Next.js 16, React 19, TypeScript, Tailwind, shadcn/ui
 │   ├── app/ components/ lib/ services/ hooks/ types/
-│   ├── tests/                    # Vitest (unit) & Playwright (UI mock + integrasi API)
-│   └── Dockerfile                # build standalone
-│
-├── database/                     # 🗄️ Skema & Dokumentasi Basis Data
-│   ├── ERD.png                   # Diagram visual relasi tabel (Crow's Foot style)
-│   ├── ERD.svg                   # Diagram vektor murni resolusi tinggi
-│   ├── README.md                 # Kamus data komprehensif & panduan skema (23 tabel)
-│   └── SIIPB.sql                 # DDL skema terbaru (hasil migrasi Alembic head)
+│   ├── tests/                    Vitest (unit) dan Playwright (UI)
+│   └── Dockerfile
+├── database/                     ERD, kamus data, DDL
 ├── infrastructure/
-│   ├── nginx/nginx.conf          # / → Next.js, /api → Flask, /uploads → volume, rate limit login
-│   ├── nginx/nginx.https.conf    # Varian HTTPS (HSTS, TLS 1.2/1.3)
-│   └── scripts/                  # backup_db.sh & restore_db.sh
-├── docs/                         # 📑 Dokumentasi teknis, ERD, arsitektur, & spesifikasi API
-│   ├── database_erd.md           # Dokumentasi komprehensif 23 tabel & relasi
-│   ├── SIIPB_ERD_diagram.html    # Penampil diagram interaktif pan & zoom
-│   └── api_specification.md      # Spesifikasi REST API
-├── .github/workflows/ci.yml      # CI: pytest, lint/typecheck/vitest/build, Playwright, docker build
-├── docker-compose.yml            # Nginx, Next.js, Flask, MariaDB, Redis, Celery worker & beat
-└── .env.example                  # Contoh konfigurasi (rahasia tidak di-commit)
+│   ├── nginx/                    konfigurasi Nginx HTTP dan HTTPS
+│   ├── cloudformation/           template AWS
+│   └── scripts/                  backup_db.sh, restore_db.sh, rds_restore_test.sh
+├── deploy/scripts/               skrip deploy di server
+├── docs/                         dokumentasi teknis dan panduan pengguna
+├── .github/workflows/            CI (tes, lint, build) dan deploy
+├── docker-compose.yml            Nginx, Next.js, Flask, MariaDB, Redis, Celery worker dan beat
+└── .env.example                  contoh konfigurasi (rahasia tidak di-commit)
 ```
 
----
+## 5. Teknologi
 
-## 8. Matriks Kesesuaian Teknologi (dokumen Plan §8)
+| Komponen | Teknologi |
+|---|---|
+| Frontend | Next.js, React, TypeScript, Tailwind CSS, shadcn/ui |
+| Backend | Python 3.12, Flask, REST + JSON |
+| Dokumentasi API | Swagger (flasgger) di `/api/docs` |
+| Database | MariaDB 11, SQLAlchemy 2, Alembic |
+| Autentikasi | JWT, OAuth 2.0/OIDC (Authlib), CAPTCHA |
+| Antrean dan penjadwal | Redis, Celery, Celery Beat |
+| Email | SMTP (STARTTLS/SSL), kata sandi SMTP disimpan terenkripsi |
+| QR | `qrcode` |
+| Laporan | WeasyPrint (PDF), openpyxl (Excel) |
+| Pengujian | pytest, Vitest, Playwright |
+| Deployment | Docker Compose, Nginx, GitHub Actions, AWS CloudFormation |
+| Penyimpanan berkas | Volume lokal `/app/uploads`, disinkronkan ke S3 di server AWS |
 
-| Komponen | Teknologi | Status |
-| :--- | :--- | :--- |
-| Frontend | Next.js + React + TypeScript, Tailwind CSS + shadcn/ui | ✅ `frontend/` |
-| Backend & API | Python 3.12 + Flask, REST + JSON | ✅ `backend/app/routes` |
-| Dokumentasi API | OpenAPI / Swagger (flasgger) | ✅ `/api/docs` |
-| Database & ORM | MariaDB 11.x + SQLAlchemy 2.x, migrasi Alembic | ✅ |
-| Autentikasi & SSO | JWT (access + refresh, rotasi saat ganti sandi), OAuth 2.0/OIDC (Authlib, state/nonce) | ✅ |
-| Otorisasi | RBAC 16 permission, role dapat diatur dari UI | ✅ |
-| Queue / Worker / Scheduler | Redis + Celery + Celery Beat (Pemeriksaan jatuh tempo berkala 15m, backup harian 01.00 WIB, antrean email 5m) | ✅ `backend/celery_app.py` |
-| Email | SMTP (STARTTLS/SSL), kata sandi tersimpan terenkripsi | ✅ |
-| QR Code & Barcode | Python `qrcode` (`/assets/{id}/qr`) + Barcode Code128 + Pemindai Kamera di UI | ✅ `frontend/components/ui/` |
-| PDF / Excel | WeasyPrint / openpyxl (`/reports/{jenis}?format=pdf|xlsx`) | ✅ |
-| Pengujian | pytest, Vitest, Playwright | ✅ |
-| Web server & container | Nginx + Docker Compose | ✅ |
-| CI/CD | GitHub Actions | ✅ `.github/workflows/ci.yml` |
-| Penyimpanan berkas | Volume lokal `/app/uploads` (MinIO/S3 opsional — konfigurasi `S3_*`) | ⚠️ lokal |
+## 6. Pengujian
 
----
+| Jenis | Isi | Perintah |
+|---|---|---|
+| Backend | 79 tes: autentikasi, CAPTCHA, RBAC, master data, inventaris, peminjaman, pengembalian, notifikasi H-3 sampai H+7, anti-duplikat, laporan, pengaturan, audit log, backup | `cd backend && pytest` |
+| Concurrency | 4 checkout bersamaan pada barang yang sama, hanya 1 yang berhasil | termasuk di atas |
+| Frontend unit | 49 tes: tanggal, aturan bisnis, validasi, pemetaan API | `cd frontend && npm test` |
+| UI (mode demo) | 7 skenario Playwright | `npm run test:e2e` |
+| Integrasi UI dengan API | 4 skenario Playwright | `E2E_API=1 npx playwright test tests/e2e/api.spec.ts` |
 
-## 9. Kesiapan Pengujian & Jaminan Mutu (QA)
+Database uji `siipb_test` dibuat ulang setiap kali tes dijalankan, jadi database pengembangan tidak ikut berubah.
 
-| Jenis (Plan §22) | Cakupan | Perintah |
-| :--- | :--- | :--- |
-| Unit & API test (backend) | 62 tes: auth/JWT/refresh/SSO code, RBAC per role, CRUD master, inventaris (foto, QR, status manual, alias `/items`), draf→checkout, pengembalian rusak/hilang, **notifikasi H-3…H+7 + eskalasi + anti-duplikat**, laporan PDF/Excel, pengaturan SMTP terenkripsi, audit log, backup | `cd backend && pytest` |
-| Concurrency test | 4 checkout bersamaan pada barang yang sama → tepat 1 berhasil (`SELECT … FOR UPDATE`) | termasuk di atas |
-| Unit test frontend | 41 tes: tanggal, aturan bisnis, mapper API, komponen | `cd frontend && npm test` |
-| UI test (mode mock) | 7 skenario Playwright | `npm run test:e2e` |
-| Integrasi frontend ↔ API | 4 skenario Playwright (foto, draf/checkout/pengembalian, pengguna, pengaturan, scheduler, laporan, RBAC) — lulus langsung & lewat Nginx | `E2E_API=1 npx playwright test tests/e2e/api.spec.ts` |
+## 7. Menjalankan aplikasi
 
-Database uji dibuat ulang otomatis (`siipb_test`: DROP → `alembic upgrade head` → seed), sehingga database pengembangan tidak tersentuh.
+Dengan Docker Compose:
 
----
-
-## 10. Panduan Deployment & Operasional
-
-> **AWS production (CloudFormation + GitHub Actions + CloudWatch):** lihat [docs/DEVOPS-DEPLOYMENT.md](docs/DEVOPS-DEPLOYMENT.md).
-
-### A. Docker Compose (production)
 ```bash
-cp .env.example .env        # ganti semua nilai "ganti-…" (DB, SECRET_KEY, JWT_SECRET_KEY, SEED_ADMIN_PASSWORD)
+cp .env.example .env        # ganti semua nilai "ganti-..." (DB, SECRET_KEY, JWT_SECRET_KEY, SEED_ADMIN_PASSWORD)
 docker compose up -d --build
 ```
-- Aplikasi: `http://<server>` (HTTPS: `NGINX_CONF=nginx.https.conf` + sertifikat di `infrastructure/nginx/certs/`)
-- Swagger: `/api/docs` · Health check: `/api/health`
-- Container `backend` menjalankan `alembic upgrade head` + seed (akun `admin` dengan `SEED_ADMIN_PASSWORD`) sebelum start.
-- Backup: otomatis tiap hari 01.00 (Celery Beat, volume `backups_data`), manual dari **Pengaturan → Backup**, atau `infrastructure/scripts/backup_db.sh`. Pemulihan: `infrastructure/scripts/restore_db.sh <berkas>`.
-- Rollback: `docker compose down` → checkout tag sebelumnya → `alembic downgrade <revisi>` bila perlu → `docker compose up -d --build`.
 
-### B. Pengembangan lokal (Local Development)
+- Aplikasi: `http://localhost` (untuk HTTPS pakai `NGINX_CONF=nginx.https.conf` dan sertifikat di `infrastructure/nginx/certs/`)
+- Swagger: `/api/docs`, health check: `/api/health`
+- Container backend menjalankan `alembic upgrade head` dan seed sebelum start.
+- Backup otomatis setiap hari pukul 01.00, atau manual dari Pengaturan > Backup MariaDB. Pemulihan memakai
+  `infrastructure/scripts/restore_db.sh <berkas>`.
+- Langkah rollback ada di [docs/DEVOPS-DEPLOYMENT.md](docs/DEVOPS-DEPLOYMENT.md#rollback-database).
 
-> [!NOTE]
-> Monorepo ini memiliki dua lingkungan dependensi terpisah: Python (`backend/`) dan Node.js (`frontend/`). Pastikan masuk ke direktori masing-masing sebelum memasang dependensi atau menjalankan server.
+Deploy ke AWS (CloudFormation, GitHub Actions, CloudWatch) dijelaskan di [docs/DEVOPS-DEPLOYMENT.md](docs/DEVOPS-DEPLOYMENT.md).
+Cara memakai aplikasi untuk Administrator, Petugas, dan Pimpinan ada di [docs/PANDUAN-PENGGUNA.md](docs/PANDUAN-PENGGUNA.md).
 
-#### 1. Backend, Basis Data, & Worker
+Tanpa Docker, backend dan frontend dijalankan terpisah.
+
+Backend:
+
 ```bash
 cd backend
-
-# Buat & aktifkan virtual environment
 python -m venv .venv
-# Windows (PowerShell): .\.venv\Scripts\Activate.ps1
-# Windows (CMD):        .venv\Scripts\activate.bat
-# Linux / macOS:        source .venv/bin/activate
-
-# Pasang dependensi Python
+# Windows PowerShell: .\.venv\Scripts\Activate.ps1
+# Linux/macOS:        source .venv/bin/activate
 pip install -r requirements.txt
-
-# Migrasi basis data & inisialisasi akun/role awal
 alembic upgrade head
-python scripts/seed_data.py               # admin/admin123, petugas/petugas123, pimpinan/pimpinan123
+python scripts/seed_data.py
+python run.py                             # http://localhost:5000, Swagger di /api/docs
 
-# Jalankan server REST API Flask
-python run.py                             # http://localhost:5000 (Swagger: /api/docs)
-
-# Jalankan Celery Worker & Beat (opsional jika NOTIFICATION_DISPATCH=sync)
+# worker dan beat (tidak perlu jika NOTIFICATION_DISPATCH=sync)
 celery -A celery_app.celery worker --loglevel=info
 celery -A celery_app.celery beat --loglevel=info
 ```
 
-#### 2. Frontend (Next.js)
+Frontend:
+
 ```bash
 cd frontend
-
-# Pasang dependensi Node.js (pastikan di folder frontend)
 npm install
-
-# Konfigurasi environment lokal
 cp .env.example .env    # NEXT_PUBLIC_DATA_SOURCE=api, NEXT_PUBLIC_API_BASE_URL=http://localhost:5000/api/v1
-
-# Jalankan server pengembang Next.js
-npm run dev             # http://localhost:3000 (Mode Mock: NEXT_PUBLIC_DATA_SOURCE=mock)
+npm run dev             # http://localhost:3000, atau NEXT_PUBLIC_DATA_SOURCE=mock untuk mode demo tanpa backend
 ```
 
----
+## 8. Akun bawaan
 
-## 11. Kredensial & Akun Bawaan (Default Accounts)
+Akun ini dibuat oleh `scripts/seed_data.py` dan juga tersedia di mode demo.
 
-Setelah menjalankan `python scripts/seed_data.py` (pada mode API/Database) atau saat menjalankan frontend pada mode Mock (`NEXT_PUBLIC_DATA_SOURCE=mock`), akun-akun bawaan berikut siap digunakan untuk login:
+| Role | Username | Email | Kata sandi |
+|---|---|---|---|
+| Administrator | `admin` | `admin@siipb.local` | `admin123` |
+| Petugas Sarpras/IT | `petugas` | `petugas@siipb.local` | `petugas123` |
+| Pimpinan | `pimpinan` | `pimpinan@siipb.local` | `pimpinan123` |
 
-| Peran (Role) | Username | Email | Password Default | Hak Akses Utama |
-| :--- | :--- | :--- | :--- | :--- |
-| **Administrator** | `admin` | `admin@siipb.local` | `admin123` | Akses penuh sistem, manajemen pengguna, role & permission, pengaturan SMTP/sistem, audit log, dan backup. |
-| **Petugas Sarpras / IT** | `petugas` | `petugas@siipb.local` | `petugas123` | Manajemen aset/inventaris, pencatatan transaksi peminjaman & pengembalian, monitoring keterlambatan, cetak label QR, dan ekspor laporan. |
-| **Pimpinan** | `pimpinan` | `pimpinan@siipb.local` | `pimpinan123` | Monitoring dashboard eksekutif, rekapitulasi keterlambatan/eskalasi, dan melihat/ekspor laporan aset & sirkulasi. |
+Di server sungguhan, atur kata sandi awal lewat `SEED_ADMIN_PASSWORD`, `SEED_PETUGAS_PASSWORD`, dan
+`SEED_PIMPINAN_PASSWORD`, lalu ganti kata sandi setelah login pertama.
 
-> [!IMPORTANT]
-> **Catatan Keamanan Production:**
-> - Kata sandi default di atas dapat disesuaikan sebelum inisialisasi melalui environment variable `SEED_ADMIN_PASSWORD`, `SEED_PETUGAS_PASSWORD`, dan `SEED_PIMPINAN_PASSWORD`.
-> - Untuk lingkungan *production*, sangat disarankan untuk segera mengganti kata sandi bawaan melalui menu **Pengaturan Pengguna** setelah login pertama kali.
+## 9. Dokumentasi lain
 
----
-
-## 12. Dokumentasi API & Kontak
-
-- **Spesifikasi Lengkap REST API:** Kunjungi endpoint `/api/docs` saat server aktif untuk melihat antarmuka Swagger UI interaktif yang memuat seluruh parameter, model payload, dan skema respons.
-- **Daftar Endpoint API:** [`docs/api_specification.md`](docs/api_specification.md).
-- **Dokumentasi Basis Data & ERD:** [`docs/database_erd.md`](docs/database_erd.md) dan [`database/README.md`](database/README.md).
-- **Penampil Visual ERD Interaktif:** [`docs/SIIPB_ERD_diagram.html`](docs/SIIPB_ERD_diagram.html).
-- **Repository Git:** [GitHub lemonade199/SIIPB](https://github.com/lemonade199/SIIPB.git).
-
----
-
-<div align="center">
-  <small>© 2026 Tim Pengembang SIIPB — Seluruh hak cipta dilindungi undang-undang.</small>
-</div>
+- Swagger: `/api/docs` saat server berjalan
+- Daftar endpoint: [docs/api_specification.md](docs/api_specification.md)
+- Koleksi Postman: [docs/postman/SIIPB.postman_collection.json](docs/postman/SIIPB.postman_collection.json)
+- Panduan SMTP dan SSO: [docs/PANDUAN-SSO-SMTP.md](docs/PANDUAN-SSO-SMTP.md)
+- Arsitektur: [docs/architecture.md](docs/architecture.md)
+- Repositori: https://github.com/lemonade199/SIIPB

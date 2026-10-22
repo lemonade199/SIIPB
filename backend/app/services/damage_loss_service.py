@@ -1,4 +1,4 @@
-"""Damage and Loss Incident Reports Service."""
+"""Laporan kerusakan dan kehilangan barang."""
 from datetime import datetime
 from typing import Any
 from sqlalchemy import func, select
@@ -54,7 +54,7 @@ def update_damage_repair_status(
 
     now = datetime.now()
 
-    # If repaired (SELESAI), restore asset to TERSEDIA and condition BAIK
+    # selesai diperbaiki: barang kembali TERSEDIA dengan kondisi BAIK
     asset = report.return_item.asset
     damaged = {AssetStatus.RUSAK.value, AssetStatus.RUSAK_BERAT.value, AssetStatus.DALAM_PERBAIKAN.value}
     old_asset_status = asset.status

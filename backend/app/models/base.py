@@ -1,4 +1,4 @@
-"""Declarative base, shared column types, and mixins for all SIIPB models."""
+"""Base model, tipe kolom bersama, dan mixin untuk semua model SIIPB."""
 from datetime import datetime
 
 from sqlalchemy import MetaData, text

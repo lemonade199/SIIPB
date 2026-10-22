@@ -1,4 +1,4 @@
-"""Asset and Inventory validation schemas."""
+"""Validasi data barang inventaris."""
 from marshmallow import Schema, fields, validate
 
 from app.models.enums import AssetCondition, AssetStatus

@@ -12,23 +12,23 @@ def api_response(
     errors: Any = None,
     meta: dict[str, Any] | None = None,
 ) -> tuple[Response, int]:
-    """Build a uniform JSON response format.
+    """Format respons JSON yang seragam.
 
-    Success format:
+    Berhasil:
     {
         "success": true,
         "message": "...",
         "data": { ... },
-        "meta": { "page": 1, ... }  # optional
+        "meta": { "page": 1, ... }  # opsional
     }
 
-    Error format:
+    Gagal:
     {
         "success": false,
         "message": "...",
         "error_code": "ASSET_NOT_AVAILABLE",
         "data": null,
-        "errors": { ... }  # optional validation details
+        "errors": { ... }  # opsional, detail validasi
     }
     """
     payload: dict[str, Any] = {

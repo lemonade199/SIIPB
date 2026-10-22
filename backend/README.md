@@ -4,7 +4,7 @@ Service backend komprehensif berbasis Python 3.12+, Flask REST API, SQLAlchemy 2
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Framework:** Flask 3.0+ (Application Factory, Blueprints `/api/v1`)
 - **Database ORM:** SQLAlchemy 2.0 (Declarative Mapping, strict row-locking `SELECT ... FOR UPDATE`)
@@ -20,7 +20,7 @@ Service backend komprehensif berbasis Python 3.12+, Flask REST API, SQLAlchemy 2
 
 ---
 
-## 📁 Struktur Direktori Backend
+## Struktur Direktori Backend
 
 ```text
 backend/
@@ -63,7 +63,7 @@ backend/
 
 ---
 
-## 🚀 Panduan Menjalankan Backend Secara Lokal
+## Panduan Menjalankan Backend Secara Lokal
 
 ### 1. Setup Virtual Environment & Install Dependensi
 ```powershell
@@ -108,7 +108,7 @@ Seluruh 16 skenario pengujian termasuk simulasi multithreading concurrency row l
 
 ---
 
-## 🐳 Menjalankan dengan Docker & Docker Compose
+## Menjalankan dengan Docker & Docker Compose
 
 Jalankan seluruh stack (MariaDB, Redis, Flask API, Celery Worker, Celery Beat, dan Nginx) dengan satu perintah:
 
@@ -122,7 +122,7 @@ Aplikasi akan langsung dapat diakses pada port 80:
 
 ---
 
-## 🔄 Pembaruan (fitur dokumen Plan)
+## Pembaruan (fitur dokumen Plan)
 
 - **Migrasi baru** `a7c3e91d2b40`: draf peminjaman & checkout, `asset_photos` (item_photos), sumber perolehan, penerima notifikasi
   (peminjam/petugas/pimpinan) & `notification_reads`, `scheduler_runs`, permission RBAC diseragamkan dengan antarmuka, template

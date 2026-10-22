@@ -44,7 +44,7 @@ Login sebagai admin, lalu buka **Pengaturan → Keamanan & SSO**:
 
 | Kolom | Isi |
 |---|---|
-| Aktifkan login SSO | ✅ centang |
+| Aktifkan login SSO | dicentang |
 | Issuer / Identity Provider | `https://accounts.google.com` |
 | Client ID | Client ID dari Google |
 | Client secret | Client Secret dari Google (kosongkan saat menyimpan ulang jika tidak diubah) |

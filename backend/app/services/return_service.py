@@ -1,4 +1,4 @@
-"""Return Processing Service with Condition Evaluation and Incident Reporting."""
+"""Pengembalian barang: kondisi akhir, status barang, dan laporan kerusakan/kehilangan."""
 from datetime import datetime
 from typing import Any
 from sqlalchemy import func, select
@@ -51,7 +51,7 @@ def process_return(
     returned_on: Any | None = None,
     send_confirmation: bool = True,
 ) -> tuple[Return, list[int]]:
-    """Process return of borrowed items (supports partial or complete returns)."""
+    """Catat pengembalian barang (boleh sebagian)."""
     borrowing = session.get(Borrowing, borrowing_id)
     if not borrowing:
         raise ValueError("Transaksi peminjaman tidak ditemukan")

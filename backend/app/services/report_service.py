@@ -319,7 +319,7 @@ def to_pdf(rep: Report, settings: dict, user_name: str) -> bytes:
         from weasyprint import HTML
         return HTML(string=doc).write_pdf()
     except (ImportError, OSError):
-        # Fallback for environments without GTK/Pango C libraries (e.g., Windows development)
+        # WeasyPrint butuh GTK/Pango; tanpa itu (mis. di Windows) pakai cara cadangan
         stream = f"BT /F1 12 Tf 50 750 Td (SIIPB - {rep.title}) Tj ET".encode("latin-1", "replace")
         return (
             b"%PDF-1.4\n"

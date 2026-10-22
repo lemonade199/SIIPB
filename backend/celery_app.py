@@ -1,4 +1,4 @@
-"""Celery application and beat schedule entrypoint."""
+"""Aplikasi Celery dan jadwal Celery Beat."""
 import sys
 from pathlib import Path
 from celery.schedules import crontab

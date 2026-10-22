@@ -1,7 +1,6 @@
-"""Domain enums. Stored as VARCHAR and guarded by DB CHECK constraints.
+"""Enum status dan kondisi. Disimpan sebagai VARCHAR dan dibatasi CHECK constraint.
 
-The CHECK constraint SQL is generated from these enums via :func:`check_in`,
-and the same literal SQL is frozen in the Alembic migrations.
+SQL CHECK dibuat dari enum ini lewat check_in(), dan teks SQL yang sama dibekukan di migrasi Alembic.
 """
 from enum import StrEnum
 

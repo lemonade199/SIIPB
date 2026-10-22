@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 
 class Return(IdMixin, CreatedAtMixin, Base):
-    """Partial returns allowed -> borrowing_id is NOT unique."""
+    """Pengembalian boleh sebagian, jadi borrowing_id tidak unik."""
 
     __tablename__ = "returns"
     __table_args__ = table_args()

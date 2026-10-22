@@ -162,7 +162,7 @@
           }
         },
         {
-          "name": "POST /auth/logout - Logout and revoke refresh token.",
+          "name": "POST /auth/logout - Logout dan cabut refresh token.",
           "request": {
             "method": "POST",
             "header": [
@@ -183,7 +183,7 @@
                 "logout"
               ]
             },
-            "description": "Logout and revoke refresh token.",
+            "description": "Logout dan cabut refresh token.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"refresh_token\": \"{{refreshToken}}\"\n}",
@@ -264,7 +264,7 @@
           }
         },
         {
-          "name": "POST /auth/refresh - Refresh expired access token using valid refresh token.",
+          "name": "POST /auth/refresh - Perbarui access token memakai refresh token yang masih berlaku.",
           "request": {
             "method": "POST",
             "header": [
@@ -285,7 +285,7 @@
                 "refresh"
               ]
             },
-            "description": "Refresh expired access token using valid refresh token.",
+            "description": "Perbarui access token memakai refresh token yang masih berlaku.",
             "auth": {
               "type": "noauth"
             },
@@ -1368,7 +1368,7 @@
           }
         },
         {
-          "name": "PUT /damage-reports/{report_id}/repair-status - Update repair lifecycle status for a damage report.",
+          "name": "PUT /damage-reports/{report_id}/repair-status - Ubah status perbaikan pada laporan kerusakan.",
           "request": {
             "method": "PUT",
             "header": [
@@ -1397,7 +1397,7 @@
                 }
               ]
             },
-            "description": "Update repair lifecycle status for a damage report.",
+            "description": "Ubah status perbaikan pada laporan kerusakan.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"repair_status\": \"SELESAI\",\n  \"action_taken\": \"Ganti keyboard\",\n  \"repair_cost\": 350000\n}",
@@ -2535,7 +2535,7 @@
           }
         },
         {
-          "name": "POST /returns - Process return of borrowed items (supports partial or complete returns).",
+          "name": "POST /returns - Catat pengembalian barang (boleh sebagian).",
           "request": {
             "method": "POST",
             "header": [
@@ -2555,7 +2555,7 @@
                 "returns"
               ]
             },
-            "description": "Process return of borrowed items (supports partial or complete returns).",
+            "description": "Catat pengembalian barang (boleh sebagian).",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"borrowing_id\": 1,\n  \"notes\": \"\",\n  \"send_confirmation\": true,\n  \"items\": [\n    {\n      \"borrowing_item_id\": 1,\n      \"asset_id\": 1,\n      \"final_condition\": \"BAIK\",\n      \"completeness\": \"Lengkap\"\n    }\n  ]\n}",

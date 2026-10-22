@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 
 class NotificationEvent(IdMixin, CreatedAtMixin, Base):
-    """Insert with INSERT IGNORE / ON DUPLICATE KEY so the scheduler is re-runnable."""
+    """Disisipkan dengan INSERT IGNORE agar pemeriksaan jatuh tempo aman dijalankan ulang."""
 
     __tablename__ = "notification_events"
     __table_args__ = table_args(

@@ -4,7 +4,7 @@ Direktori ini berisi berkas skema, diagram ERD (Entity Relationship Diagram), da
 
 ---
 
-## 📁 Struktur Direktori
+## Struktur Direktori
 
 ```text
 database/
@@ -16,7 +16,7 @@ database/
 
 ---
 
-## 🖼️ Entity Relationship Diagram (ERD)
+## Entity Relationship Diagram (ERD)
 
 Diagram ERD resmi skema database aktif SIIPB (23 tabel produksi) menggunakan gaya visual **Crow's Foot**:
 
@@ -28,7 +28,7 @@ Diagram ERD resmi skema database aktif SIIPB (23 tabel produksi) menggunakan gay
 
 ---
 
-## 🗄️ Daftar Tabel (23 Tabel Aplikasi + alembic_version)
+## Daftar Tabel (23 Tabel Aplikasi + alembic_version)
 
 > Sumber kebenaran skema adalah migrasi Alembic (`backend/alembic/versions`). Docker Compose menjalankannya otomatis; `SIIPB.sql` untuk referensi/impor manual (lanjutkan dengan `python backend/scripts/seed_data.py`).
 
@@ -62,7 +62,7 @@ Katalog 16 permission granular didefinisikan secara statis pada backend (`app/mo
 
 ---
 
-## ⚡ Cara Import / Restore Database
+## Cara Import / Restore Database
 
 ### Opsi 1: Menggunakan Dump SQL Langsung
 Jika ingin mengimpor langsung dari dump SQL:
@@ -85,7 +85,7 @@ alembic upgrade head
 
 ---
 
-## 🧪 Validasi Integritas Database
+## Validasi Integritas Database
 Untuk menjalankan pengujian otomatis atas seluruh CHECK constraints, relasi RESTRICT, dan idempotency:
 
 ```bash

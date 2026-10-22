@@ -16,7 +16,7 @@ def record_audit(
     old_data: dict[str, Any] | None = None,
     new_data: dict[str, Any] | None = None,
 ) -> AuditLog:
-    """Record an immutable, append-only audit log entry."""
+    """Tambah satu baris audit log (tidak pernah diubah atau dihapus)."""
     ip_address = None
     user_agent = None
 

@@ -1,4 +1,4 @@
-"""File and evidence upload routes."""
+"""Unggah berkas dan bukti."""
 from flask import Blueprint, request
 
 from app.middleware.auth_middleware import any_permission_required

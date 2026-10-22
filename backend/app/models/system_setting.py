@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 
 class SystemSetting(IdMixin, TimestampMixin, Base):
-    """Secrets (is_secret=1) must be stored encrypted by the application."""
+    """Nilai rahasia (is_secret=1) disimpan terenkripsi oleh aplikasi."""
 
     __tablename__ = "system_settings"
     __table_args__ = table_args(

@@ -1,4 +1,4 @@
-"""Security utilities: password hashing, SHA-256 token hashing, and JWT handling."""
+"""Hash kata sandi, hash token SHA-256, dan JWT."""
 import hashlib
 import hmac
 import secrets
@@ -50,16 +50,12 @@ def validate_password_strength(password: str) -> str | None:
 
 
 def hash_token(raw_token: str) -> str:
-    """Hash a token using SHA-256 for secure storage in refresh_tokens.token_hash."""
+    """Hash SHA-256 untuk disimpan di refresh_tokens.token_hash."""
     return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
 
 
 def generate_refresh_token() -> tuple[str, str]:
-    """Generate a random cryptographically secure token and its SHA-256 hash.
-
-    Returns:
-        (raw_token, token_hash)
-    """
+    """Buat token acak; mengembalikan (token, hash SHA-256-nya)."""
     raw_token = secrets.token_urlsafe(64)
     token_hash = hash_token(raw_token)
     return raw_token, token_hash
@@ -72,7 +68,7 @@ def create_access_token(
     permissions: list[str],
     expires_delta: timedelta | None = None,
 ) -> str:
-    """Create a signed JWT access token containing user identity and permission claims."""
+    """Buat access token JWT berisi identitas dan permission pengguna."""
     now = datetime.now(timezone.utc)
     if expires_delta:
         expire = now + expires_delta
@@ -93,7 +89,7 @@ def create_access_token(
 
 
 def decode_access_token(token: str) -> dict[str, Any] | None:
-    """Decode and validate a JWT access token. Returns payload dict or None if invalid/expired."""
+    """Baca dan cek access token JWT; None bila tidak valid atau kedaluwarsa."""
     try:
         payload = jwt.decode(
             token,

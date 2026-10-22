@@ -10,7 +10,7 @@ from app.utils.response import error_response, success_response
 
 
 def create_app(config_class=Config) -> Flask:
-    """Create and configure the Flask application with CORS, Swagger, and API v1 blueprints."""
+    """Membuat aplikasi Flask beserta CORS, Swagger, dan blueprint /api/v1."""
     app = Flask(__name__)
     app.config.from_object(config_class)
 
@@ -46,7 +46,7 @@ def create_app(config_class=Config) -> Flask:
 
     register_api_routes(app)
 
-    # Static route for uploads (development / local storage)
+    # file unggahan dilayani Flask bila tidak lewat Nginx (pengembangan lokal)
     @app.route("/uploads/<path:filename>")
     def uploaded_file(filename):
         return send_from_directory(Config.UPLOAD_FOLDER, filename)

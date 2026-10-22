@@ -1,8 +1,5 @@
-"""CAPTCHA Generation and Verification Service.
-
-Provides 6-character visual challenges with visual noise (lines, jitter, rotation)
-and secure one-time-use verification using HMAC-SHA256 and adaptive Redis/In-Memory storage.
-"""
+"""CAPTCHA gambar 6 karakter untuk login lokal. Jawaban disimpan sebagai HMAC di Redis
+(atau di memori bila Redis tidak tersedia) dan hanya bisa dipakai sekali."""
 from __future__ import annotations
 
 import base64
@@ -24,28 +21,23 @@ from app.config import Config
 
 logger = logging.getLogger(__name__)
 
-# 28 unambiguous alphanumeric characters (excluding 0, O, 1, I, l, 5, S, Z, 2 if ambiguous)
+# tanpa karakter yang mudah tertukar: 0, O, 1, I, 5, S, Z
 CAPTCHA_CHARSET = "2346789ABCDEFGHJKLMNPQRTUVWXY"
 CAPTCHA_LENGTH = 6
-CAPTCHA_TTL_SECONDS = 300  # 5 minutes
+CAPTCHA_TTL_SECONDS = 300
 MAX_VERIFICATION_ATTEMPTS = 3
 IMAGE_WIDTH = 180
 IMAGE_HEIGHT = 50
 
 
 def _hash_answer(answer: str) -> str:
-    """Generate secure HMAC-SHA256 digest of normalized (uppercase) answer."""
     normalized = answer.strip().upper().encode("utf-8")
     secret = (Config.SECRET_KEY or "siipb-default-secret").encode("utf-8")
     return hmac.new(secret, normalized, hashlib.sha256).hexdigest()
 
 
 class InMemoryCaptchaStore:
-    """Thread-safe in-memory challenge store with auto-expiry cleanup.
-
-    Used as resilient fallback for single-process local dev and test environments
-    when Redis is offline or not installed.
-    """
+    """Cadangan untuk pengembangan lokal dan tes bila Redis tidak tersedia (hanya untuk satu proses)."""
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
@@ -81,14 +73,11 @@ class InMemoryCaptchaStore:
             matches = hmac.compare_digest(record["hash"], user_hash)
 
             if matches:
-                # One-time use: consume immediately on success
                 self._challenges.pop(challenge_id, None)
                 return True, "OK"
 
-            # Wrong answer: increment attempt counter
             record["attempts"] += 1
             if record["attempts"] >= MAX_VERIFICATION_ATTEMPTS:
-                # Invalidate challenge after too many failed tries
                 self._challenges.pop(challenge_id, None)
                 return False, "Kode CAPTCHA salah (batas percobaan tercapai)."
 
@@ -96,7 +85,7 @@ class InMemoryCaptchaStore:
 
 
 class RedisCaptchaStore:
-    """Redis-backed challenge store for multi-worker production deployments."""
+    """Dipakai di production agar challenge bisa diverifikasi oleh worker Gunicorn mana pun."""
 
     def __init__(self, redis_url: str) -> None:
         import redis
@@ -130,7 +119,6 @@ class RedisCaptchaStore:
         matches = hmac.compare_digest(record["hash"], user_hash)
 
         if matches:
-            # Single-use: delete immediately
             self._client.delete(key)
             return True, "OK"
 
@@ -139,7 +127,7 @@ class RedisCaptchaStore:
             self._client.delete(key)
             return False, "Kode CAPTCHA salah (batas percobaan tercapai)."
 
-        # Update remaining attempts with remaining TTL
+        # simpan jumlah percobaan tanpa memperpanjang masa berlaku
         ttl = self._client.ttl(key)
         if ttl and ttl > 0:
             record["attempts"] = attempts
@@ -151,8 +139,6 @@ class RedisCaptchaStore:
 
 
 class CaptchaService:
-    """High-level CAPTCHA generation and verification manager."""
-
     def __init__(self) -> None:
         self._in_memory_store = InMemoryCaptchaStore()
         self._redis_store: RedisCaptchaStore | None = None
@@ -174,23 +160,16 @@ class CaptchaService:
         return self._redis_store if self._redis_store else self._in_memory_store
 
     def generate_code(self, length: int = CAPTCHA_LENGTH) -> str:
-        """Generate cryptographically random alphanumeric string."""
         return "".join(secrets.choice(CAPTCHA_CHARSET) for _ in range(length))
 
     def render_image(self, code: str) -> str:
-        """Render visual CAPTCHA with noise lines, dots, and character jitter.
-
-        Returns:
-            str: Data URI string 'data:image/png;base64,...'
-        """
-        # Light pastel background with slight variation
+        """Gambar PNG (data URI) berisi kode dengan titik acak, garis pengganggu, dan huruf yang dimiringkan."""
         bg_r = secrets.randbelow(15) + 240
         bg_g = secrets.randbelow(15) + 240
         bg_b = secrets.randbelow(15) + 244
         image = Image.new("RGBA", (IMAGE_WIDTH, IMAGE_HEIGHT), color=(bg_r, bg_g, bg_b, 255))
         draw = ImageDraw.Draw(image)
 
-        # 1. Background noise dots
         for _ in range(120):
             x = secrets.randbelow(IMAGE_WIDTH)
             y = secrets.randbelow(IMAGE_HEIGHT)
@@ -202,7 +181,6 @@ class CaptchaService:
             )
             draw.point((x, y), fill=dot_color)
 
-        # 2. Draw subtle interference curves
         for _ in range(3):
             line_color = (
                 secrets.randbelow(80) + 70,
@@ -237,25 +215,21 @@ class CaptchaService:
                 points.append((px, py))
             draw.line(points, fill=line_color, width=2)
 
-        # 3. Load font
         try:
             font = ImageFont.load_default(size=26)
         except TypeError:
             font = ImageFont.load_default()
 
-        # 4. Render characters with jitter and rotation
         char_box_w = IMAGE_WIDTH // (len(code) + 1)
         start_offset_x = (IMAGE_WIDTH - (len(code) * char_box_w)) // 2
 
         for i, char in enumerate(code):
-            # Text colors: high contrast navy/slate/indigo
             text_color = (
                 secrets.randbelow(40) + 20,
                 secrets.randbelow(50) + 30,
                 secrets.randbelow(60) + 80,
                 255,
             )
-            # Create sub-image for rotated character
             char_img = Image.new("RGBA", (36, 40), color=(0, 0, 0, 0))
             char_draw = ImageDraw.Draw(char_img)
             char_draw.text((6, 2), char, fill=text_color, font=font)
@@ -267,7 +241,6 @@ class CaptchaService:
             dest_y = (IMAGE_HEIGHT - rotated_char.height) // 2 + secrets.randbelow(6) - 3
             image.paste(rotated_char, (int(dest_x), int(dest_y)), rotated_char)
 
-        # 5. Export to PNG bytes -> Base64 Data URI
         buf = io.BytesIO()
         rgb_image = image.convert("RGB")
         rgb_image.save(buf, format="PNG", optimize=True)
@@ -276,7 +249,6 @@ class CaptchaService:
         return f"data:image/png;base64,{b64}"
 
     def create_challenge(self) -> dict[str, Any]:
-        """Generate new challenge ID, render image, and store hashed answer."""
         challenge_id = str(uuid.uuid4())
         code = self.generate_code(CAPTCHA_LENGTH)
         answer_hash = _hash_answer(code)
@@ -292,7 +264,6 @@ class CaptchaService:
         }
 
     def verify(self, challenge_id: str | None, answer: str | None) -> tuple[bool, str]:
-        """Verify given answer against stored challenge (one-time consumption)."""
         if not challenge_id or not answer:
             return False, "Kode CAPTCHA dan ID challenge wajib disertakan."
 
@@ -300,5 +271,4 @@ class CaptchaService:
         return store.verify_and_consume(challenge_id.strip(), answer.strip())
 
 
-# Global singleton service instance
 captcha_service = CaptchaService()

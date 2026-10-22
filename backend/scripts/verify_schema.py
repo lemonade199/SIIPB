@@ -381,7 +381,7 @@ def run_checks():
         session.commit()
         print("[11] SystemSetting, RefreshToken, and Google SSO fields verified.")
 
-    # Final verification of all 23 application domain tables
+    # cek akhir: ke-23 tabel aplikasi ada
     with SessionLocal() as session:
         counts = {}
         for table in Base.metadata.sorted_tables:

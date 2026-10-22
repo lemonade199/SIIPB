@@ -1,4 +1,4 @@
-# 🏛️ Dokumentasi Entity Relationship Diagram (ERD) Basis Data SIIPB
+# Dokumentasi Entity Relationship Diagram (ERD) Basis Data SIIPB
 
 Dokumen ini memuat spesifikasi teknis arsitektur basis data, Entity Relationship Diagram (ERD), kamus data (*data dictionary*), dan aturan integritas relasional untuk **Sistem Informasi Inventaris, Peminjaman, dan Pengembalian Barang (SIIPB)**.
 
@@ -27,7 +27,7 @@ Diagram visual skema aktif 23 tabel produksi SIIPB menggunakan notasi standar Cr
   <img src="../database/ERD.png" alt="Entity Relationship Diagram SIIPB (23 Tabel)" width="100%" />
 </div>
 
-### 🔗 Berkas Diagram Terkait:
+### Berkas Diagram Terkait:
 - **Visual Vektor (Lossless SVG):** [`database/ERD.svg`](../database/ERD.svg)
 - **Visual Gambar (PNG):** [`database/ERD.png`](../database/ERD.png)
 - **Penampil Interaktif (Pan/Zoom):** [`docs/SIIPB_ERD_diagram.html`](SIIPB_ERD_diagram.html) *(Buka langsung pada peramban web untuk zoom interaktif dan inspeksi relasi)*
@@ -363,15 +363,15 @@ Catatan rekam jejak audit keamanan (*append-only*, non-editable).
 
 Berdasarkan hasil refactoring dan simplifikasi skema produksi (Alembic `c1f9e2b8a341` & `d4e8b1a5f920`), berikut ringkasan tabel yang disederhanakan:
 
-1. **`damage_reports` + `loss_reports` ➔ `asset_incident_reports`**  
+1. **`damage_reports` + `loss_reports` menjadi `asset_incident_reports`**  
    Dua tabel insiden digabung menjadi satu tabel dengan diskriminator `incident_type` (`DAMAGE` / `LOSS`), menyederhanakan alur ganti rugi dan perbaikan barang.
-2. **`email_deliveries` + `notification_logs` ➔ `notification_deliveries`**  
+2. **`email_deliveries` + `notification_logs` menjadi `notification_deliveries`**  
    Pencatatan percobaan pengiriman email disatukan dengan pelacakan nomor percobaan (`attempt_number`) dan log error.
-3. **`user_roles` ➔ `users.role_id`**  
+3. **`user_roles` menjadi `users.role_id`**  
    Relasi *many-to-many* peran pengguna disederhanakan menjadi relasi langsung 1 pengguna = 1 role (`users.role_id`).
-4. **`external_identities` ➔ `users.google_id` & `google_email`**  
+4. **`external_identities` menjadi `users.google_id` & `google_email`**  
    Kredensial OAuth Google SSO diintegrasikan langsung pada kolom tabel `users`.
-5. **`permissions` + `role_permissions` ➔ `roles.permissions` (JSON)**  
+5. **`permissions` + `role_permissions` menjadi `roles.permissions` (JSON)**  
    Katalog 16 permission granular dikelola secara statis pada kode backend (`app/models/permission.py`) dan disimpan sebagai array string JSON pada kolom `roles.permissions`.
 6. **Master Peminjam (`borrowers`) Tetap Terpisah dari `users`**  
    Peminjam adalah sivitas/publik yang meminjam barang fisik tanpa perlu membuat akun login, menjaga privasi dan kecepatan pelayanan petugas.

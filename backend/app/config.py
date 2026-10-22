@@ -1,4 +1,4 @@
-"""Application configuration loaded from environment variables."""
+"""Konfigurasi aplikasi dari environment variable."""
 import os
 from pathlib import Path
 from dotenv import load_dotenv

@@ -393,6 +393,55 @@ Skrip ini:
 
 Simpan output skrip sebagai bukti uji restore pada laporan UAT.
 
+**Restore dari dump aplikasi (Docker lokal).** Backup dari tombol *Pengaturan → Backup MariaDB* atau dari jadwal 01.00 WIB
+tersimpan di volume `backups_data` (`/app/backups` di container backend). Jalankan dari root repo memakai Git Bash:
+
+```bash
+docker compose exec backend ls /app/backups                      # lihat nama berkas backup
+docker compose cp backend:/app/backups/siipb-YYYYMMDD-HHMMSS.sql.gz backups/
+./infrastructure/scripts/restore_db.sh backups/siipb-YYYYMMDD-HHMMSS.sql.gz
+```
+
+Skrip meminta konfirmasi dengan mengetik `PULIHKAN`, menghentikan backend/worker/beat/frontend, mengimpor dump, lalu
+menyalakannya lagi. Backend menjalankan `alembic upgrade head`, sehingga backup lama otomatis disesuaikan dengan skema
+terbaru. Setelah itu, cek jumlah data di aplikasi dan klik **Catat uji restore** di *Pengaturan → Backup MariaDB*.
+
+## Rollback database
+
+Rollback image pada `deploy.sh` hanya mengganti container, sedangkan migration yang sudah dijalankan tetap tinggal di
+database. Karena itu, setiap rilis yang membawa migration baru (berkas baru di `backend/alembic/versions/`) mengikuti
+urutan berikut.
+
+**Sebelum deploy**, buat snapshot RDS manual:
+
+```bash
+aws rds create-db-snapshot --db-instance-identifier siipb-production-mariadb   --db-snapshot-identifier siipb-sebelum-$(date +%Y%m%d-%H%M)
+aws rds wait db-snapshot-available --db-snapshot-identifier siipb-sebelum-<tanggal-jam>
+```
+
+Catat juga versi migration yang aktif:
+
+```bash
+ssh ubuntu@EC2 'cd /opt/siipb && docker compose -f docker-compose.prod.yml exec backend alembic current'
+```
+
+**Bila rilis bermasalah**, pilih salah satu:
+
+1. **Downgrade migration** (data sejak deploy tetap ada). Jalankan selagi image baru masih terpasang, karena image lama
+   tidak mengenal revisi yang lebih baru:
+   ```bash
+   ssh ubuntu@EC2 'cd /opt/siipb && docker compose -f docker-compose.prod.yml exec backend alembic downgrade <revisi-sebelum-deploy>'
+   ssh ubuntu@EC2 /opt/siipb/scripts/deploy.sh <commit-sha-sebelumnya>
+   ```
+   Periksa fungsi `downgrade()` migration terkait lebih dulu. Migration yang menghapus kolom atau data hanya
+   mengembalikan struktur, tidak mengembalikan isinya.
+2. **Pulihkan snapshot** bila data rusak atau downgrade tidak memungkinkan. Data yang masuk setelah snapshot akan hilang.
+   Restore snapshot ke instans baru lewat *RDS Console → Snapshots → Restore snapshot* (atau
+   `aws rds restore-db-instance-from-db-snapshot`), ganti nilai `host` pada secret database (`<prefix>/db`) di Secrets Manager dengan endpoint baru, lalu jalankan
+   `deploy.sh <commit-sha-sebelumnya>`.
+
+Setelah rollback, pastikan `alembic current` sama dengan revisi yang dicatat sebelum deploy dan `/api/health` merespons `ok`.
+
 ## Operasional harian
 
 | Kebutuhan | Cara |

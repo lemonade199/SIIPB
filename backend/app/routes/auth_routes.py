@@ -69,13 +69,12 @@ def login():
     if errors:
         return error_response("Data input tidak valid", error_code="VALIDATION_ERROR", errors=errors)
 
-    # Verifikasi CAPTCHA
     is_testing = current_app.config.get("TESTING") or Config.APP_ENV == "testing"
-    # captcha juga diterima dari query string (mis. diisi lewat tab Params di Postman)
+    # boleh lewat query string juga, mis. diisi di tab Params Postman
     captcha_id = request.args.get("captcha_id") or data.get("captcha_id")
     captcha_answer = request.args.get("captcha_answer") or data.get("captcha_answer")
 
-    # Dalam mode non-testing atau jika client mengirimkan parameter captcha, verifikasi wajib
+    # saat testing CAPTCHA boleh tidak dikirim; bila dikirim tetap diperiksa
     if not is_testing or captcha_id or captcha_answer:
         if not captcha_id or not captcha_answer:
             return error_response(
@@ -104,7 +103,7 @@ def login():
 
 @auth_bp.post("/refresh")
 def refresh():
-    """Refresh expired access token using valid refresh token.
+    """Perbarui access token memakai refresh token yang masih berlaku.
     ---
     tags:
       - Authentication
@@ -276,7 +275,7 @@ def sso_exchange():
 @auth_bp.post("/logout")
 @jwt_required
 def logout():
-    """Logout and revoke refresh token.
+    """Logout dan cabut refresh token.
     ---
     tags:
       - Authentication

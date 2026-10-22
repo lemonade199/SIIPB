@@ -1,4 +1,4 @@
-"""Authentication and JWT Token Service."""
+"""Login, JWT, dan refresh token."""
 import logging
 from datetime import datetime, timedelta
 from typing import Any
@@ -97,7 +97,7 @@ def get_token_ttl(session: Session) -> tuple[int, int]:
 
 
 def authenticate_user(session: Session, username_or_email: str, password: str) -> dict[str, Any]:
-    """Authenticate staff/admin user and issue JWT access token + hashed refresh token."""
+    """Cek username/email dan kata sandi, lalu terbitkan access token dan refresh token."""
     query = (
         select(User)
         .where(
@@ -167,7 +167,7 @@ def authenticate_user(session: Session, username_or_email: str, password: str) -
 
 
 def refresh_access_token(session: Session, raw_refresh_token: str) -> dict[str, Any]:
-    """Validate hashed refresh token and issue a new JWT access token."""
+    """Cek refresh token lalu terbitkan access token baru."""
     hashed = hash_token(raw_refresh_token)
     query = select(RefreshToken).where(RefreshToken.token_hash == hashed)
     record = session.scalars(query).first()
@@ -203,7 +203,7 @@ def refresh_access_token(session: Session, raw_refresh_token: str) -> dict[str, 
 
 
 def revoke_refresh_token(session: Session, raw_refresh_token: str, user_id: int | None = None) -> bool:
-    """Revoke a refresh token on logout."""
+    """Cabut refresh token saat logout."""
     hashed = hash_token(raw_refresh_token)
     query = select(RefreshToken).where(RefreshToken.token_hash == hashed)
     record = session.scalars(query).first()

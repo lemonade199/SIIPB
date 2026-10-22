@@ -47,7 +47,7 @@ ALL_PERMISSION_CODES: set[str] = set(PERMISSIONS_BY_CODE.keys())
 
 
 def get_all_permissions() -> list[dict[str, Any]]:
-    """Return all permissions sorted by module and code."""
+    """Semua permission, diurutkan per modul dan kode."""
     return [p.to_dict() for p in sorted(SYSTEM_PERMISSIONS, key=lambda x: (x.module, x.code))]
 
 
