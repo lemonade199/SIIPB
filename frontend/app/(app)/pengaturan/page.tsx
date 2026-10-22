@@ -135,7 +135,6 @@ function Smtp({ s }: { s: Settings }) {
   const [password, setPassword] = useState('');
   const [testing, setTesting] = useState(false);
   const [testTo, setTestTo] = useState(s.smtp.username.includes('@') ? s.smtp.username : user?.email || '');
-  const passwordSet = (s.smtp as Settings['smtp'] & { password_set?: boolean }).password_set;
   return (
     <Card title="Server email (SMTP)">
       <form
@@ -150,7 +149,7 @@ function Smtp({ s }: { s: Settings }) {
           toast(r.ok ? 'Pengaturan SMTP disimpan.' : r.error, r.ok ? 'ok' : 'err');
         }}
       >
-        <TextField placeholder="smtp.gmail.com" label="Host" mono value={v.host} hint="Gmail: smtp.gmail.com · port 587 · STARTTLS · kata sandi = App Password" onChange={(e) => setV({ ...v, host: e.target.value })} />
+        <TextField placeholder="smtp.gmail.com" label="Host" mono value={v.host} onChange={(e) => setV({ ...v, host: e.target.value })} />
         <TextField placeholder="587" label="Port" type="number" mono value={v.port} onChange={(e) => setV({ ...v, port: Number(e.target.value) })} />
         <TextField placeholder="mis. sarpras@gmail.com" label="Username" mono value={v.username} onChange={(e) => setV({ ...v, username: e.target.value })} />
         <SelectField
@@ -167,7 +166,6 @@ function Smtp({ s }: { s: Settings }) {
             type="password"
             autoComplete="new-password"
             value={password}
-            hint={passwordSet ? 'Sudah tersimpan (terenkripsi). Kosongkan bila tidak diubah.' : undefined}
             onChange={(e) => setPassword(e.target.value)}
           />
         )}
@@ -177,7 +175,7 @@ function Smtp({ s }: { s: Settings }) {
           full
           value={testTo}
           placeholder={user?.email}
-          hint="Alamat penerima email uji. Kosongkan untuk mengirim ke email akun Anda."
+          
           onChange={(e) => setTestTo(e.target.value)}
         />
         <div className="full row">
@@ -408,7 +406,12 @@ function Keamanan({ s }: { s: Settings }) {
   const [v, setV] = useState({ ...s.security });
   const [secret, setSecret] = useState('');
   const num = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement>) => setV({ ...v, [k]: Number(e.target.value) });
-  const { oidc_client_secret_set: secretSet, oidc_redirect_uri: redirectUri, oidc_ready: ready, ...security } = v;
+  // nilai turunan dari server (status secret, redirect URI) tidak dikirim balik; backend juga mengabaikannya
+  const { oidc_redirect_uri: redirectUri, oidc_ready: ready } = v;
+  const security = { ...v };
+  delete security.oidc_client_secret_set;
+  delete security.oidc_redirect_uri;
+  delete security.oidc_ready;
   return (
     <Card title="Keamanan, JWT & SSO">
       <form
@@ -439,7 +442,7 @@ function Keamanan({ s }: { s: Settings }) {
           mono
           full
           value={v.oidc_issuer}
-          hint="Google: https://accounts.google.com · Microsoft: https://login.microsoftonline.com/<tenant-id>/v2.0 · Keycloak: https://<host>/realms/<realm>"
+          
           onChange={(e) => setV({ ...v, oidc_issuer: e.target.value })}
         />
         <TextField placeholder="mis. 1234567890-abc.apps.googleusercontent.com" label="Client ID" mono value={v.oidc_client_id} onChange={(e) => setV({ ...v, oidc_client_id: e.target.value })} />
@@ -450,7 +453,6 @@ function Keamanan({ s }: { s: Settings }) {
             autoComplete="new-password"
             mono
             value={secret}
-            hint={secretSet ? 'Sudah tersimpan (terenkripsi). Kosongkan bila tidak diubah.' : 'Belum diisi.'}
             onChange={(e) => setSecret(e.target.value)}
           />
         ) : (
@@ -459,7 +461,7 @@ function Keamanan({ s }: { s: Settings }) {
           </Field>
         )}
         {isApiMode && redirectUri && (
-          <Field label="Redirect URI (daftarkan di Identity Provider)" full htmlFor="oidc-redirect" hint="Salin ke Authorized redirect URIs pada Google Cloud Console / Entra ID / Keycloak.">
+          <Field label="Redirect URI (daftarkan di Identity Provider)" full htmlFor="oidc-redirect">
             <Input id="oidc-redirect" className="font-mono" value={redirectUri} readOnly onFocus={(e) => e.currentTarget.select()} />
           </Field>
         )}

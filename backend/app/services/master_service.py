@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Asset, Borrower, Borrowing, BorrowingStatus, Category, Location, OrganizationalUnit, User
 from app.services.audit_service import record_audit
+from app.utils.validators import nip_error, normalize_nip, normalize_phone, phone_error
 
 
 class MasterError(ValueError):
@@ -59,6 +60,21 @@ def _unique_code(session: Session, kind: str, code: str | None, row_id: int | No
         raise MasterError(f"Kode '{code}' sudah digunakan", {"code": "Kode sudah digunakan."})
 
 
+def _clean_borrower(data: dict[str, Any]) -> None:
+    """NIP 18 digit & telepon 10-13 digit; disimpan dalam format seragam (angka saja)."""
+    errors: dict[str, str] = {}
+    if "identity_number" in data:
+        data["identity_number"] = normalize_nip(data["identity_number"]) or None
+        if err := nip_error(data["identity_number"] or ""):
+            errors["identity_number"] = err
+    if "phone" in data:
+        data["phone"] = normalize_phone(data["phone"]) or None
+        if err := phone_error(data["phone"] or ""):
+            errors["phone"] = err
+    if errors:
+        raise MasterError("Periksa NIP / nomor telepon", errors)
+
+
 def _unique_identity(session: Session, data: dict[str, Any], row_id: int | None = None) -> None:
     nip = (data.get("identity_number") or "").strip()
     if not nip:
@@ -74,6 +90,7 @@ def create_row(session: Session, kind: str, data: dict[str, Any], user_id: int):
     model, entity = MODELS[kind]
     _unique_code(session, kind, data.get("code"))
     if kind == "borrower":
+        _clean_borrower(data)
         _unique_identity(session, data)
     row = model(**data)
     session.add(row)
@@ -88,6 +105,7 @@ def update_row(session: Session, kind: str, row_id: int, data: dict[str, Any], u
     row = _get(session, kind, row_id)
     _unique_code(session, kind, data.get("code"), row_id)
     if kind == "borrower":
+        _clean_borrower(data)
         _unique_identity(session, data, row_id)
     if data.get("is_active") is False:
         _check_can_deactivate(session, kind, row)

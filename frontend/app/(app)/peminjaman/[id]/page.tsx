@@ -14,6 +14,7 @@ import { Card } from '@/components/ui/card';
 import { Alert, Avatar, Empty, KV, PageHead, Thumb } from '@/components/ui/misc';
 import { BorrowBadge, DueText } from '@/components/domain/borrow-status';
 import { EmailPreview } from '@/components/domain/email-preview';
+import { humanize, PrintDoc, PrintInfo, PrintSection, PrintSign } from '@/components/domain/print-doc';
 import { NotFoundView } from '@/components/layout/app-shell';
 import { useConfirm, useToast } from '@/components/providers/feedback-provider';
 import * as repo from '@/services/repo';
@@ -100,19 +101,13 @@ export default function BorrowDetailPage() {
           </>
         }
       />
-      <div className="print-only report-head">
-        <h2>BUKTI PEMINJAMAN BARANG</h2>
-        <div>
-          {s.institution} — {s.unit_sarpras}
-        </div>
-      </div>
       {b.status === 'DRAF' && (
         <Alert type="warn" className="mb-4 no-print">
           Transaksi masih <b>DRAF</b>: barang belum diserahkan, status barang belum berubah, dan notifikasi belum dikirim. Tekan <b>Checkout / Serahkan</b> saat barang diberikan kepada peminjam.
         </Alert>
       )}
       {b.status === 'DIBATALKAN' && (
-        <Alert type="info" className="mb-4">
+        <Alert type="info" className="mb-4 no-print">
           Draf ini dibatalkan{b.cancel_reason ? <> dengan alasan: <i>{b.cancel_reason}</i></> : ''}.
         </Alert>
       )}
@@ -122,7 +117,7 @@ export default function BorrowDetailPage() {
         </Alert>
       )}
 
-      <div className="split">
+      <div className="split no-print">
         <div className="stack">
           <Card title="Informasi transaksi">
             <KV
@@ -206,31 +201,6 @@ export default function BorrowDetailPage() {
               </table>
             </TableWrap>
           </Card>
-
-          <div className="print-only" style={{ marginTop: 40 }}>
-            <table style={{ width: '100%', textAlign: 'center' }}>
-              <tbody>
-                <tr>
-                  <td>
-                    Peminjam,
-                    <br />
-                    <br />
-                    <br />
-                    <br />
-                    {e?.name}
-                  </td>
-                  <td>
-                    Petugas Sarpras/IT,
-                    <br />
-                    <br />
-                    <br />
-                    <br />
-                    {officer?.name}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
 
           <Card title="Riwayat notifikasi" className="no-print">
             {notifs.length ? (
@@ -323,6 +293,67 @@ export default function BorrowDetailPage() {
           )}
         </div>
       </div>
+      <PrintDoc title="Bukti Peminjaman Barang" number={b.code}>
+        <PrintSection title="Data peminjam">
+          <PrintInfo
+            rows={[
+              ['Nama', e?.name],
+              ['NIP', e?.nip],
+              ['Unit kerja', unit(e?.unit_id)?.name],
+              ['Telepon', e?.phone],
+              ['Email', e?.email],
+            ]}
+          />
+        </PrintSection>
+        <PrintSection title="Data peminjaman">
+          <PrintInfo
+            rows={[
+              ['Tanggal pinjam', fmtDate(b.borrow_date, true)],
+              ['Batas kembali', fmtDate(b.due_date, true)],
+              ['Status', humanize(v.display)],
+              ['Diserahkan oleh', officer?.name],
+              ['Tujuan', b.purpose],
+              ['Catatan', b.notes],
+            ]}
+          />
+        </PrintSection>
+        <PrintSection title={`Daftar barang (${details.length})`}>
+          <table className="pd-table">
+            <thead>
+              <tr>
+                <th className="num">No</th>
+                <th>Kode</th>
+                <th>Nama barang</th>
+                <th>Merek / model</th>
+                <th>Kondisi saat diserahkan</th>
+              </tr>
+            </thead>
+            <tbody>
+              {details.map((d, i) => {
+                const it = getItem(d.item_id);
+                return (
+                  <tr key={d.id}>
+                    <td className="num">{i + 1}</td>
+                    <td className="code">{it?.item_code}</td>
+                    <td>{it?.item_name}</td>
+                    <td>{[it?.brand, it?.model].filter(Boolean).join(' / ') || '—'}</td>
+                    <td>{conditionLabel(d.item_condition_out)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <div className="pd-note">
+            Barang wajib dikembalikan paling lambat <b>{fmtDate(b.due_date, true)}</b> ke {s.return_location} dalam kondisi dan kelengkapan yang sama.
+          </div>
+        </PrintSection>
+        <PrintSign
+          cols={[
+            { role: 'Peminjam,', name: e?.name },
+            { role: 'Petugas Sarpras/IT,', name: officer?.name },
+          ]}
+        />
+      </PrintDoc>
       <EmailPreview id={emailId} onClose={() => setEmailId(null)} />
     </>
   );

@@ -183,10 +183,16 @@ def update_me():
         email = fields.Email()
         phone = fields.String(allow_none=True, validate=validate.Length(max=30))
 
+    from app.utils.validators import normalize_phone, phone_error
+
     try:
         data = ProfileSchema().load(request.get_json(silent=True) or {})
     except ValidationError as err:
         return error_response("Validasi profil gagal", error_code="VALIDATION_ERROR", errors=err.messages)
+    if "phone" in data:
+        data["phone"] = normalize_phone(data["phone"]) or None
+        if err := phone_error(data["phone"] or ""):
+            return error_response(err, error_code="VALIDATION_ERROR", errors={"phone": [err]})
     with SessionLocal() as session:
         user = session.get(User, g.current_user["id"])
         if "email" in data and data["email"] != user.email:

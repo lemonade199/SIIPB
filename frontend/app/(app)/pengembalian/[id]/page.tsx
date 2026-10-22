@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { KV, PageHead } from '@/components/ui/misc';
 import { LateText } from '@/components/domain/borrow-status';
+import { humanize, PrintDoc, PrintInfo, PrintSection, PrintSign } from '@/components/domain/print-doc';
 import { NotFoundView } from '@/components/layout/app-shell';
 import { emp, item as getItem, returnDetails, unit, userName } from '@/services/lookup';
 import { TableWrap } from '@/components/ui/table-wrap';
@@ -22,7 +23,6 @@ export default function ReturnDetailPage() {
   const b = db.get('borrowings', r.borrowing_id)!;
   const e = emp(b.employee_id);
   const det = returnDetails(r);
-  const s = db.data.settings;
 
   return (
     <>
@@ -47,13 +47,7 @@ export default function ReturnDetailPage() {
           </Button>
         }
       />
-      <div className="print-only report-head">
-        <h2>BUKTI PENGEMBALIAN BARANG</h2>
-        <div>
-          {s.institution} — {s.unit_sarpras}
-        </div>
-      </div>
-      <div className="split">
+      <div className="split no-print">
         <div className="stack">
           <Card title="Hasil pemeriksaan" flush>
             <TableWrap>
@@ -103,30 +97,6 @@ export default function ReturnDetailPage() {
               </table>
             </TableWrap>
           </Card>
-          <div className="print-only" style={{ marginTop: 40 }}>
-            <table style={{ width: '100%', textAlign: 'center' }}>
-              <tbody>
-                <tr>
-                  <td>
-                    Peminjam,
-                    <br />
-                    <br />
-                    <br />
-                    <br />
-                    {e?.name}
-                  </td>
-                  <td>
-                    Petugas penerima,
-                    <br />
-                    <br />
-                    <br />
-                    <br />
-                    {userName(r.received_by)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
         </div>
         <div className="stack">
           <Card title="Ringkasan">
@@ -147,6 +117,58 @@ export default function ReturnDetailPage() {
           </Card>
         </div>
       </div>
+      <PrintDoc title="Bukti Pengembalian Barang" number={r.code} subtitle={`Pengembalian atas peminjaman ${b.code}`}>
+        <PrintSection title="Data pengembalian">
+          <PrintInfo
+            rows={[
+              ['Peminjam', e?.name],
+              ['NIP', e?.nip],
+              ['Unit kerja', unit(e?.unit_id)?.name],
+              ['Diterima oleh', userName(r.received_by)],
+              ['Tanggal pinjam', fmtDate(b.borrow_date, true)],
+              ['Batas kembali', fmtDate(b.due_date, true)],
+              ['Tanggal kembali', fmtDate(r.return_date, true)],
+              ['Keterlambatan', r.late_days > 0 ? `${r.late_days} hari` : 'Tepat waktu'],
+              ['Catatan', r.notes],
+            ]}
+          />
+        </PrintSection>
+        <PrintSection title={`Hasil pemeriksaan barang (${det.length})`}>
+          <table className="pd-table">
+            <thead>
+              <tr>
+                <th className="num">No</th>
+                <th>Kode</th>
+                <th>Nama barang</th>
+                <th>Kondisi akhir</th>
+                <th>Kelengkapan</th>
+                <th>Keterangan</th>
+              </tr>
+            </thead>
+            <tbody>
+              {det.map((d, i) => {
+                const it = getItem(d.item_id);
+                return (
+                  <tr key={d.id}>
+                    <td className="num">{i + 1}</td>
+                    <td className="code">{it?.item_code}</td>
+                    <td>{it?.item_name}</td>
+                    <td>{humanize(d.condition_after)}</td>
+                    <td>{d.complete ? 'Lengkap' : `Tidak lengkap${d.missing_note ? ` (${d.missing_note})` : ''}`}</td>
+                    <td>{d.damage_note || '—'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </PrintSection>
+        <PrintSign
+          cols={[
+            { role: 'Peminjam,', name: e?.name },
+            { role: 'Petugas penerima,', name: userName(r.received_by) },
+          ]}
+        />
+      </PrintDoc>
     </>
   );
 }

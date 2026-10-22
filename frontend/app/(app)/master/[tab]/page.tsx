@@ -82,7 +82,7 @@ const VIEWS: Record<MasterKey, ViewDef> = {
     },
     form: (v, set, err, existing) => (
       <div className="form-grid">
-        <TextField placeholder="mis. 198501012010011001" label="NIP / nomor induk" required mono value={v.nip} error={err.nip} onChange={(e) => set('nip', e.target.value)} />
+        <TextField placeholder="mis. 198501012010011001" label="NIP / nomor induk" required mono inputMode="numeric" hint="18 digit angka" value={v.nip} error={err.nip} onChange={(e) => set('nip', e.target.value)} />
         <TextField placeholder="mis. Andi Wijaya" label="Nama lengkap" required value={v.name} error={err.name} onChange={(e) => set('name', e.target.value)} />
         <SelectField
           label="Unit kerja"
@@ -101,7 +101,7 @@ const VIEWS: Record<MasterKey, ViewDef> = {
           error={err.email}
           onChange={(e) => set('email', e.target.value)}
         />
-        <TextField placeholder="mis. 0812-3456-7890" label="No. telepon" value={v.phone} onChange={(e) => set('phone', e.target.value)} />
+        <TextField placeholder="mis. 081234567890" label="No. telepon" inputMode="tel" hint="10–13 digit, diawali 0" value={v.phone} error={err.phone} onChange={(e) => set('phone', e.target.value)} />
       </div>
     ),
   },

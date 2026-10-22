@@ -105,7 +105,7 @@ export default function ProfilPage() {
             <form className="stack" style={{ gap: 12 }} noValidate onSubmit={saveProfile}>
               <TextField placeholder="mis. Budi Santoso" label="Nama lengkap" required value={p.name} error={profErr} onChange={(e) => setProf({ ...p, name: e.target.value })} />
               <TextField placeholder="mis. budi@instansi.go.id" label="Email" type="email" value={p.email} onChange={(e) => setProf({ ...p, email: e.target.value })} />
-              <TextField placeholder="mis. 0812-3456-7890" label="Telepon" value={p.phone} onChange={(e) => setProf({ ...p, phone: e.target.value })} />
+              <TextField placeholder="mis. 081234567890" label="Telepon" inputMode="tel" hint="10–13 digit, diawali 0" value={p.phone} onChange={(e) => setProf({ ...p, phone: e.target.value })} />
               <div>
                 <Button type="submit">Simpan profil</Button>
               </div>

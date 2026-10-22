@@ -2,6 +2,7 @@
 import { db } from '@/lib/mock/db';
 import { nowISO } from '@/lib/date';
 import { EMAIL_RE, uid } from '@/lib/utils';
+import { normalizePhone, phoneError } from '@/lib/validation';
 import { audit } from '@/services/audit';
 import { role, user } from '@/services/lookup';
 import type { FieldErrors, ID, LoginMethod, PermissionKey, User } from '@/types';
@@ -25,6 +26,8 @@ export function saveUser(d: UserInput, existing: User | null, actorId: ID) {
     err.username = 'Username sudah dipakai.';
   if (!EMAIL_RE.test(d.email.trim())) err.email = 'Email tidak valid.';
   if (!existing && (d.password || '').length < 8) err.password = 'Minimal 8 karakter.';
+  const phoneErr = phoneError(normalizePhone(d.phone));
+  if (phoneErr) err.phone = phoneErr;
   if (Object.keys(err).length) return { ok: false as const, errors: err };
 
   const isSelf = !!existing && existing.id === actorId;
@@ -32,7 +35,7 @@ export function saveUser(d: UserInput, existing: User | null, actorId: ID) {
     name: d.name.trim(),
     username: d.username.trim(),
     email: d.email.trim(),
-    phone: d.phone.trim(),
+    phone: normalizePhone(d.phone),
     role_id: Number(d.role_id),
     login_method: d.login_method,
     active: isSelf ? true : d.active,

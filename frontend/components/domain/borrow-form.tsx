@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { db } from '@/lib/mock/db';
 import { addDays, diffDays, fmtDate, relDue, today } from '@/lib/date';
-import { capitalize, cn, match, stripQrPrefix } from '@/lib/utils';
+import { cn, match, stripQrPrefix } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { useTitle } from '@/hooks/use-title';
 import { Badge } from '@/components/ui/badge';
@@ -24,20 +24,6 @@ import { activeBorrowings, borrowableItems, detailsOf, emp, isBorrowable, item a
 import type { FieldErrors, ID, Item } from '@/types';
 
 const STEPS = ['Pilih peminjam', 'Pilih barang', 'Jadwal & tujuan', 'Simpan & checkout'];
-
-function planDates(borrow: string, due: string) {
-  const s = db.data.settings;
-  const out: { ev: string; date: string; to: string; late?: boolean }[] = [];
-  if (s.checkout_notify) out.push({ ev: 'Saat checkout', date: borrow, to: 'Peminjam' });
-  s.rules
-    .filter((r) => r.active)
-    .forEach((r) => {
-      const dt = addDays(due, r.days);
-      if (r.days < 0 && dt < borrow) return;
-      out.push({ ev: r.event, date: dt, to: r.to.map(capitalize).join(' + '), late: r.days > 0 });
-    });
-  return out;
-}
 
 /** Pencatatan peminjaman oleh petugas: peminjam → barang → jadwal → simpan/checkout. */
 export function BorrowForm({ id }: { id?: ID }) {
@@ -78,7 +64,6 @@ export function BorrowForm({ id }: { id?: ID }) {
   const e = emp(employeeId);
   const { borrow_date: borrow, due_date: due } = form;
   const dur = borrow && due ? diffDays(borrow, due) : null;
-  const plan = borrow && due && dur !== null && dur >= 0 ? planDates(borrow, due) : [];
   const done = [!!e, itemIds.length > 0, !!(borrow && due && dur !== null && dur >= 0 && form.purpose.trim())];
 
   const employees = db
@@ -278,7 +263,7 @@ export function BorrowForm({ id }: { id?: ID }) {
                   error={errors.borrow_date}
                   onChange={(ev) => setForm({ ...form, borrow_date: ev.target.value })}
                 />
-                <Field label="Batas pengembalian" required error={errors.due_date} htmlFor="f-due" hint={dur === null ? undefined : dur < 0 ? 'Batas kembali sebelum tanggal pinjam.' : `Durasi ${dur} hari · jatuh pada ${fmtDate(due, true)}`}>
+                <Field label="Batas pengembalian" required error={errors.due_date} htmlFor="f-due" hint={dur === null ? undefined : dur < 0 ? 'Batas kembali sebelum tanggal pinjam.' : `Durasi ${dur} hari`}>
                   <Input id="f-due" type="date" className="w-full" aria-invalid={!!errors.due_date || undefined} value={form.due_date} onChange={(ev) => setForm({ ...form, due_date: ev.target.value })} />
                 </Field>
                 <TextField
@@ -331,26 +316,6 @@ export function BorrowForm({ id }: { id?: ID }) {
                   </Button>
                 )}
               </div>
-            </Card>
-            <Card title="Jadwal notifikasi ke peminjam">
-              {plan.length ? (
-                <ul className="list">
-                  {plan.map((x) => (
-                    <li key={x.ev} style={{ padding: '8px 0' }}>
-                      <span className="mono strong" style={{ width: 92, flexShrink: 0 }}>
-                        {x.ev}
-                      </span>
-                      <span style={{ flex: 1 }} className="small">
-                        {fmtDate(x.date)}
-                        {x.late && <span className="muted"> (jika belum kembali)</span>}
-                      </span>
-                      <span className="small muted">{x.to}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="small muted">Isi tanggal untuk melihat jadwal notifikasi.</p>
-              )}
             </Card>
           </div>
         </div>

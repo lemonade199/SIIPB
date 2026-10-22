@@ -32,12 +32,24 @@ def test_location_and_unit_update(client, auth_headers):
 
 
 def test_borrower_crud(client, auth_headers, petugas_headers, pimpinan_headers):
-    res = client.post("/api/v1/borrowers", json={"name": "Peminjam Uji", "identity_number": "NIP-UJI-1", "email": "uji@contoh.id", "unit_id": 1},
+    res = client.post("/api/v1/borrowers", json={"name": "Peminjam Uji", "identity_number": "199001012015011001", "email": "uji@contoh.id", "unit_id": 1},
                       headers=petugas_headers)
     assert res.status_code == 201
     bid = res.get_json()["data"]["id"]
-    assert client.post("/api/v1/borrowers", json={"name": "Lain", "identity_number": "NIP-UJI-1"}, headers=petugas_headers).status_code == 400
+    assert client.post("/api/v1/borrowers", json={"name": "Lain", "identity_number": "1990 0101 2015 01 1001"}, headers=petugas_headers).status_code == 400
     assert client.post("/api/v1/borrowers", json={"name": "X", "email": "bukan-email"}, headers=petugas_headers).status_code == 400
     assert client.post("/api/v1/borrowers", json={"name": "Lain"}, headers=pimpinan_headers).status_code == 403
-    assert client.put(f"/api/v1/borrowers/{bid}", json={"phone": "0811"}, headers=petugas_headers).get_json()["data"]["phone"] == "0811"
+    assert client.put(f"/api/v1/borrowers/{bid}", json={"phone": "+62 811-2345-6789"}, headers=petugas_headers).get_json()["data"]["phone"] == "081123456789"
     assert client.delete(f"/api/v1/borrowers/{bid}", headers=petugas_headers).status_code == 200
+
+
+def test_borrower_nip_and_phone_validation(client, petugas_headers):
+    bad_nip = client.post("/api/v1/borrowers", json={"name": "NIP Pendek", "identity_number": "12345"}, headers=petugas_headers)
+    assert bad_nip.status_code == 400 and "identity_number" in bad_nip.get_json()["errors"]
+    bad_phone = client.post("/api/v1/borrowers", json={"name": "Telp Pendek", "phone": "0811"}, headers=petugas_headers)
+    assert bad_phone.status_code == 400 and "phone" in bad_phone.get_json()["errors"]
+    ok = client.post("/api/v1/borrowers", json={"name": "Format Rapi", "identity_number": "1988 0303 2012 03 1099",
+                                                 "phone": "(0812) 3456-7890"}, headers=petugas_headers)
+    assert ok.status_code == 201, ok.get_json()
+    data = ok.get_json()["data"]
+    assert data["identity_number"] == "198803032012031099" and data["phone"] == "081234567890"

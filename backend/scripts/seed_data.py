@@ -120,7 +120,7 @@ def seed(minimal: bool = False):
         c and created.append("admin")
         if not minimal:
             _, c = seed_user(session, "petugas", "petugas@siipb.local", "Budi Santoso",
-                             os.getenv("SEED_PETUGAS_PASSWORD", "petugas123"), roles["SARPRAS"], sarpras.id, "0812-1000-2000")
+                             os.getenv("SEED_PETUGAS_PASSWORD", "petugas123"), roles["SARPRAS"], sarpras.id, "081210002000")
             c and created.append("petugas")
             _, c = seed_user(session, "pimpinan", "pimpinan@siipb.local", "Dr. Siti Rahayu",
                              os.getenv("SEED_PIMPINAN_PASSWORD", "pimpinan123"), roles["PIMPINAN"], root.id)
@@ -141,10 +141,10 @@ def seed(minimal: bool = False):
                 locs[code], _ = get_or_create(session, Location, {"code": code}, name=name, parent_id=gedung.id, description="Gedung A")
 
             for nip, name, unit, email, phone, pos in [
-                ("198501012010011001", "Andi Wijaya", "TU", "andi.wijaya@contoh.id", "0813-1111-2222", "Staf TU"),
-                ("199002022015022002", "Rina Kartika", "KEU", "rina.kartika@contoh.id", "0813-3333-4444", "Bendahara"),
-                ("198803032012031003", "Dedi Kurniawan", "AKD", "dedi.k@contoh.id", "0813-5555-6666", "Guru"),
-                ("199204042018042004", "Maya Lestari", "HUMAS", "maya.lestari@contoh.id", "0813-7777-8888", "Staf Humas"),
+                ("198501012010011001", "Andi Wijaya", "TU", "andi.wijaya@contoh.id", "081311112222", "Staf TU"),
+                ("199002022015022002", "Rina Kartika", "KEU", "rina.kartika@contoh.id", "081333334444", "Bendahara"),
+                ("198803032012031003", "Dedi Kurniawan", "AKD", "dedi.k@contoh.id", "081355556666", "Guru"),
+                ("199204042018042004", "Maya Lestari", "HUMAS", "maya.lestari@contoh.id", "081377778888", "Staf Humas"),
             ]:
                 get_or_create(session, Borrower, {"identity_number": nip}, name=name, unit_id=units[unit].id,
                               email=email, phone=phone, position=pos)

@@ -168,6 +168,7 @@ export default function QrPage() {
               </Card>
             </div>
             <Card
+              className="labels-card"
               title={`Label siap cetak (${labels.length})`}
               actions={
                 <Button
@@ -190,16 +191,12 @@ export default function QrPage() {
                   labels.map((i) => (
                     <div key={i.id} className="label-card">
                       <QrCode value={qrPayload(i)} />
-                      <div style={{ minWidth: 0 }}>
-                        <div className="small strong" style={{ letterSpacing: '.06em' }}>
-                          {db.data.settings.institution.toUpperCase()}
-                        </div>
-                        <div className="mono strong" style={{ fontSize: 14 }}>
-                          {i.item_code}
-                        </div>
-                        <div className="small">{i.item_name}</div>
-                        <div className="small muted">
-                          {loc(i.location_id)?.name} · {i.acquisition_year}
+                      <div className="label-text">
+                        <div className="label-inst">{db.data.settings.institution}</div>
+                        <div className="label-code">{i.item_code}</div>
+                        <div className="label-name">{i.item_name}</div>
+                        <div className="label-meta">
+                          {[loc(i.location_id)?.name, i.acquisition_year].filter(Boolean).join(' · ')}
                         </div>
                       </div>
                     </div>

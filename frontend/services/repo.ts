@@ -8,6 +8,7 @@
 import { isApiMode } from '@/lib/config';
 import { db } from '@/lib/mock/db';
 import { download as downloadBlobFile } from '@/lib/file';
+import { normalizeNip, normalizePhone, phoneError } from '@/lib/validation';
 import { ApiError } from '@/services/api/client';
 import {
   assetsApi,
@@ -121,13 +122,16 @@ export async function changePassword(u: User, oldPw: string, next: string, confi
 }
 
 export async function updateProfile(u: User, p: { name: string; email: string; phone: string }): Promise<Ok<object> | Fail> {
+  const phone = normalizePhone(p.phone);
+  const phoneErr = phoneError(phone);
+  if (phoneErr) return { ok: false, error: phoneErr };
   if (!isApiMode) {
-    db.update('users', u.id, { name: p.name.trim(), email: p.email.trim(), phone: p.phone.trim() });
+    db.update('users', u.id, { name: p.name.trim(), email: p.email.trim(), phone });
     db.save();
     return { ok: true };
   }
   return attempt(async () => {
-    await authApi.updateMe({ full_name: p.name.trim(), email: p.email.trim(), phone: p.phone.trim() || null });
+    await authApi.updateMe({ full_name: p.name.trim(), email: p.email.trim(), phone: phone || null });
     await refreshMe();
     await pullAll();
     return {};
@@ -336,7 +340,7 @@ const MASTER_PATH: Record<masterSvc.MasterKey, MasterPath> = {
 function masterBody(key: masterSvc.MasterKey, form: masterSvc.MasterForm, id: ID | null): Record<string, unknown> {
   const t = (v?: string) => (v || '').trim();
   if (key === 'peminjam')
-    return { identity_number: t(form.nip) || null, name: t(form.name), unit_id: form.unit_id ? Number(form.unit_id) : null, position: t(form.position) || null, email: t(form.email) || null, phone: t(form.phone) || null };
+    return { identity_number: normalizeNip(form.nip) || null, name: t(form.name), unit_id: form.unit_id ? Number(form.unit_id) : null, position: t(form.position) || null, email: t(form.email) || null, phone: normalizePhone(form.phone) || null };
   if (key === 'kategori') return { code: t(form.code).toUpperCase(), name: t(form.name) };
   if (key === 'lokasi') return { code: t(form.code).toUpperCase(), name: t(form.name), description: t(form.building) || null };
   const body: Record<string, unknown> = { name: t(form.name) };
@@ -530,10 +534,12 @@ export async function exportReport(filters: ReportFilters, format: 'xlsx' | 'pdf
 
 export async function saveUser(d: usersSvc.UserInput, existing: User | null, actorId: ID): Promise<{ ok: true } | { ok: false; errors: FieldErrors }> {
   if (!isApiMode) return usersSvc.saveUser(d, existing, actorId);
+  const phoneErr = phoneError(normalizePhone(d.phone));
+  if (phoneErr) return { ok: false, errors: { phone: phoneErr } };
   const body: Record<string, unknown> = {
     full_name: d.name.trim(),
     email: d.email.trim(),
-    phone: d.phone.trim() || null,
+    phone: normalizePhone(d.phone) || null,
     role_id: Number(d.role_id),
   };
   if (existing && existing.id !== actorId) body.is_active = d.active;

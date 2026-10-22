@@ -26,8 +26,8 @@ export function seedDatabase() {
   data.roles = defaultRoles();
   data.users = [
     { id: 1, name: 'Administrator Sistem', username: 'admin', email: 'admin@siipb.local', password: 'admin123', role_id: 1, active: true, login_method: 'LOKAL', phone: '', last_login: at(-1, '16:40'), created_at: at(-200) },
-    { id: 2, name: 'Rina Kartika', username: 'petugas', email: 'rina.kartika@siipb.local', password: 'petugas123', role_id: 2, active: true, login_method: 'LOKAL + SSO', phone: 'ext. 1021', last_login: at(-1, '07:55'), created_at: at(-180) },
-    { id: 3, name: 'Yoga Saputra', username: 'yoga', email: 'yoga.saputra@siipb.local', password: 'yoga123', role_id: 2, active: true, login_method: 'LOKAL + SSO', phone: 'ext. 1022', last_login: at(-2, '16:10'), created_at: at(-150) },
+    { id: 2, name: 'Rina Kartika', username: 'petugas', email: 'rina.kartika@siipb.local', password: 'petugas123', role_id: 2, active: true, login_method: 'LOKAL + SSO', phone: '081210001021', last_login: at(-1, '07:55'), created_at: at(-180) },
+    { id: 3, name: 'Yoga Saputra', username: 'yoga', email: 'yoga.saputra@siipb.local', password: 'yoga123', role_id: 2, active: true, login_method: 'LOKAL + SSO', phone: '081210001022', last_login: at(-2, '16:10'), created_at: at(-150) },
     { id: 4, name: 'Hendra Susanto', username: 'pimpinan', email: 'hendra.susanto@siipb.local', password: 'pimpinan123', role_id: 3, active: true, login_method: 'LOKAL + SSO', phone: '', last_login: at(-4, '09:02'), created_at: at(-180) },
     { id: 5, name: 'M. Arif', username: 'arif', email: 'arif@siipb.local', password: 'arif123', role_id: 2, active: false, login_method: 'LOKAL', phone: '', last_login: at(-55, '11:30'), created_at: at(-300) },
   ];
@@ -45,15 +45,15 @@ export function seedDatabase() {
   ).map(([c, n, b], i) => ({ id: i + 1, code: c, name: n, building: b, active: true }));
   data.employees = (
     [
-      ['198703122010', 'Siti Nurhaliza', 3, 'siti.nurhaliza@siipb.local', '0812-3456-1021'],
-      ['199001042015', 'Dimas Pratama', 2, 'dimas.pratama@siipb.local', '0813-2211-4410'],
-      ['198511202009', 'Andi Wijaya', 4, 'andi.wijaya@siipb.local', '0857-1100-2290'],
-      ['197902142005', 'Rahmat Hidayat', 1, 'rahmat.hidayat@siipb.local', '0821-7788-7731'],
-      ['199205302018', 'Lestari Putri', 5, 'lestari.putri@siipb.local', '0819-3344-3305'],
-      ['199408172020', 'Fajar Nugroho', 6, 'fajar.nugroho@siipb.local', '0878-5500-5562'],
-      ['199112092016', 'Yusuf Maulana', 3, 'yusuf.maulana@siipb.local', '0812-9090-1212'],
-      ['198808252012', 'Dewi Anggraini', 4, 'dewi.anggraini@siipb.local', '0813-4545-8080'],
-      ['199503112021', 'Bayu Prasetyo', 7, 'bayu.prasetyo@siipb.local', '0856-7171-3030'],
+      ['198703122010011001', 'Siti Nurhaliza', 3, 'siti.nurhaliza@siipb.local', '081234561021'],
+      ['199001042015011002', 'Dimas Pratama', 2, 'dimas.pratama@siipb.local', '081322114410'],
+      ['198511202009011003', 'Andi Wijaya', 4, 'andi.wijaya@siipb.local', '085711002290'],
+      ['197902142005011004', 'Rahmat Hidayat', 1, 'rahmat.hidayat@siipb.local', '082177887731'],
+      ['199205302018011005', 'Lestari Putri', 5, 'lestari.putri@siipb.local', '081933443305'],
+      ['199408172020011006', 'Fajar Nugroho', 6, 'fajar.nugroho@siipb.local', '087855005562'],
+      ['199112092016011007', 'Yusuf Maulana', 3, 'yusuf.maulana@siipb.local', '081290901212'],
+      ['198808252012011008', 'Dewi Anggraini', 4, 'dewi.anggraini@siipb.local', '081345458080'],
+      ['199503112021011009', 'Bayu Prasetyo', 7, 'bayu.prasetyo@siipb.local', '085671713030'],
     ] as const
   ).map(([nip, name, unit, email, phone], i) => ({ id: i + 1, nip, name, unit_id: unit, email, phone, position: 'Staf', active: true }));
 

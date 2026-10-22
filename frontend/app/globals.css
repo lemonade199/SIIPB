@@ -352,12 +352,13 @@
   .diff-new { color: var(--ok); }
 
   .modal-backdrop { position: fixed; inset: 0; background: rgba(47, 65, 86, .5); display: flex; align-items: flex-start; justify-content: center; padding: 6vh 16px; z-index: 100; overflow-y: auto; animation: fade .12s ease-out; }
-  .modal { background: #fff; border-radius: 14px; width: 100%; max-width: 560px; box-shadow: var(--shadow-lg); animation: pop .14s ease-out; }
+  .modal { background: #fff; border-radius: 14px; width: 100%; max-width: 560px; box-shadow: var(--shadow-lg); animation: pop .14s ease-out; display: flex; flex-direction: column; max-height: 88vh; }
   .modal.lg { max-width: 820px; }
   .modal-head { padding: 18px 22px 0; display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
   .modal-head h2, .modal-head [data-slot=dialog-title] { font-size: 17px; font-weight: 600; }
   .modal-head p, .modal-head [data-slot=dialog-description] { color: var(--muted-foreground); font-size: 13px; margin-top: 3px; }
-  .modal-body { padding: 16px 22px; }
+  /* isi panjang (mis. pratinjau email) bergulir di dalam modal: Radix memblokir scroll di luar konten dialog */
+  .modal-body { padding: 16px 22px; overflow-y: auto; min-height: 0; flex: 1 1 auto; overscroll-behavior: contain; }
   .modal-foot { padding: 14px 22px 18px; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
   .toast-root { position: fixed; right: 18px; bottom: 18px; display: flex; flex-direction: column; gap: 8px; z-index: 200; }
   .toast { background: var(--fg); color: #fff; border-radius: 10px; padding: 11px 14px; min-width: 260px; max-width: 380px; box-shadow: var(--shadow-lg); display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; animation: pop .14s ease-out; }
@@ -392,7 +393,12 @@
   .report-head { text-align: center; border-bottom: 2px solid var(--fg); padding-bottom: 10px; margin-bottom: 14px; }
   .labels-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
   .label-card { border: 1px dashed var(--border-strong); border-radius: 10px; padding: 12px; display: flex; gap: 12px; align-items: center; background: #fff; break-inside: avoid; }
-  .label-card .qr-box { width: 92px; height: 92px; padding: 6px; }
+  .label-card .qr-box { width: 92px; height: 92px; padding: 6px; flex-shrink: 0; }
+  .label-text { min-width: 0; display: grid; gap: 2px; }
+  .label-inst { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .label-code { font-family: var(--mono); font-weight: 700; font-size: 13px; white-space: nowrap; }
+  .label-name { font-size: 12px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .label-meta { font-size: 10.5px; color: var(--muted-foreground); }
 
 
 }
@@ -426,16 +432,61 @@
   .sidebar, .topbar, .no-print, .toast-root, .modal-backdrop, [data-slot=dialog-overlay] { display: none !important; }
   .print-only { display: block; }
   .content { padding: 0; max-width: none; }
-  .split, .split-wide { display: block !important; }
+  .split:not(.no-print), .split-wide:not(.no-print) { display: block !important; }
   .labels-grid { grid-template-columns: repeat(3, 1fr); }
   .card { border: 0; box-shadow: none; }
   .table th { background: #eee !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .table td, .table th { padding: 6px 8px; font-size: 11px; border: 1px solid #999; }
   .badge { font-family: inherit; padding: 0; background: none !important; }
   .badge::before { display: none; }
-  .label-card { border: 1px dashed #777; }
-  @page { margin: 14mm; }
+  .label-card { border: 1px dashed #777; border-radius: 0; padding: 3mm; height: 30mm; gap: 3mm; }
+  .label-card .qr-box { width: 24mm; height: 24mm; padding: 1mm; border: 0; border-radius: 0; }
+  .labels-grid { gap: 0 !important; }
+  .labels-card > [data-slot=card-header] { display: none !important; }
+  .labels-card > [data-slot=card-content] { padding: 0 !important; }
+  .page-head { display: none !important; }
+  /* tabel layar memakai scroll horizontal + bayangan; di kertas semua kolom harus tampil & teks boleh turun */
+  .table-wrap, .table-scroll { overflow: visible !important; }
+  .table-scroll::before, .table-scroll::after { display: none !important; }
+  .table, .table-wrap > .table { min-width: 0 !important; width: 100%; }
+  .table td, .table th { white-space: normal !important; }
+  .table td.nowrap { white-space: nowrap !important; }
+  .clamp-2 { display: block !important; -webkit-line-clamp: unset !important; overflow: visible !important; }
+  .thumb { display: none !important; }
+  @page { size: A4; margin: 14mm 14mm 16mm; }
 }
+
+/* Dokumen cetak resmi (components/domain/print-doc.tsx) */
+.print-doc { color: #000; font-size: 12px; line-height: 1.45; }
+.pd-kop { text-align: center; border-bottom: 3px double #000; padding-bottom: 8px; }
+.pd-inst { font-size: 17px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
+.pd-unit { font-size: 13px; font-weight: 600; }
+.pd-contact { font-size: 10.5px; margin-top: 2px; }
+.pd-title { text-align: center; margin: 16px 0 14px; }
+.pd-title-main { font-size: 14px; font-weight: 700; text-decoration: underline; text-transform: uppercase; letter-spacing: .02em; }
+.pd-title-sub { font-size: 11px; margin-top: 2px; }
+.pd-section { margin-top: 14px; break-inside: avoid; }
+.pd-section-title { font-weight: 700; font-size: 12.5px; margin-bottom: 6px; }
+.pd-info { width: 100%; border-collapse: collapse; }
+.pd-info th, .pd-info td { text-align: left; vertical-align: top; padding: 3px 6px 3px 0; font-size: 12px; }
+.pd-info th { width: 17%; font-weight: 600; white-space: nowrap; }
+.pd-info td { width: 33%; }
+.pd-info td::before { content: ": "; }
+.pd-info td:empty::before, .pd-info td[colspan]::before { content: ""; }
+.pd-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.pd-table th, .pd-table td { border: 1px solid #555; padding: 5px 6px; text-align: left; vertical-align: top; }
+.pd-table th { background: #eee; font-weight: 700; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.pd-table .num { width: 28px; text-align: center; }
+.pd-table .code { white-space: nowrap; }
+.pd-note { margin-top: 10px; font-size: 11px; }
+.pd-sign { margin-top: 26px; break-inside: avoid; page-break-inside: avoid; }
+.pd-sign-date { text-align: right; margin-bottom: 4px; }
+.pd-sign-row { display: flex; justify-content: space-between; gap: 24px; text-align: center; }
+.pd-sign-col { flex: 0 0 38%; white-space: pre-line; }
+.pd-sign-role { min-height: 2.9em; }
+.pd-sign-space { height: 56px; }
+.pd-sign-name { font-weight: 600; text-decoration: underline; }
+.pd-foot { margin-top: 8px; font-size: 10px; }
 
 /* Halaman login. Sengaja di luar @layer agar menang atas utilitas Tailwind pada kontrol form. */
 .signin { box-sizing: border-box; min-height: 100vh; display: flex; background: var(--beige); padding: clamp(14px, 4.3vh, 33px) clamp(14px, 3vw, 41px) clamp(14px, 6.4vh, 49px); }

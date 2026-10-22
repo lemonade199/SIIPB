@@ -12,6 +12,7 @@ from app.models.permission import ALL_PERMISSION_CODES, get_all_permissions
 from app.services.audit_service import record_audit
 from app.services.auth_service import login_method
 from app.utils.security import hash_password, validate_password_strength
+from app.utils.validators import normalize_phone, phone_error
 
 SYSTEM_ROLES = {"ADMIN", "SARPRAS", "PIMPINAN"}
 
@@ -121,6 +122,13 @@ def _set_roles(session: Session, user: User, role_ids: list[int], actor_id: int)
     session.refresh(user)
 
 
+def _clean_phone(value) -> str | None:
+    phone = normalize_phone(value)
+    if err := phone_error(phone):
+        raise UserError(err, {"phone": err})
+    return phone or None
+
+
 def create_user(session: Session, data: dict[str, Any], actor_id: int) -> User:
     _check_unique(session, data)
     password = data.get("password") or ""
@@ -140,7 +148,7 @@ def create_user(session: Session, data: dict[str, Any], actor_id: int) -> User:
         username=data["username"].strip(),
         email=data["email"].strip(),
         full_name=data["full_name"].strip(),
-        phone=(data.get("phone") or "").strip() or None,
+        phone=_clean_phone(data.get("phone")),
         unit_id=data.get("unit_id"),
         password_hash=hash_password(password) if password else None,
         is_active=data.get("is_active", True),
@@ -168,7 +176,7 @@ def update_user(session: Session, user_id: int, data: dict[str, Any], actor_id: 
         if k in data and data[k] is not None:
             setattr(user, k, data[k].strip() if isinstance(data[k], str) else data[k])
     if "phone" in data:
-        user.phone = (data.get("phone") or "").strip() or None
+        user.phone = _clean_phone(data.get("phone"))
     if data.get("password"):
         err = validate_password_strength(data["password"])
         if err:

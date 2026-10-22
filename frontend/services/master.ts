@@ -1,6 +1,7 @@
 /** Master data: peminjam/pegawai, kategori, lokasi, unit kerja. */
 import { db } from '@/lib/mock/db';
 import { clone, EMAIL_RE } from '@/lib/utils';
+import { nipError, normalizeNip, normalizePhone, phoneError } from '@/lib/validation';
 import { audit } from '@/services/audit';
 import { activeBorrowings } from '@/services/lookup';
 import type { FieldErrors, ID } from '@/types';
@@ -25,14 +26,18 @@ export const MASTER: Record<MasterKey, MasterDef> = {
     noun: 'peminjam',
     validate: (d, id) => {
       const e: FieldErrors = {};
-      if (!t(d.nip)) e.nip = 'Wajib diisi.';
-      else if (db.find('employees', (x) => x.nip === t(d.nip) && x.id !== id)) e.nip = 'NIP sudah terdaftar.';
+      const nip = normalizeNip(d.nip);
+      if (!nip) e.nip = 'Wajib diisi.';
+      else if (nipError(nip)) e.nip = nipError(nip) as string;
+      else if (db.find('employees', (x) => x.nip === nip && x.id !== id)) e.nip = 'NIP sudah terdaftar.';
+      const phoneErr = phoneError(normalizePhone(d.phone));
+      if (phoneErr) e.phone = phoneErr;
       if (!t(d.name)) e.name = 'Wajib diisi.';
       if (!d.unit_id) e.unit_id = 'Pilih unit kerja.';
       if (!EMAIL_RE.test(t(d.email))) e.email = 'Format email tidak valid.';
       return e;
     },
-    map: (d) => ({ nip: t(d.nip), name: t(d.name), unit_id: Number(d.unit_id), position: t(d.position), email: t(d.email), phone: t(d.phone) }),
+    map: (d) => ({ nip: normalizeNip(d.nip), name: t(d.name), unit_id: Number(d.unit_id), position: t(d.position), email: t(d.email), phone: normalizePhone(d.phone) }),
     used: (id) => !!db.find('borrowings', (b) => b.employee_id === id),
   },
   kategori: {

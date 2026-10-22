@@ -13,7 +13,7 @@ def test_permissions_and_roles(client, auth_headers):
 def test_user_crud_and_deactivate(client, auth_headers):
     res = client.post("/api/v1/users", json={
         "username": "staf.baru", "email": "staf.baru@contoh.id", "full_name": "Staf Baru",
-        "password": "Password123", "role_id": 3, "phone": "0812"}, headers=auth_headers)
+        "password": "Password123", "role_id": 3, "phone": "0812-3456-7890"}, headers=auth_headers)
     assert res.status_code == 201
     uid = res.get_json()["data"]["id"]
     dup = client.post("/api/v1/users", json={
@@ -111,3 +111,12 @@ def test_role_with_empty_permissions(client, auth_headers):
     # Reassign user role ke role lain sebelum menghapus role tamu
     client.put(f"/api/v1/users/{uid}", json={"role_id": 3}, headers=auth_headers)
     assert client.delete(f"/api/v1/roles/{rid}", headers=auth_headers).status_code == 200
+
+
+def test_user_and_profile_phone_validation(client, auth_headers):
+    bad = client.post("/api/v1/users", json={"username": "telp.salah", "email": "telp.salah@contoh.id", "full_name": "Telp Salah",
+                                             "password": "Password123", "role_id": 3, "phone": "12345"}, headers=auth_headers)
+    assert bad.status_code == 400 and "phone" in bad.get_json()["errors"]
+    me = client.put("/api/v1/auth/me", json={"phone": "+62 812 0000 1111"}, headers=auth_headers)
+    assert me.status_code == 200 and me.get_json()["data"]["phone"] == "081200001111"
+    assert client.put("/api/v1/auth/me", json={"phone": "bukan-nomor"}, headers=auth_headers).status_code == 400

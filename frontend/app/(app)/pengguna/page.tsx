@@ -168,15 +168,6 @@ export default function PenggunaPage() {
           </TableWrap>
         ) : (
           <>
-            <div style={{ padding: '14px 20px' }}>
-            </div>
-            <div className="row" style={{ padding: '0 20px 14px', gap: 16 }}>
-              {roles.map((r) => (
-                <div key={r.id} className="small">
-                  <b>{r.name}</b> — <span className="muted">{r.description}</span>
-                </div>
-              ))}
-            </div>
             <TableWrap>
               <table className="table matrix">
                 <thead>
@@ -202,7 +193,6 @@ export default function PenggunaPage() {
         open={!!userForm}
         onClose={() => setUserForm(null)}
         title={userForm?.existing ? 'Ubah pengguna' : 'Tambah pengguna'}
-        desc="Pengguna internal: administrator, petugas, atau pimpinan."
         footer={
           <>
             <Button onClick={() => setUserForm(null)}>Batal</Button>
@@ -224,7 +214,7 @@ export default function PenggunaPage() {
               <TextField placeholder="mis. Budi Santoso" label="Nama lengkap" required value={userForm.v.name} error={errors.name} onChange={(e) => setU('name', e.target.value)} />
               <TextField placeholder="mis. budi.santoso" label="Username" required mono value={userForm.v.username} error={errors.username} onChange={(e) => setU('username', e.target.value)} />
               <TextField placeholder="mis. budi@instansi.go.id" label="Email" type="email" required value={userForm.v.email} error={errors.email} onChange={(e) => setU('email', e.target.value)} />
-              <TextField placeholder="mis. 0812-3456-7890" label="Telepon / ext." value={userForm.v.phone} onChange={(e) => setU('phone', e.target.value)} />
+              <TextField placeholder="mis. 081234567890" label="Telepon" inputMode="tel" hint="10–13 digit, diawali 0" value={userForm.v.phone} error={errors.phone} onChange={(e) => setU('phone', e.target.value)} />
               <SelectField label="Role" required value={userForm.v.role_id} onChange={(e) => setU('role_id', e.target.value)} options={roles.map((r) => ({ value: r.id, label: r.name }))} />
               <SelectField
                 label="Metode login"
@@ -237,7 +227,7 @@ export default function PenggunaPage() {
                   label="Kata sandi awal"
                   type="password"
                   required
-                  hint="Minimal 8 karakter. Pengguna dapat menggantinya di Profil."
+                  hint="Minimal 8 karakter."
                   value={userForm.v.password}
                   error={errors.password}
                   onChange={(e) => setU('password', e.target.value)}

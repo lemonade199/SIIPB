@@ -23,6 +23,7 @@ import * as repo from '@/services/repo';
 import { isApiMode } from '@/lib/config';
 import type { ID, ReportFilters, ReportType } from '@/types';
 import { TableWrap } from '@/components/ui/table-wrap';
+import { PrintHeader, PrintSign } from '@/components/domain/print-doc';
 
 
 /** Kolom pendek (kode, tanggal, angka) tidak dipecah ke baris baru; kolom teks panjang dibatasi 2 baris. */
@@ -200,16 +201,7 @@ export default function LaporanPage() {
             )}
           </div>
           <div className="card-body">
-            <div className="report-head print-only">
-              <div style={{ fontSize: 12 }}>
-                {s.institution} — {s.unit_sarpras}
-              </div>
-              <h2 style={{ margin: '6px 0' }}>LAPORAN {meta.label.toUpperCase()}</h2>
-              <div style={{ fontSize: 12 }}>
-                {periodText}
-                {filt && ` · ${filt}`}
-              </div>
-            </div>
+            <PrintHeader title={`Laporan ${meta.label}`} subtitle={`${periodText}${filt ? ` · ${filt}` : ''}`} />
             <div className="row between no-print" style={{ marginBottom: 10 }}>
               <div>
                 <div className="strong">Laporan {meta.label}</div>
@@ -251,18 +243,16 @@ export default function LaporanPage() {
                 </tbody>
               </table>
             </TableWrap>
-            <div className="print-only" style={{ marginTop: 12, fontSize: 11 }}>
-              {rep.summary} · Dicetak {fmtDateTime(nowISO())} oleh {user.name}
-            </div>
-            <div className="print-only" style={{ marginTop: 36, textAlign: 'right', fontSize: 12 }}>
-              Mengetahui,
-              <br />
-              <br />
-              <br />
-              <br />
-              ______________________
-              <br />
-              Pimpinan
+            <div className="print-only print-doc">
+              <div className="pd-foot">
+                {rep.summary} · Dicetak {fmtDateTime(nowISO())} oleh {user.name}
+              </div>
+              <PrintSign
+                cols={[
+                  { role: 'Mengetahui,\nPimpinan' },
+                  { role: 'Petugas Sarpras/IT,', name: user.name },
+                ]}
+              />
             </div>
           </div>
         </section>
