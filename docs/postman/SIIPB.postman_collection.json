@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "SIIPB API",
-    "description": "Koleksi seluruh endpoint SIIPB. Jalankan Authentication > POST /auth/login lebih dulu: token tersimpan otomatis dan dipakai request lain.\n\nUbah variabel baseUrl ke https://averus.my.id untuk server AWS.",
+    "description": "Koleksi seluruh endpoint SIIPB. Jalankan Authentication > GET /auth/captcha, lihat kodenya di tab Visualize, isi captcha_answer di POST /auth/login lalu kirim: token tersimpan otomatis dan dipakai request lain.\n\nUbah variabel baseUrl ke https://averus.my.id untuk server AWS.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -26,12 +26,55 @@
     {
       "key": "refreshToken",
       "value": ""
+    },
+    {
+      "key": "captchaId",
+      "value": ""
     }
   ],
   "item": [
     {
       "name": "Authentication",
       "item": [
+        {
+          "name": "GET /auth/captcha - Minta tantangan CAPTCHA gambar baru untuk formulir login.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/captcha",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "captcha"
+              ]
+            },
+            "description": "Minta tantangan CAPTCHA gambar baru untuk formulir login.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) {",
+                  "  pm.collectionVariables.set('captchaId', j.data.captcha_id);",
+                  "  pm.visualizer.set('<p>Ketik 6 karakter ini ke captcha_answer di Body request login (berlaku 5 menit, sekali pakai):</p>'",
+                  "    + '<img src=\"{{img}}\" style=\"width:540px;border:1px solid #ccc\">', { img: j.data.image });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
         {
           "name": "POST /auth/login - Login internal user (Admin/Petugas/Pimpinan).",
           "request": {
@@ -60,7 +103,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"password\": \"admin123\",\n  \"username\": \"admin\"\n}",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin123\",\n  \"captcha_id\": \"{{captchaId}}\",\n  \"captcha_answer\": \"ISI-KODE-DARI-GAMBAR\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -150,7 +193,21 @@
                 }
               }
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  pm.collectionVariables.set('token', '');",
+                  "  pm.collectionVariables.set('refreshToken', '');",
+                  "}"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "GET /auth/me - Profil pengguna yang sedang login beserta role & permission.",
@@ -456,7 +513,7 @@
             "description": "Tambah barang. `inventory_code` kosong -> dibuat otomatis (INV-<KATEGORI>-0001).",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"category_id\": 1,\n  \"location_id\": 1,\n  \"name\": \"Laptop Lenovo ThinkPad T14\",\n  \"brand\": \"Lenovo\",\n  \"model\": \"ThinkPad T14 Gen 3\",\n  \"serial_number\": \"PF-3A21\",\n  \"purchase_date\": \"2024-01-15\",\n  \"acquisition_cost\": 14500000,\n  \"acquisition_source\": \"APBN 2024\",\n  \"condition\": \"BAIK\"\n}",
+              "raw": "{\n  \"category_id\": 1,\n  \"location_id\": 1,\n  \"name\": \"Laptop Lenovo ThinkPad T14\",\n  \"brand\": \"Lenovo\",\n  \"model\": \"ThinkPad T14 Gen 3\",\n  \"serial_number\": \"PF-3A21\",\n  \"purchase_date\": \"2024-01-15\",\n  \"acquisition_source\": \"APBN 2024\",\n  \"condition\": \"BAIK\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

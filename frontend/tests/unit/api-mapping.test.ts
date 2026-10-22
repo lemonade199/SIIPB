@@ -14,7 +14,6 @@ const asset: ApiAsset = {
   description: null,
   photo_path: '/uploads/assets/abc.jpg',
   purchase_date: '2023-03-12',
-  acquisition_cost: 9200000,
   status: 'TERSEDIA',
   condition: 'BAIK',
   category_id: 4,
@@ -31,7 +30,7 @@ const asset: ApiAsset = {
 describe('mapAsset', () => {
   it('memetakan field aset ke item', () => {
     const it0 = mapAsset(asset);
-    expect(it0).toMatchObject({ id: 5, item_code: 'AST-TKJ-001', item_name: 'Fluke Network Cable Tester Kit', acquisition_year: 2023, acquisition_value: 9200000, item_status: 'TERSEDIA', active: true });
+    expect(it0).toMatchObject({ id: 5, item_code: 'AST-TKJ-001', item_name: 'Fluke Network Cable Tester Kit', acquisition_year: 2023, item_status: 'TERSEDIA', active: true });
     expect(it0.photos[0]).toMatch(/^http.*\/uploads\/assets\/abc\.jpg$/);
   });
 

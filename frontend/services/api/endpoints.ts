@@ -104,7 +104,6 @@ export interface ApiAsset {
   photo_path: string | null;
   photos?: { id: number; path: string }[];
   purchase_date: string | null;
-  acquisition_cost: number | null;
   acquisition_source?: string | null;
   status: string;
   condition: string;
@@ -128,7 +127,6 @@ export interface ApiAssetInput {
   serial_number?: string | null;
   description?: string | null;
   purchase_date?: string | null;
-  acquisition_cost?: number | null;
   acquisition_source?: string | null;
   condition?: string;
   status?: string;

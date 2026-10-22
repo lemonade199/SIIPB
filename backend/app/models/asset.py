@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
@@ -13,7 +12,6 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
-    Numeric,
     String,
     Text,
     text,
@@ -45,10 +43,6 @@ class Asset(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
     __table_args__ = table_args(
         CheckConstraint(check_in("status", AssetStatus), name="status"),
         CheckConstraint(check_in("condition", AssetCondition), name="condition"),
-        CheckConstraint(
-            "acquisition_cost IS NULL OR acquisition_cost >= 0",
-            name="acquisition_cost_non_negative",
-        ),
     )
 
     inventory_code: Mapped[str] = mapped_column(String(50), unique=True)
@@ -69,7 +63,6 @@ class Asset(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
     description: Mapped[str | None] = mapped_column(Text)
     photo_path: Mapped[str | None] = mapped_column(String(500))
     purchase_date: Mapped[date | None] = mapped_column(Date)
-    acquisition_cost: Mapped[Decimal | None] = mapped_column(Numeric(15, 2))
     acquisition_source: Mapped[str | None] = mapped_column(String(150))
     status: Mapped[str] = mapped_column(
         String(30),

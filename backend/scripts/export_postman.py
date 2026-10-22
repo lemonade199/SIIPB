@@ -2,7 +2,8 @@
 
     cd backend && python scripts/export_postman.py      # -> docs/postman/SIIPB.postman_collection.json
 
-Isi koleksi: folder per modul, variabel {{baseUrl}} & {{token}}, login yang menyimpan token otomatis,
+Isi koleksi: folder per modul, variabel {{baseUrl}} & {{token}}, CAPTCHA yang gambarnya tampil di tab Visualize,
+login yang menyimpan token otomatis, logout yang mengosongkan token,
 contoh body untuk setiap POST/PUT, serta parameter path & query dengan contoh nilai.
 """
 import json
@@ -20,7 +21,7 @@ TODAY, DUE = "2026-10-21", "2026-10-24"
 EXAMPLES = {
     "POST /api/v1/assets": {"category_id": 1, "location_id": 1, "name": "Laptop Lenovo ThinkPad T14", "brand": "Lenovo",
                             "model": "ThinkPad T14 Gen 3", "serial_number": "PF-3A21", "purchase_date": "2024-01-15",
-                            "acquisition_cost": 14500000, "acquisition_source": "APBN 2024", "condition": "BAIK"},
+                            "acquisition_source": "APBN 2024", "condition": "BAIK"},
     "PUT /api/v1/assets/{asset_id}": {"name": "Laptop Lenovo ThinkPad T14", "location_id": 2, "condition": "BAIK"},
     "PUT /api/v1/assets/{asset_id}/photos/order": {"photo_ids": [3, 2]},
     "POST /api/v1/borrowings": {"borrower_id": 1, "asset_ids": [1], "start_date": TODAY, "due_date": DUE,
@@ -46,6 +47,8 @@ EXAMPLES = {
     "POST /api/v1/roles": {"code": "STAF_GUDANG", "name": "Staf Gudang", "description": "Mengelola stok barang di gudang",
                            "permissions": ["dashboard.view", "inventory.view", "inventory.manage"]},
     "PUT /api/v1/roles/{role_id}": {"permissions": ["dashboard.view", "inventory.view"]},
+    "POST /api/v1/auth/login": {"username": "admin", "password": "admin123", "captcha_id": "{{captchaId}}",
+                                "captcha_answer": "ISI-KODE-DARI-GAMBAR"},
     "PUT /api/v1/auth/me": {"full_name": "Administrator SIIPB", "phone": "0812-3456-7890"},
     "POST /api/v1/auth/refresh": {"refresh_token": "{{refreshToken}}"},
     "POST /api/v1/auth/logout": {"refresh_token": "{{refreshToken}}"},
@@ -59,12 +62,22 @@ EXAMPLES = {
 FORM_FILES = {"POST /api/v1/assets/{asset_id}/photos": "files", "POST /api/v1/assets/{asset_id}/upload-photo": "file",
               "POST /api/v1/uploads": "file"}
 PATH_EXAMPLES = {"rtype": "peminjaman", "code": "INV-LPT-0001", "name": "siipb-20261021-010000.sql.gz"}
-PUBLIC = {"/api/health", "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/sso/exchange",
+PUBLIC = {"/api/health", "/api/v1/auth/captcha", "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/sso/exchange",
           "/api/v1/settings/public", "/api/v1/auth/sso", "/api/v1/auth/sso/callback"}
 SAVE_TOKENS = """const j = pm.response.json();
 if (j.success && j.data.access_token) {
   pm.collectionVariables.set('token', j.data.access_token);
   if (j.data.refresh_token) pm.collectionVariables.set('refreshToken', j.data.refresh_token);
+}"""
+SAVE_CAPTCHA = """const j = pm.response.json();
+if (j.success) {
+  pm.collectionVariables.set('captchaId', j.data.captcha_id);
+  pm.visualizer.set('<p>Ketik 6 karakter ini ke captcha_answer di Body request login (berlaku 5 menit, sekali pakai):</p>'
+    + '<img src="{{img}}" style="width:540px;border:1px solid #ccc">', { img: j.data.image });
+}"""
+CLEAR_TOKENS = """if (pm.response.code === 200) {
+  pm.collectionVariables.set('token', '');
+  pm.collectionVariables.set('refreshToken', '');
 }"""
 
 
@@ -129,26 +142,30 @@ def main() -> None:
                 continue
             name = (op.get("summary") or "").strip() or f"{method.upper()} {path}"
             entry = {"name": f"{method.upper()} {re.sub(r'^/api/v1', '', path)} - {name}", "request": build_request(path, method, op)}
+            script = {"/api/v1/auth/captcha": SAVE_CAPTCHA, "/api/v1/auth/logout": CLEAR_TOKENS}.get(path)
             if path in ("/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/sso/exchange"):
-                entry["event"] = [{"listen": "test", "script": {"type": "text/javascript", "exec": SAVE_TOKENS.splitlines()}}]
+                script = SAVE_TOKENS
+            if script:
+                entry["event"] = [{"listen": "test", "script": {"type": "text/javascript", "exec": script.splitlines()}}]
             folders.setdefault((op.get("tags") or ["Lainnya"])[0], []).append(entry)
 
-    # login paling atas agar token tersedia untuk request lain
-    folders.get("Authentication", []).sort(key=lambda e: "/auth/login " not in e["name"])
+    # captcha lalu login paling atas agar token tersedia untuk request lain
+    folders.get("Authentication", []).sort(key=lambda e: (" /auth/captcha " not in e["name"], " /auth/login " not in e["name"]))
     order = ["Authentication"]
     items = [{"name": t, "item": folders[t]} for t in order if t in folders]
     items += [{"name": t, "item": v} for t, v in sorted(folders.items()) if t not in order]
     collection = {
         "info": {
             "name": "SIIPB API",
-            "description": "Koleksi seluruh endpoint SIIPB. Jalankan Authentication > POST /auth/login lebih dulu: "
-                           "token tersimpan otomatis dan dipakai request lain.\n\nUbah variabel baseUrl ke "
+            "description": "Koleksi seluruh endpoint SIIPB. Jalankan Authentication > GET /auth/captcha, lihat kodenya di tab "
+                           "Visualize, isi captcha_answer di POST /auth/login lalu kirim: token tersimpan otomatis dan "
+                           "dipakai request lain.\n\nUbah variabel baseUrl ke "
                            "https://averus.my.id untuk server AWS.",
             "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
         },
         "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
         "variable": [{"key": "baseUrl", "value": "http://localhost"}, {"key": "token", "value": ""},
-                     {"key": "refreshToken", "value": ""}],
+                     {"key": "refreshToken", "value": ""}, {"key": "captchaId", "value": ""}],
         "item": items,
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)

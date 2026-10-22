@@ -41,7 +41,6 @@ export function ItemForm({ id }: { id?: ID }) {
     condition_status: existing?.condition_status ?? 'BAIK',
     acquisition_year: existing?.acquisition_year ?? new Date().getFullYear(),
     acquisition_source: existing?.acquisition_source ?? '',
-    acquisition_value: existing?.acquisition_value ?? '',
     notes: existing?.notes ?? '',
   }));
   const [photos, setPhotos] = useState<string[]>(existing?.photos ?? []);

@@ -11,7 +11,6 @@ Di production WAJIB diganti setelah login pertama.
 import os
 import sys
 from datetime import date
-from decimal import Decimal
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -149,17 +148,17 @@ def seed(minimal: bool = False):
                 get_or_create(session, Borrower, {"identity_number": nip}, name=name, unit_id=units[unit].id,
                               email=email, phone=phone, position=pos)
 
-            for code, name, cat, loc, brand, model, sn, year, cost in [
-                ("INV-LPT-0001", "Laptop ThinkPad T14", "LPT", "GDA-SARPRAS", "Lenovo", "T14 Gen 3", "PF-3A21", 2023, 14500000),
-                ("INV-LPT-0002", "Laptop ThinkPad T14", "LPT", "GDA-SARPRAS", "Lenovo", "T14 Gen 3", "PF-3A22", 2023, 14500000),
-                ("INV-PRY-0001", "Proyektor Epson EB-X51", "PRY", "GDA-GUDANG", "Epson", "EB-X51", "EPX-5521", 2022, 6500000),
-                ("INV-KAM-0001", "Kamera Sony A6400", "KAM", "GDA-GUDANG", "Sony", "ILCE-6400", "SNY-9912", 2024, 15000000),
-                ("INV-JAR-0001", "Access Point UniFi U6", "JAR", "GDA-GUDANG", "Ubiquiti", "U6-Lite", "UBQ-7710", 2024, 2400000),
-                ("INV-AUD-0001", "Speaker Portable JBL", "AUD", "GDA-RAPAT", "JBL", "EON 710", "JBL-4410", 2021, 9800000),
+            for code, name, cat, loc, brand, model, sn, year in [
+                ("INV-LPT-0001", "Laptop ThinkPad T14", "LPT", "GDA-SARPRAS", "Lenovo", "T14 Gen 3", "PF-3A21", 2023),
+                ("INV-LPT-0002", "Laptop ThinkPad T14", "LPT", "GDA-SARPRAS", "Lenovo", "T14 Gen 3", "PF-3A22", 2023),
+                ("INV-PRY-0001", "Proyektor Epson EB-X51", "PRY", "GDA-GUDANG", "Epson", "EB-X51", "EPX-5521", 2022),
+                ("INV-KAM-0001", "Kamera Sony A6400", "KAM", "GDA-GUDANG", "Sony", "ILCE-6400", "SNY-9912", 2024),
+                ("INV-JAR-0001", "Access Point UniFi U6", "JAR", "GDA-GUDANG", "Ubiquiti", "U6-Lite", "UBQ-7710", 2024),
+                ("INV-AUD-0001", "Speaker Portable JBL", "AUD", "GDA-RAPAT", "JBL", "EON 710", "JBL-4410", 2021),
             ]:
                 get_or_create(session, Asset, {"inventory_code": code}, name=name, category_id=cats[cat].id,
                               location_id=locs[loc].id, brand=brand, model=model, serial_number=sn,
-                              purchase_date=date(year, 1, 1), acquisition_cost=Decimal(cost), acquisition_source="APBN",
+                              purchase_date=date(year, 1, 1), acquisition_source="APBN",
                               status=AssetStatus.TERSEDIA.value, condition=AssetCondition.BAIK.value)
         session.commit()
         print("[SEED] selesai." + (f" Akun baru: {', '.join(created)}" if created else " (data sudah ada)"))

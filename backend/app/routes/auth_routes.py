@@ -71,8 +71,9 @@ def login():
 
     # Verifikasi CAPTCHA
     is_testing = current_app.config.get("TESTING") or Config.APP_ENV == "testing"
-    captcha_id = data.get("captcha_id")
-    captcha_answer = data.get("captcha_answer")
+    # captcha juga diterima dari query string (mis. diisi lewat tab Params di Postman)
+    captcha_id = request.args.get("captcha_id") or data.get("captcha_id")
+    captcha_answer = request.args.get("captcha_answer") or data.get("captcha_answer")
 
     # Dalam mode non-testing atau jika client mengirimkan parameter captcha, verifikasi wajib
     if not is_testing or captcha_id or captcha_answer:
