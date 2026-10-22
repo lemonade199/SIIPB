@@ -36,10 +36,14 @@ def jwt_required(f):
         auth_header = request.headers.get("Authorization")
         if not auth_header:
             return error_response("Header Authorization wajib disertakan", error_code="UNAUTHORIZED", status_code=401)
-        parts = auth_header.split(" ")
-        if len(parts) != 2 or parts[0].lower() != "bearer":
+        parts = auth_header.strip().split()
+        if len(parts) == 1:
+            token = parts[0]
+        elif len(parts) == 2 and parts[0].lower().rstrip(":") == "bearer":
+            token = parts[1]
+        else:
             return error_response("Format Authorization harus: Bearer <token>", error_code="INVALID_TOKEN_FORMAT", status_code=401)
-        payload = decode_access_token(parts[1])
+        payload = decode_access_token(token)
         if not payload:
             return error_response("Token akses tidak valid atau sudah kedaluwarsa", error_code="TOKEN_EXPIRED_OR_INVALID", status_code=401)
         identity = _load_identity(payload)
