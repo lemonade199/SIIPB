@@ -1,25 +1,23 @@
 'use client';
 
 import Link from 'next/link';
-import { Input } from '@/components/ui/input';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { db } from '@/lib/mock/db';
 import { fmtDate, fmtDateTime, offsetDays, today } from '@/lib/date';
 import { EVENT_LABEL } from '@/lib/constants';
-import { cn, stripQrPrefix } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { Button, buttonClass } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { StatIcon } from '@/components/ui/card';
 import { inbox } from '@/services/notification';
 import * as repo from '@/services/repo';
-import { borrowingByCode, emp, itemByCode, returnByCode } from '@/services/lookup';
+import { emp } from '@/services/lookup';
 
 export function Topbar({ onMenu }: { onMenu: () => void }) {
   const { user } = useAuth();
   const router = useRouter();
-  const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
   const bellRef = useRef<HTMLDivElement>(null);
 
@@ -37,29 +35,9 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
   const unread = list.filter((n) => !n.read_by.includes(user.id)).length;
   const off = offsetDays();
 
-  const onSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    const code = stripQrPrefix(q);
-    if (!code) return;
-    const it = itemByCode(code);
-    if (it) return router.push(`/inventaris/${it.id}`);
-    const b = borrowingByCode(code);
-    if (b) return router.push(`/peminjaman/${b.id}`);
-    const r = returnByCode(code);
-    if (r) return router.push(`/pengembalian/${r.id}`);
-    router.push(`/inventaris?q=${encodeURIComponent(code)}`);
-  };
-
   return (
     <header className="topbar">
       <Button variant="ghost" iconOnly icon="menu" className="menu-btn min-[901px]:hidden" title="Buka menu" onClick={onMenu} />
-      <form className="search" role="search" onSubmit={onSearch}>
-        <label className="sr-only" htmlFor="gs">
-          Cari
-        </label>
-        <Icon name="search" size={17} />
-        <Input className="pl-9" id="gs" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari / pindai kode barang atau transaksi (INV-…, PJM-…)" autoComplete="off" />
-      </form>
       <span className="spacer" />
       <span className={cn('date-chip', off && 'demo')} title={off ? `Mode demo: tanggal sistem digeser ${off} hari` : 'Tanggal sistem'}>
         <Icon name="calendar" size={15} />

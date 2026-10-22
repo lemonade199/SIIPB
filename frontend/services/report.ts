@@ -1,7 +1,7 @@
 /** Laporan: inventaris, peminjaman, pengembalian, keterlambatan, kerusakan & kehilangan. */
 import { db } from '@/lib/mock/db';
 import { fmtDate, localDate, nowISO } from '@/lib/date';
-import { clone, rupiah } from '@/lib/utils';
+import { clone } from '@/lib/utils';
 import { audit } from '@/services/audit';
 import { borrowView, cat, emp, item, itemsOf, loc, returnDetails, unit, userName, conditionLabel } from '@/services/lookup';
 import { currentUser } from '@/services/session';
@@ -42,7 +42,6 @@ export function buildReport(type: ReportType, f: Partial<ReportFilters> = {}): R
         seri: it.serial_number,
         tahun: it.acquisition_year,
         sumber: it.acquisition_source,
-        nilai: it.acquisition_value,
         lokasi: loc(it.location_id)?.name,
         kondisi: conditionLabel(it.condition_status),
         status: it.item_status,
@@ -56,13 +55,12 @@ export function buildReport(type: ReportType, f: Partial<ReportFilters> = {}): R
         { key: 'seri', label: 'No. Seri' },
         { key: 'tahun', label: 'Tahun' },
         { key: 'sumber', label: 'Sumber' },
-        { key: 'nilai', label: 'Nilai Perolehan', money: true },
         { key: 'lokasi', label: 'Lokasi' },
         { key: 'kondisi', label: 'Kondisi' },
         { key: 'status', label: 'Status', badge: true },
       ],
       rows,
-      summary: `${rows.length} barang · total nilai ${rupiah(rows.reduce((s, r) => s + (Number(r.nilai) || 0), 0))}`,
+      summary: `${rows.length} barang`,
     };
   }
   if (type === 'peminjaman') {
@@ -186,7 +184,6 @@ export function buildReport(type: ReportType, f: Partial<ReportFilters> = {}): R
         kondisi: conditionLabel(it.condition_status),
         sejak: mv ? fmtDate(localDate(mv.at)) : '—',
         keterangan: mv ? mv.note : '',
-        nilai: it.acquisition_value,
       };
     });
   return {

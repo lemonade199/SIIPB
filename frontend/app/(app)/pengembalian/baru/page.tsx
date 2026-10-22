@@ -1,13 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { Input } from '@/components/ui/input';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { db } from '@/lib/mock/db';
 import { diffDays, fmtDate, today } from '@/lib/date';
 import { RETURN_CONDITIONS } from '@/lib/constants';
-import { match, stripQrPrefix } from '@/lib/utils';
+import { match } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { useTitle } from '@/hooks/use-title';
 import { Badge } from '@/components/ui/badge';
@@ -16,10 +15,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Card } from '@/components/ui/card';
 import { Field, SelectField, TextareaField, TextField } from '@/components/ui/form';
 import { Icon } from '@/components/ui/icon';
-import { Alert, Avatar, Empty, KV, PageHead, Thumb } from '@/components/ui/misc';
+import { Alert, Avatar, Empty, KV, PageHead, SearchInput, Thumb } from '@/components/ui/misc';
 import { BorrowBadge, DueText, LateText } from '@/components/domain/borrow-status';
 import { useToast } from '@/components/providers/feedback-provider';
-import { activeBorrowings, borrowingByCode, borrowView, detailsOf, emp, isActive, item as getItem, itemByCode, itemsOf, returnDetails, unit } from '@/services/lookup';
+import { activeBorrowings, borrowView, emp, isActive, item as getItem, itemsOf, returnDetails, unit } from '@/services/lookup';
 import { type ReturnItemInput } from '@/services/return';
 import * as repo from '@/services/repo';
 import { CAPABILITIES } from '@/lib/config';
@@ -49,9 +48,7 @@ export default function ReturnFormPage() {
 /* Pilih transaksi aktif yang akan dikembalikan */
 function Picker() {
   const router = useRouter();
-  const toast = useToast();
   const [q, setQ] = useState('');
-  const [scan, setScan] = useState('');
   const all = activeBorrowings();
   const list = all
     .filter((b) => {
@@ -59,16 +56,6 @@ function Picker() {
       return match(q, b.code, e?.name, e?.nip, ...itemsOf(b).map((i) => i.item_code + ' ' + i.item_name));
     })
     .sort((a, b) => a.due_date.localeCompare(b.due_date));
-
-  const onScan = () => {
-    const code = stripQrPrefix(scan);
-    const it = itemByCode(code);
-    const bb = borrowingByCode(code);
-    const b = bb || (it && all.find((x) => detailsOf(x).some((d) => d.item_id === it.id)));
-    if (b && isActive(b)) router.push(`/pengembalian/baru?pinjam=${b.id}`);
-    else toast(it ? `${it.item_code} tidak sedang dipinjam (status ${it.item_status}).` : `Kode ${code} tidak ditemukan.`, 'err');
-    setScan('');
-  };
 
   return (
     <>
@@ -82,24 +69,7 @@ function Picker() {
       />
       <section className="card">
         <div className="toolbar">
-          <div className="grow">
-            <Icon name="search" size={16} />
-            <Input placeholder="Cari nama peminjam, kode PJM-…, atau kode barang INV-…" aria-label="Cari transaksi aktif" autoComplete="off" value={q} onChange={(e) => setQ(e.target.value)} />
-          </div>
-          <Input
-            className="font-mono"
-            placeholder="Pindai QR barang + Enter"
-            aria-label="Pindai QR barang"
-            style={{ width: 260 }}
-            value={scan}
-            onChange={(e) => setScan(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                onScan();
-              }
-            }}
-          />
+          <SearchInput value={q} onChange={setQ} placeholder="Cari nama peminjam, kode PJM-…, atau kode barang INV-…" label="Cari transaksi aktif" />
         </div>
         {!all.length ? (
           <Empty icon="checkCircle">Tidak ada transaksi aktif yang menunggu pengembalian.</Empty>

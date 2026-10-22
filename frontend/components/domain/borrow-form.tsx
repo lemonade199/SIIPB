@@ -19,7 +19,7 @@ import { Alert, Avatar, Empty, KV, PageHead, Thumb } from '@/components/ui/misc'
 import { useToast } from '@/components/providers/feedback-provider';
 import { genCode } from '@/services/borrowing';
 import * as repo from '@/services/repo';
-import { CAPABILITIES, isApiMode } from '@/lib/config';
+import { CAPABILITIES } from '@/lib/config';
 import { activeBorrowings, borrowableItems, detailsOf, emp, isBorrowable, item as getItem, itemByCode, loc, unit, conditionLabel } from '@/services/lookup';
 import type { FieldErrors, ID, Item } from '@/types';
 
@@ -112,8 +112,8 @@ export function BorrowForm({ id }: { id?: ID }) {
     if (doCheckout) {
       const n = r.notification || db.find('notifications', (x) => x.borrowing_id === b.id && x.event === 'CHECKOUT');
       toast(
-        `${b.code} diserahkan. Status barang: DIPINJAM.${n ? ` Email ${n.status === 'TERKIRIM' ? 'terkirim' : 'GAGAL dikirim'} ke ${bEmp?.email}.` : ''}`,
-        n && n.status !== 'TERKIRIM' ? 'warn' : 'ok',
+        `${b.code} diserahkan. Status barang: DIPINJAM.${n ? ` Email ${n.status === 'TERKIRIM' ? 'terkirim' : n.status === 'GAGAL' ? 'GAGAL dikirim' : 'sedang dikirim'} ke ${bEmp?.email}.` : ''}`,
+        n?.status === 'GAGAL' ? 'warn' : 'ok',
       );
     } else toast(`Draf ${b.code} disimpan. Status barang belum berubah.`);
     router.push(`/peminjaman/${b.id}`);
@@ -192,7 +192,7 @@ export function BorrowForm({ id }: { id?: ID }) {
                 <TextField
                   label="Pindai / ketik kode barang"
                   mono
-                  placeholder="INV-… lalu Enter (pemindai QR/barcode)"
+                  placeholder="INV-…"
                   autoComplete="off"
                   value={scan}
                   onChange={(ev) => setScan(ev.target.value)}
@@ -291,7 +291,7 @@ export function BorrowForm({ id }: { id?: ID }) {
               <KV
                 one
                 items={[
-                  ['Kode transaksi', <span key="c" className="mono">{editing ? editing.code : isApiMode ? 'Dibuat otomatis saat disimpan (PJM-…)' : genCode('borrowings', 'PJM', borrow || today())}</span>],
+                  ['Kode transaksi', <span key="c" className="mono">{editing ? editing.code : genCode('borrowings', 'PJM', borrow || today())}</span>],
                   ['Petugas', user.name],
                   ['Peminjam', e ? e.name : <span key="p" className="muted">Belum dipilih</span>],
                   ['Jumlah barang', `${itemIds.length} barang`],

@@ -1,5 +1,5 @@
 /** Kerangka dokumen cetak resmi (hanya tampil saat dicetak): kop instansi, judul & nomor, tabel data, tanda tangan. */
-import { Fragment, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { db } from '@/lib/mock/db';
 import { fmtDate, today } from '@/lib/date';
 
@@ -55,22 +55,15 @@ export function PrintSection({ title, children }: { title: string; children: Rea
   );
 }
 
-/** Data label–nilai, dua pasang per baris agar ringkas di kertas A4. */
+/** Data label–nilai, satu pasang per baris. */
 export function PrintInfo({ rows }: { rows: [string, ReactNode][] }) {
-  const lines: [string, ReactNode][][] = [];
-  for (let i = 0; i < rows.length; i += 2) lines.push(rows.slice(i, i + 2));
   return (
     <table className="pd-info">
       <tbody>
-        {lines.map((line, i) => (
-          <tr key={i}>
-            {line.map(([k, v]) => (
-              <Fragment key={k}>
-                <th>{k}</th>
-                <td>{v === '' || v === null || v === undefined ? '—' : v}</td>
-              </Fragment>
-            ))}
-            {line.length === 1 && <td colSpan={2} />}
+        {rows.map(([k, v]) => (
+          <tr key={k}>
+            <th>{k}</th>
+            <td>{v === '' || v === null || v === undefined ? '—' : v}</td>
           </tr>
         ))}
       </tbody>

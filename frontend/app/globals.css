@@ -159,9 +159,6 @@
 
   .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .topbar { position: sticky; top: 0; z-index: 30; background: rgba(245,239,235,.92); backdrop-filter: blur(6px); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; padding: 10px 28px; min-height: 60px; }
-  .topbar .search { flex: 1; max-width: 420px; position: relative; }
-  .topbar .search input { padding-left: 36px; }
-  .topbar .search svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--subtle); }
   .topbar .spacer { flex: 1; }
   .date-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted-foreground); padding: 6px 10px; border: 1px solid var(--border); border-radius: 999px; background: #fff; white-space: nowrap; }
   .date-chip.demo { border-color: var(--sky); background: var(--warn-bg); color: var(--warn); }
@@ -412,7 +409,6 @@
   .app.nav-open .sidebar { transform: none; }
   .app.nav-open::after { content: ""; position: fixed; inset: 0; background: rgba(47,65,86,.45); z-index: 35; }
   .topbar { padding: 10px 16px; }
-  .topbar .search { display: none; }
   .content { padding: 18px 16px 48px; }
   .login { grid-template-columns: 1fr; }
   .login-side { padding: 32px 24px; }
@@ -469,10 +465,8 @@
 .pd-section-title { font-weight: 700; font-size: 12.5px; margin-bottom: 6px; }
 .pd-info { width: 100%; border-collapse: collapse; }
 .pd-info th, .pd-info td { text-align: left; vertical-align: top; padding: 3px 6px 3px 0; font-size: 12px; }
-.pd-info th { width: 17%; font-weight: 600; white-space: nowrap; }
-.pd-info td { width: 33%; }
+.pd-info th { width: 34mm; font-weight: 600; white-space: nowrap; }
 .pd-info td::before { content: ": "; }
-.pd-info td:empty::before, .pd-info td[colspan]::before { content: ""; }
 .pd-table { width: 100%; border-collapse: collapse; font-size: 11px; }
 .pd-table th, .pd-table td { border: 1px solid #555; padding: 5px 6px; text-align: left; vertical-align: top; }
 .pd-table th { background: #eee; font-weight: 700; -webkit-print-color-adjust: exact; print-color-adjust: exact; }

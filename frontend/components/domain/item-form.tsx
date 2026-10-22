@@ -174,14 +174,6 @@ export function ItemForm({ id }: { id?: ID }) {
                     onChange={(e) => set('acquisition_source', e.target.value)}
                   />
                 )}
-                <TextField placeholder="mis. 14500000"
-                  label="Nilai perolehan (Rp)"
-                  type="number"
-                  min={0}
-                  value={v.acquisition_value}
-                  error={errors.acquisition_value}
-                  onChange={(e) => set('acquisition_value', e.target.value)}
-                />
                 <TextareaField
                   label="Catatan"
                   full

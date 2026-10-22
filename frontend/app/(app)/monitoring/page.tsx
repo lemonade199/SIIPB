@@ -85,7 +85,7 @@ export default function MonitoringPage() {
   const onExport = () =>
     void exportXlsx(
       `monitoring-${f.tab}-${td}.xlsx`,
-      { title: 'MONITORING PEMINJAMAN', subtitle: [db.data.settings.institution, `Kategori: ${f.tab.replace('_', ' ')} · per ${fmtDate(td, true)}`], sheetName: 'Monitoring' },
+      { title: 'MONITORING PEMINJAMAN', sheetName: 'Monitoring' },
       [
         { key: 'kode', label: 'Kode' },
         { key: 'peminjam', label: 'Peminjam' },

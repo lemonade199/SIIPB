@@ -111,7 +111,6 @@ def build_report(session: Session, rtype: str, f: dict[str, Any], today: date | 
                 "seri": a.serial_number or "",
                 "tahun": a.purchase_date.year if a.purchase_date else "",
                 "sumber": a.acquisition_source or "",
-                "nilai": float(a.acquisition_cost) if a.acquisition_cost is not None else None,
                 "lokasi": a.location.name if a.location else "",
                 "kondisi": CONDITION_LABEL.get(a.condition, a.condition),
                 "status": a.status,
@@ -120,9 +119,9 @@ def build_report(session: Session, rtype: str, f: dict[str, Any], today: date | 
             if asset_ok(a) and (not status or a.status == status)
         ]
         cols = [("kode", "Kode"), ("nama", "Nama Barang"), ("kategori", "Kategori"), ("merek", "Merek/Model"),
-                ("seri", "No. Seri"), ("tahun", "Tahun"), ("sumber", "Sumber"), ("nilai", "Nilai Perolehan", True),
+                ("seri", "No. Seri"), ("tahun", "Tahun"), ("sumber", "Sumber"),
                 ("lokasi", "Lokasi"), ("kondisi", "Kondisi"), ("status", "Status")]
-        summary = f"{len(rows)} barang · total nilai {_rupiah(sum(r['nilai'] or 0 for r in rows))}"
+        summary = f"{len(rows)} barang"
     elif rtype == "peminjaman":
         bs = session.scalars(select(Borrowing).order_by(Borrowing.start_date.desc(), Borrowing.id.desc())).all()
         rows = [
@@ -211,10 +210,9 @@ def build_report(session: Session, rtype: str, f: dict[str, Any], today: date | 
                 "kondisi": CONDITION_LABEL.get(a.condition, a.condition),
                 "sejak": _d(h.created_at) if h else "—",
                 "keterangan": h.reason if h and h.reason else "",
-                "nilai": float(a.acquisition_cost) if a.acquisition_cost is not None else None,
             })
         cols = [("kode", "Kode"), ("nama", "Nama Barang"), ("kategori", "Kategori"), ("lokasi", "Lokasi"), ("status", "Status"),
-                ("kondisi", "Kondisi"), ("sejak", "Sejak"), ("keterangan", "Keterangan"), ("nilai", "Nilai Perolehan", True)]
+                ("kondisi", "Kondisi"), ("sejak", "Sejak"), ("keterangan", "Keterangan")]
         summary = f"{len(rows)} barang rusak/perbaikan/hilang"
 
     columns = [{"key": c[0], "label": c[1], "money": len(c) > 2} for c in cols]
