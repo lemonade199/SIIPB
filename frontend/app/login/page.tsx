@@ -120,12 +120,27 @@ export default function LoginPage() {
     const r = await repo.login(username, password, captcha?.id, captchaAnswer.trim());
     setBusy(false);
     if (!r.ok) {
-      // Reset captcha answer and reload captcha, while preserving password
+      // Reset CAPTCHA answer dan muat CAPTCHA baru setiap kali percobaan login gagal
       setCaptchaAnswer('');
       loadCaptcha();
       if (r.errors?.captcha_answer) {
         setErrors((prev) => ({ ...prev, captcha_answer: r.errors!.captcha_answer }));
       }
+
+      // Kosongkan input password jika login gagal karena kredensial tidak valid (password atau username salah).
+      // Nilai username/email tetap dipertahankan.
+      // Password TIDAK dikosongkan jika kegagalan disebabkan oleh CAPTCHA salah/kedaluwarsa,
+      // gangguan jaringan, atau error internal server (5xx).
+      const isCaptchaError = Boolean(r.errors?.captcha_answer || r.code === 'INVALID_CAPTCHA');
+      const isNetworkOrServerError = r.code === 'NETWORK_ERROR' || r.status === 0 || (typeof r.status === 'number' && r.status >= 500);
+      const isCredentialError = r.code === 'AUTH_FAILED' || r.status === 401 || (!isCaptchaError && !isNetworkOrServerError);
+
+      if (isCredentialError && !isCaptchaError && !isNetworkOrServerError) {
+        setForm((prev) => ({ ...prev, password: '' }));
+        // Kembalikan fokus ke input password agar pengguna bisa langsung mengetik ulang
+        document.getElementById('login-password')?.focus();
+      }
+
       return setError(r.error);
     }
     afterLogin(r.user);
@@ -171,7 +186,17 @@ export default function LoginPage() {
               autoComplete="username"
               value={form.username}
               error={errors.username}
-              onChange={(e) => setForm({ ...form, username: e.target.value })}
+              onChange={(e) => {
+                const val = e.target.value;
+                setForm((prev) => ({ ...prev, username: val }));
+                if (errors.username) {
+                  setErrors((prev) => {
+                    const copy = { ...prev };
+                    delete copy.username;
+                    return copy;
+                  });
+                }
+              }}
             />
             <Field label="Password" required error={errors.password} htmlFor="login-password">
               <div style={{ position: 'relative' }}>
@@ -182,7 +207,17 @@ export default function LoginPage() {
                   value={form.password}
                   aria-invalid={!!errors.password || undefined}
                   style={{ paddingRight: 46 }}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setForm((prev) => ({ ...prev, password: val }));
+                    if (errors.password) {
+                      setErrors((prev) => {
+                        const copy = { ...prev };
+                        delete copy.password;
+                        return copy;
+                      });
+                    }
+                  }}
                 />
                 <button
                   type="button"

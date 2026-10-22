@@ -49,7 +49,7 @@ import { item as getItem, itemsOf, detailsOf } from '@/services/lookup';
 import type { Borrowing, FieldErrors, ID, Item, Notification, PermissionKey, RecipientKind, Return, ReportFilters, Settings, User } from '@/types';
 
 type Ok<T> = { ok: true } & T;
-type Fail = { ok: false; error: string; errors?: FieldErrors };
+type Fail = { ok: false; error: string; errors?: FieldErrors; code?: string; status?: number };
 
 const FIELD_ALIAS: Record<string, string> = {
   name: 'item_name',
@@ -71,7 +71,7 @@ function apiFail(e: unknown, alias = false): Fail {
       const msg = Array.isArray(v) ? v.join(' ') : typeof v === 'object' ? JSON.stringify(v) : String(v);
       errors[alias ? FIELD_ALIAS[k] || k : k] = msg;
     });
-    return { ok: false, error: e.message, errors };
+    return { ok: false, error: e.message, errors, code: e.code, status: e.status };
   }
   return { ok: false, error: (e as Error)?.message || 'Terjadi kesalahan.' };
 }

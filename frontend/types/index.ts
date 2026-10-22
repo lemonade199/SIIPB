@@ -394,6 +394,6 @@ export interface Session {
 }
 
 /** Hasil operasi layanan. */
-export type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
+export type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string; errors?: FieldErrors; code?: string; status?: number };
 export type FieldErrors = Record<string, string>;
 export type FormResult<T = object> = ({ ok: true } & T) | { ok: false; errors: FieldErrors };
