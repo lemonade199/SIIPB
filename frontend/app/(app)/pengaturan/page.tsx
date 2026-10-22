@@ -144,6 +144,7 @@ function Smtp({ s }: { s: Settings }) {
           e.preventDefault();
           const smtp = { ...v, host: v.host.trim(), port: Number(v.port), username: v.username.trim(), from_name: v.from_name.trim(), from_email: v.from_email.trim() };
           delete (smtp as { password_set?: boolean }).password_set;
+          delete smtp.password_unreadable;
           const r = await repo.saveSettings({ smtp, smtp_password: password || undefined }, 'SMTP');
           if (r.ok) setPassword('');
           toast(r.ok ? 'Pengaturan SMTP disimpan.' : r.error, r.ok ? 'ok' : 'err');
@@ -160,6 +161,11 @@ function Smtp({ s }: { s: Settings }) {
         />
         <TextField placeholder="mis. SIIPB Sarpras IT" label="Nama pengirim" value={v.from_name} onChange={(e) => setV({ ...v, from_name: e.target.value })} />
         <TextField placeholder="mis. sarpras@gmail.com" label="Email pengirim" type="email" value={v.from_email} onChange={(e) => setV({ ...v, from_email: e.target.value })} />
+        {isApiMode && s.smtp.password_unreadable && (
+          <div className="full">
+            <Alert type="danger">Kata sandi SMTP yang tersimpan tidak bisa dibaca server, sehingga email tidak terkirim. Isi ulang kata sandi lalu klik Simpan.</Alert>
+          </div>
+        )}
         {isApiMode && (
           <TextField placeholder="App Password Gmail (16 huruf)"
             label="Kata sandi SMTP"
@@ -175,7 +181,6 @@ function Smtp({ s }: { s: Settings }) {
           full
           value={testTo}
           placeholder={user?.email}
-          
           onChange={(e) => setTestTo(e.target.value)}
         />
         <div className="full row">

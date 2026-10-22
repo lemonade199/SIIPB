@@ -103,7 +103,7 @@ def smtp_test():
     """
     from app.models import User
     from app.services.notification_service import send_test_email
-    from app.services.settings_service import smtp_config
+    from app.services.settings_service import SMTP_PASSWORD_UNREADABLE, smtp_config
 
     body = request.get_json(silent=True) or {}
     with SessionLocal() as session:
@@ -111,6 +111,8 @@ def smtp_test():
         institution = get_settings(session)["institution"]
         me = session.get(User, g.current_user["id"])
         to = (body.get("to") or (me.email if me else "") or "").strip()
+    if cfg["password_unreadable"]:
+        return error_response(SMTP_PASSWORD_UNREADABLE, error_code="SMTP_FAILED")
     if not cfg["username"] or not cfg["password"]:
         return success_response(data={"ok": True, "mode": "simulasi"},
                                 message="Kredensial SMTP belum diisi — email disimulasikan (mode pengembangan).")

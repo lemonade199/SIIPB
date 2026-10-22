@@ -24,6 +24,7 @@ from app.services.audit_service import record_audit
 
 SETTINGS_KEY = "app.settings"
 SMTP_PASSWORD_KEY = "smtp.password"
+SMTP_PASSWORD_UNREADABLE = ("Kata sandi SMTP yang tersimpan tidak bisa dibaca server (kunci enkripsi berbeda, mis. data dipindah dari server lain). Isi ulang kata sandi di Pengaturan > Server email (SMTP).")
 OIDC_SECRET_KEY = "oidc.client_secret"
 GOOGLE_ISSUER = "https://accounts.google.com"
 
@@ -131,6 +132,7 @@ def get_settings(session: Session) -> dict[str, Any]:
     ]
     pw = _row(session, SMTP_PASSWORD_KEY)
     data["smtp"]["password_set"] = bool(pw and pw.value) or bool(Config.SMTP_PASSWORD)
+    data["smtp"]["password_unreadable"] = bool(pw and pw.value and not decrypt_secret(pw.value)) and not Config.SMTP_PASSWORD
     secret = _row(session, OIDC_SECRET_KEY)
     data["security"]["oidc_client_secret_set"] = bool(secret and secret.value) or bool(Config.GOOGLE_CLIENT_SECRET)
 
@@ -325,6 +327,8 @@ def smtp_config(session: Session) -> dict[str, Any]:
     pw_row = _row(session, SMTP_PASSWORD_KEY)
     password = decrypt_secret(pw_row.value) if pw_row else ""
     return {
+        # tersimpan tetapi gagal didekripsi: jangan diperlakukan seperti "belum diisi" (mode simulasi)
+        "password_unreadable": bool(pw_row and pw_row.value and not password) and not Config.SMTP_PASSWORD,
         "host": s.get("host") or Config.SMTP_HOST,
         "port": int(s.get("port") or Config.SMTP_PORT),
         "username": s.get("username") or Config.SMTP_USERNAME,

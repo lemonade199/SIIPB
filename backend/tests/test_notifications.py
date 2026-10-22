@@ -46,3 +46,27 @@ def test_render_placeholders():
 
     assert render("Halo {{ nama_peminjam }} / {transaction_number} / {{tidak_ada}}", {"nama_peminjam": "Andi", "transaction_number": "PJM-1"}) \
         == "Halo Andi / PJM-1 / {{tidak_ada}}"
+
+
+def test_unreadable_smtp_password_marks_failed(client, auth_headers, make_borrowing, db_session):
+    from sqlalchemy import select
+
+    from app.models import SystemSetting
+
+    client.put("/api/v1/settings", json={"smtp": {"username": "sarpras@contoh.id", "password": "app-password"}},
+               headers=auth_headers)
+    row = db_session.scalars(select(SystemSetting).where(SystemSetting.key == "smtp.password")).first()
+    row.value = "dienkripsi-dengan-kunci-lain"  # mis. data dipindah dari server lain
+    db_session.commit()
+    try:
+        assert client.get("/api/v1/settings", headers=auth_headers).get_json()["data"]["smtp"]["password_unreadable"] is True
+        b = make_borrowing()
+        n = client.get(f"/api/v1/notifications?borrowing_id={b['id']}", headers=auth_headers).get_json()["data"][0]
+        assert n["status"] == "FAILED"
+        assert "tidak bisa dibaca" in n["deliveries"][0]["error"]
+        res = client.post("/api/v1/settings/smtp/test", json={"to": "uji@contoh.id"}, headers=auth_headers)
+        assert res.status_code == 400 and res.get_json()["error_code"] == "SMTP_FAILED"
+    finally:
+        client.put("/api/v1/settings", json={"smtp": {"username": ""}}, headers=auth_headers)
+        db_session.delete(row)
+        db_session.commit()

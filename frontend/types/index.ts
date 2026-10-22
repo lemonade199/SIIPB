@@ -329,6 +329,8 @@ export interface Settings {
     from_name: string;
     from_email: string;
     simulate_failure: boolean;
+    /** mode API: kata sandi tersimpan tidak bisa didekripsi server */
+    password_unreadable?: boolean;
   };
   scheduler: { enabled: boolean; time: string; timezone: string; last_run_date: string | null };
   checkout_notify: boolean;

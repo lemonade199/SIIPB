@@ -253,7 +253,7 @@ def record_delivery_attempt(
 
 def deliver(session: Session, notification_id: int, attempt_number: int = 1, final: bool = True) -> bool:
     """Kirim satu notifikasi lewat SMTP. Tanpa kredensial SMTP -> simulasi (mode pengembangan)."""
-    from app.services.settings_service import get_settings, smtp_config
+    from app.services.settings_service import SMTP_PASSWORD_UNREADABLE, get_settings, smtp_config
 
     notif = session.get(Notification, notification_id)
     if notif is None:
@@ -270,6 +270,10 @@ def deliver(session: Session, notification_id: int, attempt_number: int = 1, fin
     if cfg["simulate_failure"]:
         record_delivery_attempt(session, notification_id, attempt_number, False,
                                 "Simulasi kegagalan SMTP (Pengaturan)", provider="simulation", final=final)
+        return False
+    if cfg["password_unreadable"]:
+        logger.warning("SMTP: kata sandi tersimpan tidak bisa didekripsi (notifikasi #%s)", notification_id)
+        record_delivery_attempt(session, notification_id, attempt_number, False, SMTP_PASSWORD_UNREADABLE, final=final)
         return False
 
     msg = MIMEMultipart("alternative")

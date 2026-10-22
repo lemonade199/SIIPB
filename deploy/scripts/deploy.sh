@@ -35,7 +35,7 @@ rollback() {
 
 install_nginx_conf() {
   local src=nginx/siipb.http.conf
-  [ -d "/etc/letsencrypt/live/$APP_DOMAIN" ] && src=nginx/siipb.https.conf
+  sudo test -d "/etc/letsencrypt/live/$APP_DOMAIN" && src=nginx/siipb.https.conf
   sudo install -m 644 nginx/snippets/siipb-locations.conf /etc/nginx/snippets/siipb-locations.conf
   sed "s/__DOMAIN__/$APP_DOMAIN/g" "$src" | sudo tee /etc/nginx/sites-available/siipb.conf >/dev/null
   sudo nginx -t && sudo systemctl reload nginx
