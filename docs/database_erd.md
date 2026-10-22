@@ -275,25 +275,35 @@ Master template email dengan variabel dinamis (`{{borrower_name}}`, `{{borrowing
 - `created_at`, `updated_at` (TIMESTAMP)
 
 #### `notification_events`
-Tabel kunci idempotensi untuk mencegah duplikasi pemrosesan reminder.
+Tabel kunci idempotensi untuk mencegah duplikasi pemrosesan antrean dan jadwal notifikasi.
 - `id` (BIGINT UNSIGNED, PK, AI)
-- `borrowing_id` (BIGINT UNSIGNED, FK -> `borrowings.id`, ON DELETE RESTRICT)
-- `event_code` (VARCHAR(50), NOT NULL)
-- `triggered_at` (DATETIME, NOT NULL)
-- `is_resolved` (BOOLEAN, DEFAULT 0)
-- **Constraint Unik:** `UNIQUE(borrowing_id, event_code)`
+- `borrowing_id` (BIGINT UNSIGNED, FK -> `borrowings.id`, ON DELETE RESTRICT): ID transaksi peminjaman terkait.
+- `event_code` (VARCHAR(50), NOT NULL): Kode tipe event (`LOAN_CONFIRMATION`, `RETURN_CONFIRMATION`, `REMINDER_H3`, `REMINDER_H1`, `DUE_DATE`, `OVERDUE_H1`, `ESCALATION_UNIT`, dsb.).
+- `scheduled_at` (DATETIME(6), NOT NULL): Waktu jadwal eksekusi event.
+- `processed_at` (DATETIME(6), NULLABLE): Waktu event selesai dieksekusi oleh worker.
+- `status` (VARCHAR(30), DEFAULT 'PENDING'): Status eksekusi event (`PENDING`, `PROCESSING`, `PROCESSED`, `SKIPPED`, `FAILED`).
+- `created_at` (DATETIME(6), NOT NULL, DEFAULT CURRENT_TIMESTAMP(6))
+- **Constraints & Indexes:**
+  - `UNIQUE KEY (borrowing_id, event_code)`: Menjamin 1 event_code hanya terpicu 1 kali per peminjaman (Idempotency Key).
+  - `INDEX (status, scheduled_at)`: Optimasi query polling scheduler/worker.
+  - `CHECK (status IN ('PENDING', 'PROCESSING', 'PROCESSED', 'SKIPPED', 'FAILED'))`.
 
 #### `notifications`
-Daftar antrean dan snapshot surat notifikasi keluar.
+Snapshot surat notifikasi yang disiapkan untuk dikirim per penerima (Peminjam, Petugas, atau Pimpinan).
 - `id` (BIGINT UNSIGNED, PK, AI)
-- `event_id` (BIGINT UNSIGNED, FK -> `notification_events.id`, ON DELETE RESTRICT)
-- `recipient_email` (VARCHAR(100), NOT NULL)
-- `recipient_name` (VARCHAR(100), NOT NULL)
-- `subject` (VARCHAR(255), NOT NULL)
-- `body` (TEXT, NOT NULL)
-- `status` (VARCHAR(30), DEFAULT 'PENDING'): `PENDING`, `SENT`, `FAILED`.
-- `sent_at` (DATETIME, NULLABLE)
-- `created_at` (TIMESTAMP)
+- `event_id` (BIGINT UNSIGNED, FK -> `notification_events.id`, ON DELETE RESTRICT): Relasi ke event pemicu.
+- `borrower_id` (BIGINT UNSIGNED, FK -> `borrowers.id`, ON DELETE RESTRICT): Peminjam terkait.
+- `template_id` (BIGINT UNSIGNED, FK -> `notification_templates.id`, ON DELETE RESTRICT): Template email yang digunakan.
+- `channel` (VARCHAR(20), DEFAULT 'EMAIL', CHECK `channel = 'EMAIL'`): Kanal pengiriman.
+- `recipient` (VARCHAR(255), NOT NULL): Alamat email tujuan pengiriman.
+- `recipient_name` (VARCHAR(150), NULLABLE): Nama penerima.
+- `recipient_type` (VARCHAR(20), DEFAULT 'PEMINJAM', CHECK `recipient_type IN ('PEMINJAM', 'PETUGAS', 'PIMPINAN')`)
+- `recipient_user_id` (BIGINT UNSIGNED, FK -> `users.id`, ON DELETE SET NULL, NULLABLE): ID user internal jika penerima adalah petugas/pimpinan.
+- `subject` (VARCHAR(255), NULLABLE): Subjek email hasil render template.
+- `body_snapshot` (TEXT, NULLABLE): Konten isi pesan hasil render template (*frozen snapshot*).
+- `status` (VARCHAR(30), DEFAULT 'QUEUED', CHECK `status IN ('QUEUED', 'PROCESSING', 'SENT', 'FAILED', 'RETRYING')`)
+- `sent_at` (DATETIME(6), NULLABLE): Waktu notifikasi berhasil terkirim.
+- `created_at` (DATETIME(6), NOT NULL, DEFAULT CURRENT_TIMESTAMP(6))
 
 #### `notification_deliveries`
 Catatan siklus hidup pengiriman per percobaan SMTP (termasuk pesan error dan retry).
