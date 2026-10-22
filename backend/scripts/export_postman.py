@@ -21,7 +21,7 @@ TODAY, DUE = "2026-10-21", "2026-10-24"
 EXAMPLES = {
     "POST /api/v1/assets": {"category_id": 1, "location_id": 1, "name": "Laptop Lenovo ThinkPad T14", "brand": "Lenovo",
                             "model": "ThinkPad T14 Gen 3", "serial_number": "PF-3A21", "purchase_date": "2024-01-15",
-                            "acquisition_source": "APBN 2024", "condition": "BAIK"},
+                            "acquisition_cost": 14500000, "acquisition_source": "APBN 2024", "condition": "BAIK"},
     "PUT /api/v1/assets/{asset_id}": {"name": "Laptop Lenovo ThinkPad T14", "location_id": 2, "condition": "BAIK"},
     "PUT /api/v1/assets/{asset_id}/photos/order": {"photo_ids": [3, 2]},
     "POST /api/v1/borrowings": {"borrower_id": 1, "asset_ids": [1], "start_date": TODAY, "due_date": DUE,

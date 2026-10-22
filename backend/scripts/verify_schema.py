@@ -116,6 +116,7 @@ def run_checks():
             brand="Lenovo",
             model="T480s",
             serial_number="PF-XYZ123",
+            acquisition_cost=Decimal("12500000.00"),
             status=AssetStatus.TERSEDIA.value,
             condition=AssetCondition.BAIK.value,
         )

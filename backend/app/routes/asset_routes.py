@@ -46,6 +46,7 @@ def serialize_asset(asset) -> dict:
         "photo_path": asset.photo_path,
         "photos": [{"id": p.id, "path": p.path} for p in asset.photos],
         "purchase_date": asset.purchase_date.isoformat() if asset.purchase_date else None,
+        "acquisition_cost": float(asset.acquisition_cost) if asset.acquisition_cost is not None else None,
         "acquisition_source": asset.acquisition_source,
         "status": asset.status,
         "condition": asset.condition,
@@ -169,6 +170,7 @@ def add_asset():
             model: {type: string}
             serial_number: {type: string}
             purchase_date: {type: string, format: date}
+            acquisition_cost: {type: number}
             acquisition_source: {type: string}
             condition: {type: string, enum: [BAIK, RUSAK_RINGAN, RUSAK_BERAT]}
             status: {type: string, enum: [TERSEDIA, RUSAK, RUSAK_BERAT, DALAM_PERBAIKAN, HILANG]}

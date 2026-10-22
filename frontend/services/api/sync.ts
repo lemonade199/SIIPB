@@ -147,6 +147,7 @@ export function mapAsset(a: ApiAsset): Item {
     serial_number: a.serial_number || '',
     acquisition_year: a.purchase_date ? Number(a.purchase_date.slice(0, 4)) : '',
     acquisition_source: a.acquisition_source || '',
+    acquisition_value: a.acquisition_cost ?? '',
     location_id: a.location_id ?? 0,
     condition_status: (CONDS as string[]).includes(a.condition) ? (a.condition as Condition) : 'BAIK',
     item_status: status,

@@ -49,6 +49,7 @@ export interface ItemInput {
   condition_status: Condition;
   acquisition_year: string | number;
   acquisition_source: string;
+  acquisition_value: string | number;
   notes: string;
   /** Foto barang; indeks 0 = foto utama. */
   photos?: string[];
@@ -60,6 +61,8 @@ export function saveItem(p: ItemInput, id?: ID | null): FormResult<{ item: Item 
   if (!p.category_id) errors.category_id = 'Pilih kategori.';
   if (!p.location_id) errors.location_id = 'Pilih lokasi.';
   if (p.acquisition_year && !/^\d{4}$/.test(String(p.acquisition_year))) errors.acquisition_year = 'Tahun harus 4 digit.';
+  if (p.acquisition_value !== '' && p.acquisition_value !== null && isNaN(Number(p.acquisition_value)))
+    errors.acquisition_value = 'Nilai harus angka.';
   if (p.item_code) {
     const dup = db.find('items', (i) => i.item_code.toLowerCase() === p.item_code.trim().toLowerCase() && i.id !== Number(id));
     if (dup) errors.item_code = 'Kode barang sudah dipakai.';
@@ -75,6 +78,7 @@ export function saveItem(p: ItemInput, id?: ID | null): FormResult<{ item: Item 
     serial_number: p.serial_number || '',
     acquisition_year: (p.acquisition_year ? Number(p.acquisition_year) : '') as number | '',
     acquisition_source: p.acquisition_source || '',
+    acquisition_value: (p.acquisition_value === '' ? '' : Number(p.acquisition_value)) as number | '',
     location_id: Number(p.location_id),
     condition_status: p.condition_status || 'BAIK',
     notes: p.notes || '',

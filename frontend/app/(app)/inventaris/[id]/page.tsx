@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { db } from '@/lib/mock/db';
 import { fmtDate, fmtDateTime } from '@/lib/date';
 import { ITEM_STATUS, NOT_BORROWABLE } from '@/lib/constants';
-import { capitalize } from '@/lib/utils';
+import { capitalize, fmtNumber } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { useTitle } from '@/hooks/use-title';
 import { Badge } from '@/components/ui/badge';
@@ -161,6 +161,7 @@ export default function ItemDetailPage() {
                   ['Nomor seri', <span key="s" className="mono">{it.serial_number}</span>],
                   ['Tahun perolehan', it.acquisition_year],
                   ['Sumber perolehan', it.acquisition_source],
+                  ['Nilai perolehan', fmtNumber(it.acquisition_value)],
                   [
                     'Lokasi',
                     <>

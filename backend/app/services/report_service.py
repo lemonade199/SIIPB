@@ -48,8 +48,8 @@ def _d(v: date | datetime | None) -> str:
     return fmt_tanggal(v, with_day=False) if v else "—"
 
 
-def _rupiah(v: float | int | None) -> str:
-    return "Rp " + f"{int(round(v or 0)):,}".replace(",", ".")
+def _angka(v: float | int | None) -> str:
+    return f"{int(round(v or 0)):,}".replace(",", ".")
 
 
 def _date(v: str | None) -> date | None:
@@ -111,6 +111,7 @@ def build_report(session: Session, rtype: str, f: dict[str, Any], today: date | 
                 "seri": a.serial_number or "",
                 "tahun": a.purchase_date.year if a.purchase_date else "",
                 "sumber": a.acquisition_source or "",
+                "nilai": float(a.acquisition_cost) if a.acquisition_cost is not None else None,
                 "lokasi": a.location.name if a.location else "",
                 "kondisi": CONDITION_LABEL.get(a.condition, a.condition),
                 "status": a.status,
@@ -119,9 +120,9 @@ def build_report(session: Session, rtype: str, f: dict[str, Any], today: date | 
             if asset_ok(a) and (not status or a.status == status)
         ]
         cols = [("kode", "Kode"), ("nama", "Nama Barang"), ("kategori", "Kategori"), ("merek", "Merek/Model"),
-                ("seri", "No. Seri"), ("tahun", "Tahun"), ("sumber", "Sumber"),
+                ("seri", "No. Seri"), ("tahun", "Tahun"), ("sumber", "Sumber"), ("nilai", "Nilai Perolehan", True),
                 ("lokasi", "Lokasi"), ("kondisi", "Kondisi"), ("status", "Status")]
-        summary = f"{len(rows)} barang"
+        summary = f"{len(rows)} barang · total nilai perolehan {_angka(sum(r['nilai'] or 0 for r in rows))}"
     elif rtype == "peminjaman":
         bs = session.scalars(select(Borrowing).order_by(Borrowing.start_date.desc(), Borrowing.id.desc())).all()
         rows = [
@@ -210,12 +211,13 @@ def build_report(session: Session, rtype: str, f: dict[str, Any], today: date | 
                 "kondisi": CONDITION_LABEL.get(a.condition, a.condition),
                 "sejak": _d(h.created_at) if h else "—",
                 "keterangan": h.reason if h and h.reason else "",
+                "nilai": float(a.acquisition_cost) if a.acquisition_cost is not None else None,
             })
         cols = [("kode", "Kode"), ("nama", "Nama Barang"), ("kategori", "Kategori"), ("lokasi", "Lokasi"), ("status", "Status"),
-                ("kondisi", "Kondisi"), ("sejak", "Sejak"), ("keterangan", "Keterangan")]
+                ("kondisi", "Kondisi"), ("sejak", "Sejak"), ("keterangan", "Keterangan"), ("nilai", "Nilai Perolehan", True)]
         summary = f"{len(rows)} barang rusak/perbaikan/hilang"
 
-    columns = [{"key": c[0], "label": c[1], "money": len(c) > 2} for c in cols]
+    columns = [{"key": c[0], "label": c[1], "numeric": len(c) > 2} for c in cols]
     return Report(rtype, REPORT_TYPES[rtype], columns, rows, summary, f)
 
 
@@ -261,9 +263,9 @@ def to_xlsx(rep: Report, settings: dict, user_name: str) -> bytes:
         letter = get_column_letter(i)
         width = max([len(str(c["label"]))] + [len(str(r.get(c["key"]) or "")) for r in rep.rows[:500]])
         ws.column_dimensions[letter].width = min(60, max(10, width + 2))
-        if c["money"]:
+        if c["numeric"]:
             for r in range(head_row + 1, head_row + 1 + len(rep.rows)):
-                ws.cell(row=r, column=i).number_format = '"Rp" #,##0'
+                ws.cell(row=r, column=i).number_format = '#,##0'
     if rep.rows:
         ws.auto_filter.ref = f"A{head_row}:{get_column_letter(ncol)}{head_row + len(rep.rows)}"
     ws.freeze_panes = f"A{head_row + 1}"
@@ -279,13 +281,13 @@ def to_pdf(rep: Report, settings: dict, user_name: str) -> bytes:
 
     def cell(c, r):
         v = r.get(c["key"])
-        if c["money"]:
-            return _rupiah(v) if v not in (None, "") else "—"
+        if c["numeric"]:
+            return _angka(v) if v not in (None, "") else "—"
         return e(str(v)) if v not in (None, "") else "—"
 
     head = "".join(f"<th>{e(c['label'])}</th>" for c in rep.columns)
     body = "".join(
-        "<tr>" + "".join(f"<td class='{'num' if c['money'] else ''}'>{cell(c, r)}</td>" for c in rep.columns) + "</tr>"
+        "<tr>" + "".join(f"<td class='{'num' if c['numeric'] else ''}'>{cell(c, r)}</td>" for c in rep.columns) + "</tr>"
         for r in rep.rows
     ) or f"<tr><td colspan='{len(rep.columns)}' class='empty'>Tidak ada data</td></tr>"
     doc = f"""<!doctype html><html lang="id"><head><meta charset="utf-8"><style>

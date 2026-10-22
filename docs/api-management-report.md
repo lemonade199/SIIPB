@@ -234,7 +234,7 @@ Berikut adalah inventaris seluruh endpoint API yang terverifikasi dalam source c
 | `GET` | `/api/v1/assets` | Mengambil katalog aset dengan filter dan paginasi | Query: `search, category_id, location_id, status, condition, is_active, page, per_page` | `200 OK`<br>`data: [Asset], meta` | Permission: `inventory.view` | [`asset_routes.py:L69-L107`](file:///c:/SIIPB/backend/app/routes/asset_routes.py#L69-L107) |
 | `GET` | `/api/v1/assets/<int:asset_id>` | Detail lengkap aset beserta foto dan status relasi | Path: `asset_id` | `200 OK`<br>`data: Asset`<br>`404 Not Found` | Permission: `inventory.view` | [`asset_routes.py:L109-L125`](file:///c:/SIIPB/backend/app/routes/asset_routes.py#L109-L125) |
 | `GET` | `/api/v1/assets/by-code/<path:code>`| Pencarian aset via scan barcode/QR (`SIIPB:<kode>` atau `<kode>`) | Path: `code` | `200 OK`<br>`data: Asset`<br>`404 Not Found` | Permission: `inventory.view` | [`asset_routes.py:L127-L148`](file:///c:/SIIPB/backend/app/routes/asset_routes.py#L127-L148) |
-| `POST` | `/api/v1/assets` | Menambah barang (auto generate `inventory_code` bila kosong) | Body: `{name, category_id, location_id, brand, model, serial_number, condition, ...}` | `201 Created`<br>`data: Asset` | Permission: `inventory.manage` | [`asset_routes.py:L150-L191`](file:///c:/SIIPB/backend/app/routes/asset_routes.py#L150-L191) |
+| `POST` | `/api/v1/assets` | Menambah barang (auto generate `inventory_code` bila kosong) | Body: `{name, category_id, location_id, brand, model, serial_number, condition, acquisition_cost, ...}` | `201 Created`<br>`data: Asset` | Permission: `inventory.manage` | [`asset_routes.py:L150-L191`](file:///c:/SIIPB/backend/app/routes/asset_routes.py#L150-L191) |
 | `PUT` | `/api/v1/assets/<int:asset_id>` | Memperbarui spesifikasi, lokasi, atau status aktif aset | Path: `asset_id`<br>Body: `{name, category_id, location_id, is_active, reason, ...}` | `200 OK`<br>`data: Asset` | Permission: `inventory.manage` | [`asset_routes.py:L193-L214`](file:///c:/SIIPB/backend/app/routes/asset_routes.py#L193-L214) |
 | `POST` | `/api/v1/assets/<int:asset_id>/status`| Mengubah status manual aset (selesai perbaikan, dsb.) | Path: `asset_id`<br>Body: `{status, reason}` | `200 OK`<br>`data: Asset` | Permission: `inventory.manage` | [`asset_routes.py:L216-L245`](file:///c:/SIIPB/backend/app/routes/asset_routes.py#L216-L245) |
 | `DELETE`| `/api/v1/assets/<int:asset_id>` | Menonaktifkan aset (soft delete, riwayat historis tetap aman) | Path: `asset_id` | `200 OK`<br>`{message: "Aset berhasil dinonaktifkan"}` | Permission: `inventory.manage` | [`asset_routes.py:L247-L263`](file:///c:/SIIPB/backend/app/routes/asset_routes.py#L247-L263) |
@@ -511,7 +511,7 @@ erDiagram
    * `categories`: Kategori klasifikasi barang inventaris.
    * `locations`: Hierarki fisik penempatan aset (Gedung > Lantai > Ruangan).
 4. **Domain Inventaris Aset Fisik (3 Tabel):**
-   * `assets`: Data fisik barang, nomor seri, sumber perolehan, status, kondisi, dan QR payload.
+   * `assets`: Data fisik barang, nomor seri, sumber & nilai perolehan, status, kondisi, dan QR payload.
    * `asset_history`: Log kronologis riwayat mutasi status dan lokasi aset (*append-only*).
    * `asset_photos`: Berkas foto dokumentasi barang (maksimal 5 foto per aset).
 5. **Domain Transaksi Operasional (4 Tabel):**

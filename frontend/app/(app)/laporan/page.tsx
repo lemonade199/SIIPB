@@ -7,7 +7,7 @@ import { db } from '@/lib/mock/db';
 import { fmtDate, fmtDateTime, nowISO, today } from '@/lib/date';
 import { ITEM_STATUS, REPORTS } from '@/lib/constants';
 import { exportPdf, exportXlsx } from '@/lib/export';
-import { rupiah } from '@/lib/utils';
+import { fmtNumber } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { usePersistentState } from '@/hooks/use-persistent-state';
 import { useTitle } from '@/hooks/use-title';
@@ -90,7 +90,7 @@ export default function LaporanPage() {
   const cell = (c: ReportColumn, v: string | number | undefined) => {
     if (TEXT_COLS.has(c.key) && v) return <div className="clamp-2">{v}</div>;
     if (c.badge) return <Badge status={String(v)} />;
-    if (c.money) return rupiah(v);
+    if (c.numeric) return fmtNumber(v);
     return v === '' || v === undefined || v === null ? '—' : v;
   };
 
@@ -227,7 +227,7 @@ export default function LaporanPage() {
                       <tr key={i}>
                         <td className="mono">{i + 1}</td>
                         {rep.columns.map((c) => (
-                          <td key={c.key} className={c.money || NOWRAP_COLS.has(c.key) ? 'nowrap' : TEXT_COLS.has(c.key) ? 'text-col' : undefined}>
+                          <td key={c.key} className={c.numeric || NOWRAP_COLS.has(c.key) ? 'nowrap' : TEXT_COLS.has(c.key) ? 'text-col' : undefined}>
                             {cell(c, r[c.key])}
                           </td>
                         ))}

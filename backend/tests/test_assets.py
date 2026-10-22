@@ -7,7 +7,7 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
 def test_create_with_purchase_date_and_auto_code(client, auth_headers):
     res = client.post("/api/v1/assets", json={
         "category_id": 1, "location_id": 2, "name": "Laptop Uji", "purchase_date": "2024-01-01",
-        "acquisition_source": "Hibah", "brand": "Lenovo"}, headers=auth_headers)
+        "acquisition_cost": 12500000, "acquisition_source": "Hibah", "brand": "Lenovo"}, headers=auth_headers)
     assert res.status_code == 201, res.get_json()
     a = res.get_json()["data"]
     assert a["inventory_code"].startswith("INV-LPT-")
@@ -21,6 +21,7 @@ def test_create_with_purchase_date_and_auto_code(client, auth_headers):
 def test_validation(client, auth_headers):
     res = client.post("/api/v1/assets", json={"name": "X"}, headers=auth_headers)
     assert res.status_code == 400 and "category_id" in res.get_json()["errors"]
+    assert client.post("/api/v1/assets", json={"category_id": 1, "name": "Ok", "acquisition_cost": -1}, headers=auth_headers).status_code == 400
     assert client.post("/api/v1/assets", json={"category_id": 1, "name": "Ok", "status": "DIPINJAM"}, headers=auth_headers).status_code == 400
 
 

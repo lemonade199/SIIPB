@@ -6,8 +6,8 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export const rupiah = (n: number | string | null | undefined) =>
-  n === null || n === undefined || n === '' ? '—' : 'Rp ' + Number(n).toLocaleString('id-ID');
+export const fmtNumber = (n: number | string | null | undefined) =>
+  n === null || n === undefined || n === '' ? '—' : Number(n).toLocaleString('id-ID');
 
 export const num = (n: number | null | undefined) => Number(n || 0).toLocaleString('id-ID');
 

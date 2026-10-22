@@ -116,6 +116,7 @@ export interface Item {
   serial_number: string;
   acquisition_year: number | '';
   acquisition_source: string;
+  acquisition_value: number | '';
   location_id: ID;
   condition_status: Condition;
   item_status: ItemStatus;

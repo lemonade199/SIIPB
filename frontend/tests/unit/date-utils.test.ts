@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { addDays, diffDays, fmtDate, relDue } from '@/lib/date';
-import { initials, match, paginate, rupiah } from '@/lib/utils';
+import { fmtNumber, initials, match, paginate } from '@/lib/utils';
 import { toCSV } from '@/lib/file';
 
 describe('lib/date', () => {
@@ -42,9 +42,9 @@ describe('lib/utils', () => {
     expect(match('', 'apa saja')).toBe(true);
   });
 
-  it('format rupiah & inisial', () => {
-    expect(rupiah(14500000)).toBe('Rp 14.500.000');
-    expect(rupiah('')).toBe('—');
+  it('format angka & inisial', () => {
+    expect(fmtNumber(14500000)).toBe('14.500.000');
+    expect(fmtNumber('')).toBe('—');
     expect(initials('Rina Kartika Dewi')).toBe('RK');
   });
 

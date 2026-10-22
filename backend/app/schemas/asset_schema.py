@@ -16,6 +16,7 @@ class AssetCreateSchema(Schema):
     description = fields.String(allow_none=True, required=False)
     photo_path = fields.String(allow_none=True, required=False, validate=validate.Length(max=500))
     purchase_date = fields.Date(allow_none=True, required=False)
+    acquisition_cost = fields.Decimal(allow_none=True, required=False, validate=validate.Range(min=0))
     acquisition_source = fields.String(allow_none=True, required=False, validate=validate.Length(max=150))
     status = fields.String(
         required=False,
@@ -41,6 +42,7 @@ class AssetUpdateSchema(Schema):
     description = fields.String(allow_none=True, required=False)
     photo_path = fields.String(allow_none=True, required=False, validate=validate.Length(max=500))
     purchase_date = fields.Date(allow_none=True, required=False)
+    acquisition_cost = fields.Decimal(allow_none=True, required=False, validate=validate.Range(min=0))
     acquisition_source = fields.String(allow_none=True, required=False, validate=validate.Length(max=150))
     condition = fields.String(
         required=False,

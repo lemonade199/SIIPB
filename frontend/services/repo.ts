@@ -55,6 +55,7 @@ const FIELD_ALIAS: Record<string, string> = {
   name: 'item_name',
   inventory_code: 'item_code',
   purchase_date: 'acquisition_year',
+  acquisition_cost: 'acquisition_value',
   borrower_id: 'employee_id',
   asset_ids: 'item_ids',
   start_date: 'borrow_date',
@@ -180,6 +181,7 @@ export async function saveItem(p: invSvc.ItemInput, id?: ID | null): Promise<Ok<
     serial_number: p.serial_number || null,
     description: p.notes || null,
     purchase_date: p.acquisition_year ? `${p.acquisition_year}-01-01` : null,
+    acquisition_cost: p.acquisition_value === '' ? null : Number(p.acquisition_value),
     acquisition_source: p.acquisition_source || null,
     condition: p.condition_status,
   };

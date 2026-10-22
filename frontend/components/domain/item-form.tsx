@@ -41,6 +41,7 @@ export function ItemForm({ id }: { id?: ID }) {
     condition_status: existing?.condition_status ?? 'BAIK',
     acquisition_year: existing?.acquisition_year ?? new Date().getFullYear(),
     acquisition_source: existing?.acquisition_source ?? '',
+    acquisition_value: existing?.acquisition_value ?? '',
     notes: existing?.notes ?? '',
   }));
   const [photos, setPhotos] = useState<string[]>(existing?.photos ?? []);
@@ -173,6 +174,14 @@ export function ItemForm({ id }: { id?: ID }) {
                     onChange={(e) => set('acquisition_source', e.target.value)}
                   />
                 )}
+                <TextField placeholder="mis. 14500000"
+                  label="Nilai perolehan"
+                  type="number"
+                  min={0}
+                  value={v.acquisition_value}
+                  error={errors.acquisition_value}
+                  onChange={(e) => set('acquisition_value', e.target.value)}
+                />
                 <TextareaField
                   label="Catatan"
                   full

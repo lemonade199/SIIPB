@@ -7,7 +7,7 @@ import { download } from '@/lib/file';
 export interface ExportColumn {
   key: string;
   label: string;
-  money?: boolean;
+  numeric?: boolean;
   width?: number;
 }
 
@@ -24,9 +24,9 @@ export interface ExportMeta {
 type Row = Record<string, unknown>;
 
 const cellText = (v: unknown) => (v === null || v === undefined || v === '' ? '—' : String(v));
-const money = (v: unknown) => (v === '' || v === null || v === undefined ? '—' : 'Rp ' + Number(v).toLocaleString('id-ID'));
+const numeric = (v: unknown) => (v === '' || v === null || v === undefined ? '—' : Number(v).toLocaleString('id-ID'));
 
-/** Excel .xlsx dengan judul, header tebal, autofilter, kolom uang berformat Rupiah. */
+/** Excel .xlsx dengan judul, header tebal, autofilter, kolom angka berpemisah ribuan. */
 export async function exportXlsx(filename: string, meta: ExportMeta, columns: ExportColumn[], rows: Row[]) {
   const ExcelJS = (await import('exceljs')).default;
   const wb = new ExcelJS.Workbook();
@@ -63,10 +63,10 @@ export async function exportXlsx(filename: string, meta: ExportMeta, columns: Ex
     cols.forEach((c, ci) => {
       const cell = xr.getCell(ci + 1);
       if (c.key === '_no') cell.value = i + 1;
-      else if ('money' in c && c.money) {
+      else if ('numeric' in c && c.numeric) {
         const n = row[c.key];
         cell.value = n === '' || n === null || n === undefined ? null : Number(n);
-        cell.numFmt = '"Rp" #,##0';
+        cell.numFmt = '#,##0';
       } else cell.value = row[c.key] === undefined || row[c.key] === null ? '' : (row[c.key] as string | number);
       cell.alignment = { vertical: 'top', wrapText: true };
     });
@@ -109,7 +109,7 @@ export async function exportPdf(filename: string, meta: ExportMeta & { signature
   autoTable(doc, {
     startY: y + 4,
     head: [['No', ...columns.map((c) => c.label)]],
-    body: rows.map((row, i) => [String(i + 1), ...columns.map((c) => (c.money ? money(row[c.key]) : cellText(row[c.key])))]),
+    body: rows.map((row, i) => [String(i + 1), ...columns.map((c) => (c.numeric ? numeric(row[c.key]) : cellText(row[c.key])))]),
     styles: { fontSize: 7.5, cellPadding: 1.6, overflow: 'linebreak', valign: 'top' },
     headStyles: { fillColor: [47, 65, 86], textColor: 255, fontStyle: 'bold' },
     alternateRowStyles: { fillColor: [245, 239, 235] },

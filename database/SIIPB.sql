@@ -239,6 +239,7 @@ CREATE TABLE `assets` (
   `description` text DEFAULT NULL,
   `photo_path` varchar(500) DEFAULT NULL,
   `purchase_date` date DEFAULT NULL,
+  `acquisition_cost` decimal(15,2) DEFAULT NULL,
   `status` varchar(30) NOT NULL DEFAULT 'TERSEDIA',
   `condition` varchar(30) NOT NULL DEFAULT 'BAIK',
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
@@ -260,7 +261,8 @@ CREATE TABLE `assets` (
   CONSTRAINT `fk_assets_location_id_locations` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`),
   CONSTRAINT `fk_assets_owner_unit_id_organizational_units` FOREIGN KEY (`owner_unit_id`) REFERENCES `organizational_units` (`id`),
   CONSTRAINT `ck_assets_condition` CHECK (`condition` in ('BAIK','RUSAK_RINGAN','RUSAK_BERAT')),
-  CONSTRAINT `ck_assets_status` CHECK (`status` in ('TERSEDIA','DIPINJAM','RUSAK','RUSAK_BERAT','DALAM_PERBAIKAN','HILANG','NONAKTIF'))
+  CONSTRAINT `ck_assets_status` CHECK (`status` in ('TERSEDIA','DIPINJAM','RUSAK','RUSAK_BERAT','DALAM_PERBAIKAN','HILANG','NONAKTIF')),
+  CONSTRAINT `ck_assets_acquisition_cost_non_negative` CHECK (`acquisition_cost` is null or `acquisition_cost` >= 0)
 ) ENGINE=InnoDB AUTO_INCREMENT=30 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 

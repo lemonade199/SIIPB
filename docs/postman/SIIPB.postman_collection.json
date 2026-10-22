@@ -513,7 +513,7 @@
             "description": "Tambah barang. `inventory_code` kosong -> dibuat otomatis (INV-<KATEGORI>-0001).",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"category_id\": 1,\n  \"location_id\": 1,\n  \"name\": \"Laptop Lenovo ThinkPad T14\",\n  \"brand\": \"Lenovo\",\n  \"model\": \"ThinkPad T14 Gen 3\",\n  \"serial_number\": \"PF-3A21\",\n  \"purchase_date\": \"2024-01-15\",\n  \"acquisition_source\": \"APBN 2024\",\n  \"condition\": \"BAIK\"\n}",
+              "raw": "{\n  \"category_id\": 1,\n  \"location_id\": 1,\n  \"name\": \"Laptop Lenovo ThinkPad T14\",\n  \"brand\": \"Lenovo\",\n  \"model\": \"ThinkPad T14 Gen 3\",\n  \"serial_number\": \"PF-3A21\",\n  \"purchase_date\": \"2024-01-15\",\n  \"acquisition_cost\": 14500000,\n  \"acquisition_source\": \"APBN 2024\",\n  \"condition\": \"BAIK\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
