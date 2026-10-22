@@ -58,3 +58,7 @@ backend/celerybeat-schedule*
 
 # Temporary Office Lock Files
 ~$*
+
+# Materi / panduan lokal
+*.docx
+scripts/learning_guide/
