@@ -73,12 +73,46 @@ function buildUrl(path: string, query?: Query) {
   return url.toString();
 }
 
+let preferIpv4Loopback = false;
+
+export function resolveTargetUrl(path: string, query?: Query): string {
+  let url = buildUrl(path, query);
+  if (preferIpv4Loopback && url.includes('://localhost:')) {
+    url = url.replace('://localhost:', '://127.0.0.1:');
+  }
+  return url;
+}
+
+/**
+ * Wrapper `fetch` dengan fallback otomatis `localhost` -> `127.0.0.1`.
+ * Di Windows/browser tertentu, 'localhost' sering di-resolve ke IPv6 (::1). Bila server Flask
+ * hanya listen di IPv4 (0.0.0.0 / 127.0.0.1), fetch ke localhost akan ditolak oleh OS (connection refused).
+ * Fungsi ini memastikan request tetap berhasil di local tanpa mengubah konfigurasi production/deploy.
+ */
+export async function fetchWithFallback(url: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (err) {
+    if (url.includes('://localhost:')) {
+      const fallbackUrl = url.replace('://localhost:', '://127.0.0.1:');
+      try {
+        const res = await fetch(fallbackUrl, init);
+        preferIpv4Loopback = true;
+        return res;
+      } catch {
+        throw err;
+      }
+    }
+    throw err;
+  }
+}
+
 let refreshing: Promise<boolean> | null = null;
 
 async function refreshTokens(): Promise<boolean> {
   const t = tokenStore.get();
   if (!t?.refresh_token) return false;
-  refreshing ??= fetch(buildUrl('/auth/refresh'), {
+  refreshing ??= fetchWithFallback(resolveTargetUrl('/auth/refresh'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ refresh_token: t.refresh_token }),
@@ -108,7 +142,7 @@ export async function request<T>(path: string, opts: RequestOptions = {}, retry 
 
   let res: Response;
   try {
-    res = await fetch(buildUrl(path, query), {
+    res = await fetchWithFallback(resolveTargetUrl(path, query), {
       ...init,
       headers: h,
       body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
@@ -147,7 +181,7 @@ export async function download(path: string, query?: Query, retry = true): Promi
   if (tokens?.access_token) h.set('Authorization', `Bearer ${tokens.access_token}`);
   let res: Response;
   try {
-    res = await fetch(buildUrl(path, query), { headers: h });
+    res = await fetchWithFallback(resolveTargetUrl(path, query), { headers: h });
   } catch {
     throw new ApiError('Tidak dapat terhubung ke server SIIPB.', 0, 'NETWORK_ERROR');
   }
