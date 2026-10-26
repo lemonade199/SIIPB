@@ -6,7 +6,10 @@ files = [
     'f627cba678a2_create_initial_schema_26_tables.py',
     'a7c3e91d2b40_fullstack_plan_features.py',
     'c1f9e2b8a341_simplify_database_tables.py',
-    'd4e8b1a5f920_consolidate_role_permissions_into_roles_json.py'
+    'd4e8b1a5f920_consolidate_role_permissions_into_roles_json.py',
+    'e5f0a2c4b7d1_normalize_phone_and_nip.py',
+    'b8d2f4a6c913_drop_asset_acquisition_cost.py',
+    'c3e7a9d1f052_restore_asset_acquisition_cost.py'
 ]
 
 for fname in files:

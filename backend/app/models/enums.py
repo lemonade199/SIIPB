@@ -96,6 +96,7 @@ class EmailDeliveryStatus(StrEnum):
     PENDING = "PENDING"
     SENT = "SENT"
     FAILED = "FAILED"
+    RETRYING = "RETRYING"
 
 
 class SettingValueType(StrEnum):

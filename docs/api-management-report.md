@@ -38,7 +38,7 @@ Berdasarkan hasil verifikasi komprehensif terhadap berkas konfigurasi [`backend/
 
 ### 1.3 Ringkasan Temuan Audit Utama
 * **Kelengkapan Endpoint:** Ditemukan sebanyak **86 endpoint kanonikal unik** (atau 99 endpoint jika menghitung 13 endpoint alias `/api/v1/items` yang mencerminkan `/api/v1/assets`). Seluruh endpoint telah terimplementasi penuh pada level *source code* Python, terdaftar dalam routing Flask, dan terikat dengan skema validasi Marshmallow.
-* **Kesiapan Database:** Skema database terdiri dari **29 tabel relasional bisnis** ditambah 1 tabel `alembic_version`. Relasi kunci asing (*Foreign Keys*), aturan integritas *CASCADE/RESTRICT*, indeks pencarian, serta batasan nilai (*CHECK constraints*) diterapkan secara ketat.
+* **Kesiapan Database:** Skema database terdiri dari **23 tabel relasional bisnis aktif** ditambah 1 tabel `alembic_version` (hasil konsolidasi terpadu melalui migrasi Alembic). Relasi kunci asing (*Foreign Keys*), aturan integritas *CASCADE/RESTRICT*, indeks pencarian, serta batasan nilai (*CHECK constraints*) diterapkan secara ketat.
 * **Ketahanan Konkurensi:** Layanan peminjaman ([`borrowing_service.py`](file:///c:/SIIPB/backend/app/services/borrowing_service.py)) telah mengimplementasikan mekanisme *pessimistic row locking* menggunakan klausa `SELECT ... FOR UPDATE` dengan pengurutan `asset_id` guna menjamin bahwa dua transaksi peminjaman bersamaan tidak akan pernah menduplikasi aset yang sama. Hal ini dibuktikan secara empiris melalui unit test konkurensi [`test_concurrent_checkout.py`](file:///c:/SIIPB/backend/tests/test_concurrent_checkout.py).
 * **Catatan Perhatian / Limitasi:** Mode pengiriman notifikasi Celery memerlukan kontainer Redis dan Celery Worker yang berjalan aktif di lingkungan *staging/production*. Jika sistem dijalankan dalam lingkungan lokal minimal tanpa Docker, pengiriman otomatis beralih ke mode sinkron (`NOTIFICATION_DISPATCH=sync`).
 
@@ -455,16 +455,12 @@ sequenceDiagram
 ## 6. Integrasi Basis Data (MariaDB & SQLAlchemy)
 
 ### 6.1 Pemetaan Model SQLAlchemy dan Tabel MariaDB
-Sistem SIIPB mendefinisikan 29 tabel relasional yang dikelola melalui SQLAlchemy 2.0 dan terdaftar penuh di [`backend/app/models/__init__.py`](file:///c:/SIIPB/backend/app/models/__init__.py). Sumber kebenaran skema (*source of truth*) dikendalikan oleh migrasi Alembic di [`backend/alembic/versions`](file:///c:/SIIPB/backend/alembic/versions).
+Sistem SIIPB mendefinisikan 23 tabel relasional aktif yang dikelola melalui SQLAlchemy 2.0 dan terdaftar penuh di [`backend/app/models/__init__.py`](file:///c:/SIIPB/backend/app/models/__init__.py) ditambah 1 tabel `alembic_version`. Sumber kebenaran skema (*source of truth*) dikendalikan oleh migrasi Alembic di [`backend/alembic/versions`](file:///c:/SIIPB/backend/alembic/versions).
 
 ```mermaid
 erDiagram
-    users ||--o{ user_roles : "memiliki"
-    roles ||--o{ user_roles : "ditetapkan"
-    roles ||--o{ role_permissions : "memiliki"
-    permissions ||--o{ role_permissions : "diberikan"
+    roles ||--o{ users : "ditetapkan_ke"
     users ||--o{ refresh_tokens : "memiliki"
-    users ||--o{ external_identities : "terhubung"
 
     organizational_units ||--o{ users : "menaungi"
     organizational_units ||--o{ borrowers : "menaungi"
@@ -484,55 +480,47 @@ erDiagram
     returns ||--o{ return_items : "memuat"
     borrowing_items ||--o{ return_items : "direferensikan"
 
-    return_items ||--o{ damage_reports : "menghasilkan"
-    return_items ||--o{ loss_reports : "menghasilkan"
+    return_items ||--o{ asset_incident_reports : "menghasilkan"
 
     borrowings ||--o{ notification_events : "memicu"
     notification_events ||--o{ notifications : "menghasilkan"
-    notifications ||--o{ notification_logs : "mencatat"
-    notifications ||--o{ email_deliveries : "mencatat"
+    notifications ||--o{ notification_deliveries : "mencatat_percobaan"
     notifications ||--o{ notification_reads : "dibaca_oleh"
     users ||--o{ notification_reads : "membaca"
 ```
 
 ### 6.2 Ringkasan Entitas Tabel Basis Data
-1. **Domain Keamanan & RBAC (5 Tabel):**
-   * `users`: Data induk akun staf, password hash, status aktif, dan nomor kontak.
-   * `roles`: Master peran dinamis (`ADMIN`, `SARPRAS`, `PIMPINAN`).
-   * `permissions`: Master izin akses atomik (misal: `borrowing.manage`, `inventory.view`).
-   * `user_roles`: Relasi *many-to-many* antara pengguna dan peran yang diemban.
-   * `role_permissions`: Relasi *many-to-many* antara peran dan izin akses granular.
-2. **Domain Otentikasi Sesi (2 Tabel):**
+1. **Domain Keamanan & RBAC (2 Tabel):**
+   * `users`: Data induk akun staf, admin, dan pimpinan (termasuk `role_id -> roles.id`, data Google SSO, status aktif, dan nomor kontak).
+   * `roles`: Master peran dinamis (`ADMIN`, `SARPRAS`, `PIMPINAN`) dengan daftar izin disimpan pada kolom JSON `permissions` (katalog 16 permission didefinisikan secara statis di `app/models/permission.py`).
+2. **Domain Otentikasi Sesi (1 Tabel):**
    * `refresh_tokens`: Hash SHA-256 refresh token, masa kedaluwarsa, dan status pencabutan (*revoked*).
-   * `external_identities`: Pemetaan subjek Google OAuth/OIDC ke `user_id`.
 3. **Domain Data Induk Organisasi (4 Tabel):**
-   * `organizational_units`: Struktur hierarki unit kerja institusi / jurusan.
-   * `borrowers`: Data peminjam (guru/siswa/karyawan) **tanpa akun login aplikasi**.
+   * `organizational_units`: Struktur hierarki unit kerja institusi / jurusan (`parent_id` self-referencing).
+   * `borrowers`: Data peminjam (guru/siswa/karyawan) **tanpa akun login aplikasi**, berafiliasi ke `unit_id`.
    * `categories`: Kategori klasifikasi barang inventaris.
-   * `locations`: Hierarki fisik penempatan aset (Gedung > Lantai > Ruangan).
+   * `locations`: Hierarki fisik penempatan aset (Gedung > Lantai > Ruangan, `parent_id` self-referencing).
 4. **Domain Inventaris Aset Fisik (3 Tabel):**
-   * `assets`: Data fisik barang, nomor seri, sumber & nilai perolehan, status, kondisi, dan QR payload.
+   * `assets`: Data fisik barang, nomor seri, sumber & nilai perolehan (`acquisition_cost`), status, kondisi, dan QR payload.
    * `asset_history`: Log kronologis riwayat mutasi status dan lokasi aset (*append-only*).
    * `asset_photos`: Berkas foto dokumentasi barang (maksimal 5 foto per aset).
 5. **Domain Transaksi Operasional (4 Tabel):**
-   * `borrowings`: Header transaksi peminjaman (nomor invoice, tanggal pinjam, jatuh tempo).
+   * `borrowings`: Header transaksi peminjaman (nomor transaksi `PJM-YYYY-XXXX`, tanggal pinjam, jatuh tempo, `due_date >= start_date`).
    * `borrowing_items`: Daftar barang spesifik yang dipinjam beserta kondisi keluar.
    * `returns`: Header pengembalian barang fisik dan identitas staf penerima.
    * `return_items`: Detail kondisi barang saat kembali (`BAIK`, `RUSAK`, `HILANG`).
-6. **Domain Manajemen Insiden (2 Tabel):**
-   * `damage_reports`: Laporan kerusakan fisik, estimasi biaya, dan siklus perbaikan.
-   * `loss_reports`: Laporan berita acara kehilangan barang dan tindakan ganti rugi.
-7. **Domain Sistem Notifikasi & Email (7 Tabel):**
+6. **Domain Manajemen Insiden & Perbaikan (1 Tabel):**
+   * `asset_incident_reports`: Konsolidasi laporan insiden kerusakan (`KERUSAKAN`) dan kehilangan (`KEHILANGAN`), estimasi biaya, dan siklus perbaikan (menggantikan tabel terpisah `damage_reports` dan `loss_reports`).
+7. **Domain Sistem Notifikasi & Email (6 Tabel):**
    * `notification_templates`: Template subjek dan bodi pesan HTML dengan tag placeholder.
    * `notification_events`: Kunci idempotensi unik: `UNIQUE(borrowing_id, event_code)`.
-   * `notifications`: Snapshot pesan siap kirim per penerima individual.
-   * `notification_logs`: Catatan siklus hidup pembuatan dan antrean pesan.
-   * `email_deliveries`: Log detail percobaan kirim SMTP per percobaan (*attempt trace*).
+   * `notifications`: Snapshot pesan siap kirim per penerima individual (peminjam, petugas, pimpinan).
+   * `notification_deliveries`: Log detail percobaan kirim SMTP per attempt (mengonsolidasi `email_deliveries` dan `notification_logs`).
    * `notification_reads`: Pencatatan notifikasi yang telah dibaca oleh staf internal.
    * `scheduler_runs`: Log riwayat eksekusi cron penjadwal pemeriksaan keterlambatan.
 8. **Domain Konfigurasi & Kepatuhan (2 Tabel):**
    * `system_settings`: Penyimpanan konfigurasi dinamis aplikasi (*key-value JSON*).
-   * `audit_logs`: Jejak audit forensik aktivitas mutasi data oleh staf dan sistem.
+   * `audit_logs`: Jejak audit forensik aktivitas mutasi data oleh staf dan sistem (*append-only*).
 
 ### 6.3 Integritas Data, Transaksi, dan Pencegahan Race Condition
 * **Integritas Relasional:** Seluruh relasi vital dilindungi aturan integritas referensial. Tabel anak pada transaksi (`borrowing_items`, `return_items`) menerapkan `ON DELETE RESTRICT` untuk mencegah penghapusan data induk yang memiliki keterikatan transaksi historis.

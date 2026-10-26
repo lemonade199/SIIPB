@@ -17,10 +17,25 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column('assets', sa.Column('acquisition_cost', sa.Numeric(precision=15, scale=2), nullable=True))
-    op.create_check_constraint(op.f('ck_assets_acquisition_cost_non_negative'), 'assets', 'acquisition_cost IS NULL OR acquisition_cost >= 0')
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    cols = [c['name'] for c in inspector.get_columns('assets')]
+    if 'acquisition_cost' not in cols:
+        op.add_column('assets', sa.Column('acquisition_cost', sa.Numeric(precision=15, scale=2), nullable=True))
+
+    constraints = [c['name'] for c in inspector.get_check_constraints('assets')]
+    ck_name = op.f('ck_assets_acquisition_cost_non_negative')
+    if ck_name not in constraints and 'ck_assets_acquisition_cost_non_negative' not in constraints:
+        op.create_check_constraint(ck_name, 'assets', 'acquisition_cost IS NULL OR acquisition_cost >= 0')
 
 
 def downgrade() -> None:
-    op.drop_constraint(op.f('ck_assets_acquisition_cost_non_negative'), 'assets', type_='check')
-    op.drop_column('assets', 'acquisition_cost')
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    constraints = [c['name'] for c in inspector.get_check_constraints('assets')]
+    ck_name = op.f('ck_assets_acquisition_cost_non_negative')
+    if ck_name in constraints or 'ck_assets_acquisition_cost_non_negative' in constraints:
+        op.drop_constraint(ck_name, 'assets', type_='check')
+    cols = [c['name'] for c in inspector.get_columns('assets')]
+    if 'acquisition_cost' in cols:
+        op.drop_column('assets', 'acquisition_cost')

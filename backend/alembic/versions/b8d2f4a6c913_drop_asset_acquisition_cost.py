@@ -17,10 +17,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.drop_constraint(op.f('ck_assets_acquisition_cost_non_negative'), 'assets', type_='check')
-    op.drop_column('assets', 'acquisition_cost')
+    # Catatan: Kolom acquisition_cost sempat di-drop pada revisi ini namun segera dikembalikan
+    # pada revisi c3e7a9d1f052. Agar upgrade dari revisi sebelumnya (d4e8b1a5f920 / e5f0a2c4b7d1)
+    # tidak menyebabkan kehilangan data nilai perolehan aset, operasi drop ini diabaikan (no-op).
+    pass
 
 
 def downgrade() -> None:
-    op.add_column('assets', sa.Column('acquisition_cost', sa.Numeric(precision=15, scale=2), nullable=True))
-    op.create_check_constraint(op.f('ck_assets_acquisition_cost_non_negative'), 'assets', 'acquisition_cost IS NULL OR acquisition_cost >= 0')
+    pass

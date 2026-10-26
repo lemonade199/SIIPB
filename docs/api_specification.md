@@ -78,4 +78,4 @@ Kode HTTP: `200/201` sukses, `400` validasi/aturan bisnis, `401` token tidak val
 - Penerima per aturan dapat dikonfigurasi (bawaan: H+3 = peminjam + petugas, H+7 = + pimpinan); satu baris `notifications` per penerima.
 - Celery Beat mengecek tiap 15 menit dan menjalankan pemeriksaan sekali sehari setelah jam di Pengaturan (bawaan 08.00 Asia/Jakarta). Bila sempat terlewat, aturan terakhir yang sudah tercapai tetap dikirim sekali.
 - Transaksi AKTIF yang melewati batas → `TERLAMBAT`; transaksi `DIKEMBALIKAN` tidak disentuh.
-- Setiap percobaan kirim tercatat di `email_deliveries` dan `notification_logs` (retry eksponensial di worker).
+- Setiap percobaan kirim tercatat di `notification_deliveries` (retry eksponensial di worker).

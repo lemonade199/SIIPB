@@ -70,9 +70,14 @@ def run_backup(session: Session, by: str = "system", kind: str = "Manual") -> di
         proc = subprocess.run(cmd, env=env, capture_output=True, timeout=600, check=False)
         if proc.returncode != 0:
             raise RuntimeError(proc.stderr.decode("utf-8", "ignore")[:300] or f"exit {proc.returncode}")
+        if not proc.stdout or len(proc.stdout) < 100:
+            raise RuntimeError("Hasil dump database kosong atau tidak valid (< 100 bytes)")
         with gzip.open(target, "wb") as gz:
             gz.write(proc.stdout)
-        entry["size_kb"] = round(target.stat().st_size / 1024)
+        file_size = target.stat().st_size
+        if file_size == 0:
+            raise RuntimeError("Berkas arsip backup kosong (0 bytes)")
+        entry["size_kb"] = max(1, round(file_size / 1024))
         entry["status"] = "SUKSES"
     except Exception as exc:  # noqa: BLE001
         entry["error"] = str(exc)

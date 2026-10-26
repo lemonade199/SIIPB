@@ -11,7 +11,7 @@
  │  rate limit login, header keamanan, TLS (nginx.https)  │                │
  └───────────────┬────────────────────────┬───────────────┘                │
                  ▼                        ▼                                │
-        Next.js + React + TS      Flask REST API ──── SQLAlchemy ──► MariaDB 11 (29 tabel, Alembic)
+        Next.js + React + TS      Flask REST API ──── SQLAlchemy ──► MariaDB 11 (23 tabel aplikasi, Alembic)
         (UI, RBAC rute & tombol)   JWT · RBAC · Marshmallow   │
                                    │                          └──► Redis ◄── Celery Beat (jatuh tempo /15 mnt, backup 01.00)
                                    └── dispatch email ──────────────┘   │
@@ -29,7 +29,7 @@
    konfirmasi email (dapat dimatikan per transaksi atau global).
 3. **Keterlambatan** (§7.3, §21): Celery Beat → `run_due_check` → AKTIF lewat batas menjadi TERLAMBAT → aturan H-3…H+7
    (penerima dapat dikonfigurasi) → `notification_events` (UNIQUE borrowing+event, anti-duplikat) → `notifications` per penerima
-   → worker SMTP → `email_deliveries` + `notification_logs`.
+   → worker SMTP → `notification_deliveries`.
 
 ## Keputusan teknis
 

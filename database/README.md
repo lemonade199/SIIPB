@@ -8,7 +8,7 @@ Direktori ini berisi berkas skema, diagram ERD (Entity Relationship Diagram), da
 
 ```text
 database/
-├── SIIPB.sql               # Skema terbaru hasil `alembic upgrade head` (23 tabel aplikasi + alembic_version, revisi d4e8b1a5f920)
+├── SIIPB.sql               # Dump skema & data baseline (23 tabel aplikasi, revisi d4e8b1a5f920; lanjutkan alembic upgrade head ke c3e7a9d1f052)
 ├── ERD.png                 # Diagram ERD visual resolusi tinggi (format gambar)
 ├── ERD.svg                 # Diagram ERD visual vektor murni skalabel
 └── README.md               # Dokumentasi database, ERD, dan panduan impor
@@ -71,8 +71,11 @@ Jika ingin mengimpor langsung dari dump SQL:
 # 1. Buat database baru di MariaDB jika belum ada
 mariadb -u root -p -e "CREATE DATABASE IF NOT EXISTS siipb CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
-# 2. Impor berkas dump
+# 2. Impor berkas dump baseline
 mariadb -u root -p siipb < database/SIIPB.sql
+
+# 3. Jalankan migrasi ke head aktif (c3e7a9d1f052) untuk normalisasi data
+alembic upgrade head
 ```
 
 ### Opsi 2: Menggunakan Alembic Migration (Rekomendasi Developer)
