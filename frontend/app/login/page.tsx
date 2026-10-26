@@ -18,7 +18,7 @@ import { useToast } from '@/components/providers/feedback-provider';
 import { schedulerToastText } from '@/components/providers/data-provider';
 import { loginSSO } from '@/services/auth';
 import { authApi } from '@/services/api/endpoints';
-import { API_BASE_URL } from '@/services/api/client';
+import { API_BASE_URL, fetchWithFallback } from '@/services/api/client';
 import * as repo from '@/services/repo';
 import { isApiMode } from '@/lib/config';
 import { role, user as userById } from '@/services/lookup';
@@ -87,7 +87,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!isApiMode) return;
-    fetch(`${API_BASE_URL}/settings/public`)
+    fetchWithFallback(`${API_BASE_URL}/settings/public`)
       .then((r) => r.json())
       .then((j) => j?.data && setPub(j.data))
       .catch(() => undefined);
