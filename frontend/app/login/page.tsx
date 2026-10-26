@@ -71,7 +71,7 @@ export default function LoginPage() {
   };
 
   useEffect(() => {
-    loadCaptcha();
+    queueMicrotask(() => void loadCaptcha());
   }, []);
 
   useEffect(() => {
