@@ -10,7 +10,7 @@ import { useTitle } from '@/hooks/use-title';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { SelectField, TextareaField, TextField, toOptions } from '@/components/ui/form';
+import { SelectField, TextField, toOptions } from '@/components/ui/form';
 import { PageHead } from '@/components/ui/misc';
 import { PhotoEditor } from '@/components/domain/photo-gallery';
 import { NotFoundView } from '@/components/layout/app-shell';
@@ -39,7 +39,7 @@ export function ItemForm({ id }: { id?: ID }) {
     model: existing?.model ?? '',
     serial_number: existing?.serial_number ?? '',
     condition_status: existing?.condition_status ?? 'BAIK',
-    acquisition_year: existing?.acquisition_year ?? new Date().getFullYear(),
+    acquisition_year: existing?.acquisition_year ?? '',
     acquisition_source: existing?.acquisition_source ?? '',
     acquisition_value: existing?.acquisition_value ?? '',
     notes: existing?.notes ?? '',
@@ -150,44 +150,6 @@ export function ItemForm({ id }: { id?: ID }) {
                   value={v.condition_status}
                   onChange={(e) => set('condition_status', e.target.value as Condition)}
                   options={CONDITION_KEYS.map((k) => ({ value: k, label: conditionLabel(k) }))}
-                />
-              </div>
-            </Card>
-            <Card title="Perolehan">
-              <div className="form-grid">
-                {CAPABILITIES.acquisitionYear && (
-                  <TextField placeholder="mis. 2024"
-                  label="Tahun perolehan"
-                  type="number"
-                  min={1990}
-                  max={2100}
-                  value={v.acquisition_year}
-                  error={errors.acquisition_year}
-                  onChange={(e) => set('acquisition_year', e.target.value)}
-                />
-                )}
-                {CAPABILITIES.acquisitionSource && (
-                  <TextField
-                    label="Sumber perolehan"
-                    placeholder="mis. APBN 2024, Hibah"
-                    value={v.acquisition_source}
-                    onChange={(e) => set('acquisition_source', e.target.value)}
-                  />
-                )}
-                <TextField placeholder="mis. 14500000"
-                  label="Nilai perolehan"
-                  type="number"
-                  min={0}
-                  value={v.acquisition_value}
-                  error={errors.acquisition_value}
-                  onChange={(e) => set('acquisition_value', e.target.value)}
-                />
-                <TextareaField
-                  label="Catatan"
-                  full
-                  placeholder="Kelengkapan, aksesori, larangan dibawa keluar, dll."
-                  value={v.notes}
-                  onChange={(e) => set('notes', e.target.value)}
                 />
               </div>
             </Card>
