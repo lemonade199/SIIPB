@@ -28,6 +28,7 @@ def get_client(cfg: dict[str, Any]):
             client_id=cfg["client_id"],
             client_secret=cfg["client_secret"],
             server_metadata_url=f"{cfg['issuer']}/.well-known/openid-configuration",
-            client_kwargs={"scope": "openid email profile"},
+            # batas waktu agar browser tidak menunggu lama bila penyedia SSO lambat/terputus
+            client_kwargs={"scope": "openid email profile", "default_timeout": 10},
         )
     return client

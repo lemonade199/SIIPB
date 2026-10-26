@@ -322,14 +322,22 @@ def sso_login():
       501:
         description: SSO belum diaktifkan / dikonfigurasi
     """
-    from flask import url_for
+    from urllib.parse import quote
 
+    from flask import redirect, url_for
+
+    from app.config import Config
     from app.services.oidc_service import get_client
 
     cfg = _sso_settings()
     if not cfg["ready"]:
         return error_response("SSO belum diaktifkan atau dikonfigurasi di server", error_code="SSO_NOT_CONFIGURED", status_code=501)
-    return get_client(cfg).authorize_redirect(url_for("auth.sso_callback", _external=True))
+    try:
+        return get_client(cfg).authorize_redirect(url_for("auth.sso_callback", _external=True))
+    except Exception as e:  # noqa: BLE001 — mis. jaringan ke penyedia SSO terputus
+        current_app.logger.warning("SSO: gagal menghubungi %s: %s", cfg["issuer"], e)
+        msg = "Tidak dapat menghubungi penyedia SSO. Periksa koneksi internet server lalu coba lagi."
+        return redirect(Config.FRONTEND_URL.rstrip("/") + "/login#sso_error=" + quote(msg))
 
 
 @auth_bp.get("/sso/callback")

@@ -129,6 +129,14 @@ def test_sso_oidc_settings_secret_and_redirect(client, auth_headers, petugas_hea
             assert loc.netloc == "idp.contoh.id" and q["client_id"] == ["siipb-web"]
             assert q["redirect_uri"][0].endswith("/api/v1/auth/sso/callback") and q["state"] and q["nonce"]
 
+        # IdP tidak bisa dihubungi -> kembali ke halaman login dengan pesan, bukan error 500
+        def _putus(self):
+            raise ConnectionError("Remote end closed connection without response")
+
+        monkeypatch.setattr(FlaskOAuth2App, "load_server_metadata", _putus)
+        down = client.get("/api/v1/auth/sso")
+        assert down.status_code == 302 and "/login#sso_error=" in down.headers["Location"]
+
         # Callback tanpa state yang valid -> kembali ke frontend dengan pesan galat
         cb = client.get("/api/v1/auth/sso/callback?code=x&state=palsu")
         assert cb.status_code == 302 and "#sso_error=" in cb.headers["Location"]
