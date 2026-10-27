@@ -71,7 +71,9 @@ export default function LoginPage() {
   };
 
   useEffect(() => {
-    queueMicrotask(() => void loadCaptcha());
+    // CAPTCHA pertama harus langsung tersedia saat halaman dibuka (mode demo membuatnya secara sinkron)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadCaptcha();
   }, []);
 
   useEffect(() => {
