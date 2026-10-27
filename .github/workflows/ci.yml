@@ -84,7 +84,7 @@ jobs:
       DATABASE_URL: mariadb+pymysql://root:root@127.0.0.1:3306/siipb?charset=utf8mb4
       NOTIFICATION_DISPATCH: sync
       CORS_ORIGINS: http://localhost:3100
-      APP_ENV: testing  # CAPTCHA boleh tidak dikirim (lihat tests/e2e/helpers.ts)
+      APP_ENV: testing
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

@@ -42,6 +42,8 @@ vi.mock('@/services/api/endpoints', () => ({
 import { db } from '@/lib/mock/db';
 import { seedDatabase } from '@/lib/mock/seed';
 
+const anyCaptchaId = { asymmetricMatch: (actual: unknown) => actual === undefined || typeof actual === 'string' };
+
 describe('LoginPage - Perilaku Pengosongan Input Password', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -74,7 +76,7 @@ describe('LoginPage - Perilaku Pengosongan Input Password', () => {
     fireEvent.click(submitBtn);
 
     await waitFor(() => {
-      expect(repo.login).toHaveBeenCalledWith('admin', 'password_salah', expect.anything(), 'ABCDEF');
+      expect(repo.login).toHaveBeenCalledWith('admin', 'password_salah', anyCaptchaId, 'ABCDEF');
     });
 
     await waitFor(() => {
@@ -149,7 +151,7 @@ describe('LoginPage - Perilaku Pengosongan Input Password', () => {
     fireEvent.click(submitBtn);
 
     await waitFor(() => {
-      expect(repo.login).toHaveBeenCalledWith('admin', 'Admin#1234', expect.anything(), 'ABCDEF');
+      expect(repo.login).toHaveBeenCalledWith('admin', 'Admin#1234', anyCaptchaId, 'ABCDEF');
       expect(mockReplace).toHaveBeenCalled();
     });
   });

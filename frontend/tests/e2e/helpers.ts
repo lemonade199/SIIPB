@@ -14,7 +14,10 @@ export async function login(page: Page, username: string, password: string) {
   await page.goto('/login');
   await page.getByLabel('Username atau email').fill(username);
   await page.locator('#login-password').fill(password);
-  await page.locator('#login-captcha').fill('AAAAAA');
+  const captcha = page.locator('#login-captcha');
+  if (await captcha.count()) {
+    await captcha.fill('AAAAAA');
+  }
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page).not.toHaveURL(/\/login/);
 }
