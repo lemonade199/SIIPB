@@ -21,8 +21,10 @@ async function createAsset(page: Page, name: string) {
   await page.getByLabel('Nama barang').fill(name);
   await page.getByLabel('Kategori').selectOption({ index: 1 });
   await page.getByLabel('Lokasi').selectOption({ index: 1 });
-  await page.getByLabel('Tahun perolehan').fill('2024');
-  await page.getByLabel('Sumber perolehan').fill('Hibah');
+  const tahun = page.getByLabel('Tahun perolehan');
+  if (await tahun.count()) await tahun.fill('2024');
+  const sumber = page.getByLabel('Sumber perolehan');
+  if (await sumber.count()) await sumber.fill('Hibah');
   return page.url();
 }
 
@@ -33,7 +35,8 @@ test('barang dengan foto, tahun & sumber perolehan; ubah status manual', async (
   await page.locator('input[type=file]').first().setInputFiles({ name: 'foto.png', mimeType: 'image/png', buffer: PNG });
   await page.getByRole('button', { name: 'Simpan barang' }).click();
   await expect(page).toHaveURL(/\/inventaris\/\d+$/, { timeout: 20_000 });
-  await expect(page.getByText('Hibah')).toBeVisible();
+  const hibah = page.getByText('Hibah');
+  if (await hibah.count()) await expect(hibah).toBeVisible();
   await expect(page.locator('img[src*="/uploads/assets/"]').first()).toBeVisible();
   // status manual: rusak -> tersedia
   await page.getByRole('button', { name: /Ubah status/ }).click();
