@@ -92,7 +92,7 @@ const dataUrlToFile = async (url: string, name: string) => {
 };
 
 export async function login(username: string, password: string, captcha_id?: string, captcha_answer?: string): Promise<Ok<{ user: User }> | Fail> {
-  if (!isApiMode) return authSvc.login(username, password, captcha_id, captcha_answer);
+  if (!isApiMode) return authSvc.login(username, password);
   return attempt(async () => ({ user: await apiLogin(username, password, captcha_id, captcha_answer) }));
 }
 

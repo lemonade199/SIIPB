@@ -108,6 +108,8 @@ export default function LoginPage() {
       if (!r.ok) return setError(r.error);
       afterLogin(r.user, 'SSO');
     });
+    // hanya sekali saat halaman dibuka: membaca hasil SSO dari URL
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const submit = async (username: string, password: string) => {
@@ -254,6 +256,8 @@ export default function LoginPage() {
                     {captchaLoading && !captcha ? (
                       <span style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>Memuat…</span>
                     ) : captcha?.image ? (
+                      // data URI dari server; next/image tidak mengoptimalkannya
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={captcha.image}
                         alt="Kode CAPTCHA"
